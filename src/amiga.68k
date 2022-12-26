@@ -1,0 +1,290 @@
+*
+*	Amiga-specific portions of Xevious
+*
+
+* Neo Geo hardware definitions
+
+.include "src/xevious.inc"
+
+;.macro pixw nm, x, y
+; .set \nm, (\x+\y*240)*2
+;.endm
+
+	bra	_user
+.macro blitz
+	move.w	d0,-(a7)
+	clr.w	d0
+loop\@:
+	move.w	d0,0xdff180
+	btst	#6,0xbfe001
+	beq.b	out\@
+	addq.w	#1,d0
+	bra.b	loop\@
+out\@:
+
+.endm
+
+* exports
+
+    .global _jp_config
+    .global _us_config
+    .global _sp_config
+   	.global DUMMY
+	  .global _user
+		.global _player_start
+		.global _demo_end
+		.global _coin_sound
+
+* osd layer		
+		.global osd_enable_vblank_interrupt
+		.global osd_ack_vblank_interrupt
+		.global osd_disable_vblank_interrupt
+		.global osd_kick_wdog
+		.global osd_w_fg_colorram
+		.global osd_w_bg_colorram
+		.global osd_w_fg_videoram
+		.global osd_w_bg_videoram
+		.global osd_update_scroll_hw
+		.global osd_update_sprite_shadow
+		.global osd_update_32_sprite_hw
+		.global osd_read_dipswitches
+		.global osd_read_p1_inputs
+		.global osd_read_p2_inputs
+		.global osd_read_coin
+		.global osd_read_start
+
+* debugging only
+    .global osd_debug1
+    .global osd_debug2
+    .global	scb1_shadow
+    .global scb3_shadow
+    .global scb4_shadow
+    .global _end_of_ng_code
+    .global _end_of_ng_data
+    
+		.text
+
+
+.list
+
+    .align 4
+_jp_config:
+_us_config:
+_sp_config:
+    .ascii    "XEVIOUS         "
+    .word     0xffff
+    .word     0xffff
+    .byte     0xff
+    .byte     0xff
+    .byte     0x38                | bonus life (20,60,*60)
+    .byte     0x24                | lives (3)
+    .byte     0x02                | flags award bonus life (yes)
+    .byte     0x14								| difficulty (normal)
+    .byte     0x02                | cabinet
+    .byte     0x00
+    .byte     0x00
+    .byte     0x00
+    .byte     0x00
+    .byte     0x00
+* item names are 12 characters    
+    .ascii    "BONUS LIFE  "      | item 5
+    .ascii    "10K 40K *40K"
+    .ascii    "10K 50K *50K"
+    .ascii    "20K 50K *50K"
+    .ascii    "20K 60K *60K"
+    .ascii    "20K 70K *70K"
+    .ascii    "20K 80K *80K"
+    .ascii    "20K 60K only"
+    .ascii    "NONE        "
+    .ascii    "LIVES       "      | item 6
+    .ascii    "3           "
+    .ascii    "1           "
+    .ascii    "2           "
+    .ascii    "5           "
+    .ascii    "FLAGS LIFE  "      | item 7
+    .ascii    "YES         "
+    .ascii    "NO          "
+    .ascii		"DIFFICULTY  "			| item 8
+    .ascii    "NORMAL      "
+    .ascii    "EASY        "
+    .ascii    "HARD        "
+    .ascii    "HARDEST     "
+    .ascii    "CABINET     "      | item 9
+    .ascii    "VERTICAL    "
+    .ascii    "HORIZONTAL  "
+
+	.align 4
+IRQ1:
+	
+	rte
+    
+	.align 4
+IRQ3:
+	
+	rte
+
+DUMMY:
+	rte
+	    
+TRAP:
+	rte
+	    
+_user:
+		moveq			#0,d0
+		*move.b		(BIOS_USER_REQUEST),d0
+		lsl.w			#2,d0
+    movea.l   1f(pc,d0.w),a0
+    jmp       (a0)
+    .align 4
+1:	.long			startup_init
+		.long			eye_catcher
+		.long			demo_game
+		.long			title_display
+
+startup_init:
+	blitz
+		rts
+
+eye_catcher:
+* we're not doing things the NeoGeo way
+		rts
+
+demo_game:
+		move		#0x2700,sr						| disable interrupts
+		bsr			platform_init					| amiga-specific init
+		jmp			xevious_reset					| pass control to the xevious core
+
+title_display:
+* we're not doing things the NeoGeo way
+    rts
+
+_player_start:
+* we're not doing things the NeoGeo way
+		rts
+				
+_demo_end:
+* we're not doing things the NeoGeo way
+		rts
+				
+_coin_sound:
+* we're not doing things the NeoGeo way
+		rts
+				
+_vblank:
+    movem.l d0-d7/a0-a6,-(a7)
+  	jsr			xevious_im1_irq
+    movem.l (a7)+,d0-d7/a0-a6
+    rte
+
+osd_kick_wdog:
+    rts
+
+platform_init:
+	blitz
+    rts
+
+* 60Hz VBLANK interrupt
+osd_enable_vblank_interrupt:
+		rts
+
+osd_ack_vblank_interrupt:
+		rts
+		
+osd_disable_vblank_interrupt:
+		rts
+		
+* d0=offset (preserved), d1=attribute (preserved)
+osd_w_fg_colorram:
+		rts
+
+* d0=offset (preserved), d1=attribute (preserved)
+osd_w_bg_colorram:
+		rts
+		
+* d0=offset (preserved), d1=tile (preserved)
+osd_w_fg_videoram:
+		rts
+
+* d0=offset (preserved), d1=tile (preserved)
+osd_w_bg_videoram:
+		rts
+				
+* d6 = bg_scroll_x_shadow
+osd_update_scroll_hw:
+		rts
+
+* a5=obj_tbl
+osd_update_sprite_shadow:
+		moveq			#64-1,d7
+1:	jsr				update_sprite_shadow
+		adda.w		#_OBJSIZE,a5
+		dbf				d7,1b
+		rts
+
+update_sprite_shadow: | $0332
+9:	rts
+				
+* d0 = base sprite number (0/32)
+osd_update_32_sprite_hw:
+		rts
+		
+* d0=DSWA, d1=DSWB
+osd_read_dipswitches:
+		rts
+
+* - neogeo   5=B2, 4=B1, 3=right, 2=left, 1=down,  0=up
+		
+osd_read_p1_inputs:
+	moveq.l	#-1,d0
+	rts
+
+input_map_tbl:
+		.byte			0xf8															|  0, none
+		.byte			0xf0															|  1, up
+		.byte			0xf4															|  2, down
+		.byte			0xf8															|  3, down+up (invalid)
+		.byte			0xf6															|  4, left
+		.byte			0xf7															|  5, left+up
+		.byte			0xf5															|  6, left+down
+		.byte			0xf8															|  7, left+down+up (invalid)
+		.byte			0xf2															|  8, right
+		.byte			0xf1															|  9, right+up
+		.byte			0xf3															|  A, right+down
+		.byte			0xf8															|  B, right+down+up (invalid)
+		.byte			0xf8															|  C, right+left (invalid)
+		.byte			0xf8															|  D, right+left+up (invalid)
+		.byte			0xf8															|  E, right+left+down (invalid)
+		.byte			0xf8															|  F, right+left+down+up (invalid)
+		
+osd_read_p2_inputs:
+		*move.b    BIOS_P2CURRENT,d0                 | read IN1
+		bra				osd_read_p1_inputs
+		rts
+
+osd_read_coin:
+9:	rts
+		
+osd_read_start:
+9:	rts
+		
+_end_of_ng_code:
+		
+		.text
+
+	.align 2	
+	.include "palette.68k"
+
+		.bss
+
+		.align 4
+* using 2 tiles/sprite only
+*scb1_shadow:									ds.w 	128*4*2
+scb3_shadow:									ds.w 	128*2
+scb4_shadow:									ds.w 	128*2
+*scb4_shadow_2:								ds.w	128*2
+
+.align 2
+irq_cnt:											ds.w		1
+
+_end_of_ng_data:
+		
