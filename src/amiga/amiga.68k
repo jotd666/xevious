@@ -2,9 +2,19 @@
 *	Amiga-specific portions of Xevious
 *
 
-* Neo Geo hardware definitions
 
-.include "src/xevious.inc"
+.include "../src/xevious.inc"
+
+_LVOSuperState  =     -150
+_LVOAllocMem    =     -198
+
+_custom = 0xDFF000
+
+NB_PLANES = 4
+COPPERLIST_SIZE = 200
+SCREEN_PLANE_SIZE = 32*288
+SCREEN_SIZE = NB_PLANES*SCREEN_PLANE_SIZE
+CHIP_SIZE = SCREEN_SIZE+COPPERLIST_SIZE
 
 ;.macro pixw nm, x, y
 ; .set \nm, (\x+\y*240)*2
@@ -130,7 +140,7 @@ TRAP:
 	rte
 	    
 _user:
-		moveq			#0,d0
+		moveq			#2,d0
 		*move.b		(BIOS_USER_REQUEST),d0
 		lsl.w			#2,d0
     movea.l   1f(pc,d0.w),a0
@@ -142,14 +152,32 @@ _user:
 		.long			title_display
 
 startup_init:
-	blitz
 		rts
 
 eye_catcher:
 * we're not doing things the NeoGeo way
 		rts
 
+
+* To get the core to run, you just need to jump to xevious_reset after
+* you've initialised the platform (Amiga) stuff. That essentially does a
+* Z80 reset. You also need to call xevious_im1_irq from the Amiga vblank
+* routine. They are the only 2 entry points required for the core to run,
+* even if there's no other I/O.
+
+
 demo_game:
+		move.l	4,a6
+		move.l	#CHIP_SIZE,d0
+		move.l	#10002,d1
+		jsr		_LVOAllocMem(a6)
+		move.l	d0,a0
+		move.l	a0,_screen_start
+		add.l	#SCREEN_SIZE,a0
+		move.l	a0,_copperlist_start
+		
+		jsr		_LVOSuperState(a6)
+		
 		move		#0x2700,sr						| disable interrupts
 		bsr			platform_init					| amiga-specific init
 		jmp			xevious_reset					| pass control to the xevious core
@@ -172,25 +200,49 @@ _coin_sound:
 				
 _vblank:
     movem.l d0-d7/a0-a6,-(a7)
+	move.w	0xdff01e,d0
+	btst	#5,d0
+	beq.b	.no_vblank
   	jsr			xevious_im1_irq
+.no_vblank:
     movem.l (a7)+,d0-d7/a0-a6
+	move.w	#0x70,0xDFF09C
     rte
 
 osd_kick_wdog:
     rts
 
 platform_init:
+	* load copperlist
+	
+	* set copperlist
+	move.l	_copperlist_start,0xDFF080
+	* load palette
+	lea		palette(pc),a0
+	lea		0xDFF180,a1
+	move.w	#15,d0
+.copy:
+	move.w	(a0)+,(a1)+
+	dbf		d0,.copy
+	
+	* install vblank handler
+	pea		_vblank(pc)
+	move.l	(a7)+,0x6C.W
+	
 	blitz
     rts
 
 * 60Hz VBLANK interrupt
 osd_enable_vblank_interrupt:
+	move.w	#0x8020,0xDFF09A
 		rts
 
 osd_ack_vblank_interrupt:
-		rts
+	move.w	#0x20,0xDFF09C
+ 	rts
 		
 osd_disable_vblank_interrupt:
+	move.w	#0x0020,0xDFF09A
 		rts
 		
 * d0=offset (preserved), d1=attribute (preserved)
@@ -201,6 +253,9 @@ osd_w_fg_colorram:
 osd_w_bg_colorram:
 		rts
 		
+* the first 4 rows are not visible, then the next 36 rows
+* are visible. Screen is 32 tiles wide but only 28 visible.
+*  Bottom 6 bits of D0 is the row, upper 5 bits are the column.
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_fg_videoram:
 		rts
@@ -238,6 +293,23 @@ osd_read_p1_inputs:
 	moveq.l	#-1,d0
 	rts
 
+* set_bitplanes
+* what: sets bitplanes in copperlist
+
+set_bitplanes:
+    move.l  _screen_start,d0
+    moveq #NB_PLANES-1,d1
+    lea	bitplanes+2,a0
+.mkcl:
+    swap d0
+    move.w d0,(a0)
+    swap d0
+    move.w d0,(4,a0)    
+    addq.w  #8,a0
+    add.l #SCREEN_PLANE_SIZE,d0       ; next plane of maze
+    dbf d1,.mkcl
+    rts
+	
 input_map_tbl:
 		.byte			0xf8															|  0, none
 		.byte			0xf0															|  1, up
@@ -271,12 +343,17 @@ _end_of_ng_code:
 		
 		.text
 
-	.align 2	
+	.align 2
+palette:
 	.include "palette.68k"
 
 		.bss
 
 		.align 4
+_copperlist_start:
+	ds.l	1
+_screen_start:
+	ds.l	1
 * using 2 tiles/sprite only
 *scb1_shadow:									ds.w 	128*4*2
 scb3_shadow:									ds.w 	128*2

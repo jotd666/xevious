@@ -14,7 +14,7 @@ map_rom.o: map_rom.68k
 	$(ASM) map_rom.68k -o map_rom.o
 xevious_sub.o: xevious_sub.68k src/xevious.inc
 	$(ASM) xevious_sub.68k -o xevious_sub.o
-amiga.o: amiga.68k
-	$(ASM) amiga.68k -o amiga.o
-graphics.o: graphics.68k
-	$(ASM) graphics.68k -o graphics.o
+amiga.o: amiga/amiga.68k
+	$(ASM) -Iamiga amiga/amiga.68k -o amiga.o
+graphics.o: amiga/graphics.68k
+	$(ASM) amiga/graphics.68k -o graphics.o

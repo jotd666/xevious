@@ -7,7 +7,7 @@ tile_height = 8
 
 block_dict = {}
 
-src_dir = "../src"
+src_dir = "../src/amiga"
 
 # hackish convert of c gfx table to dict of lists
 with open("xevious_gfx.c") as f:
