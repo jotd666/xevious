@@ -4,9 +4,10 @@
 
 
 .include "../src/xevious.inc"
+.include "custom.i"
 
 _LVOSuperState  =     -150
-_LVOAllocMem    =     -198
+
 
 _custom = 0xDFF000
 
@@ -14,7 +15,7 @@ NB_PLANES = 4
 COPPERLIST_SIZE = 200
 SCREEN_PLANE_SIZE = 32*288
 SCREEN_SIZE = NB_PLANES*SCREEN_PLANE_SIZE
-CHIP_SIZE = SCREEN_SIZE+COPPERLIST_SIZE
+
 
 ;.macro pixw nm, x, y
 ; .set \nm, (\x+\y*240)*2
@@ -167,18 +168,9 @@ eye_catcher:
 
 
 demo_game:
-		move.l	4,a6
-		move.l	#CHIP_SIZE,d0
-		move.l	#10002,d1
-		jsr		_LVOAllocMem(a6)
-		move.l	d0,a0
-		move.l	a0,_screen_start
-		add.l	#SCREEN_SIZE,a0
-		move.l	a0,_copperlist_start
-		
 		jsr		_LVOSuperState(a6)
 		
-		move		#0x2700,sr						| disable interrupts
+		move		#0x4000,_custom+intena						| disable interrupts
 		bsr			platform_init					| amiga-specific init
 		jmp			xevious_reset					| pass control to the xevious core
 
@@ -200,13 +192,13 @@ _coin_sound:
 				
 _vblank:
     movem.l d0-d7/a0-a6,-(a7)
-	move.w	0xdff01e,d0
+	move.w	_custom+intreqr,d0
 	btst	#5,d0
 	beq.b	.no_vblank
   	jsr			xevious_im1_irq
 .no_vblank:
     movem.l (a7)+,d0-d7/a0-a6
-	move.w	#0x70,0xDFF09C
+	move.w	#0x70,_custom+intreq
     rte
 
 osd_kick_wdog:
@@ -216,10 +208,10 @@ platform_init:
 	* load copperlist
 	
 	* set copperlist
-	move.l	_copperlist_start,0xDFF080
+	move.l	#copperlist,_custom+cop1lc
 	* load palette
 	lea		palette(pc),a0
-	lea		0xDFF180,a1
+	lea		_custom+color,a1
 	move.w	#15,d0
 .copy:
 	move.w	(a0)+,(a1)+
@@ -234,15 +226,15 @@ platform_init:
 
 * 60Hz VBLANK interrupt
 osd_enable_vblank_interrupt:
-	move.w	#0x8020,0xDFF09A
+	move.w	#0x8020,_custom+intena
 		rts
 
 osd_ack_vblank_interrupt:
-	move.w	#0x20,0xDFF09C
+	move.w	#0x20,_custom+intreq
  	rts
 		
 osd_disable_vblank_interrupt:
-	move.w	#0x0020,0xDFF09A
+	move.w	#0x0020,_custom+intena
 		rts
 		
 * d0=offset (preserved), d1=attribute (preserved)
@@ -297,7 +289,7 @@ osd_read_p1_inputs:
 * what: sets bitplanes in copperlist
 
 set_bitplanes:
-    move.l  _screen_start,d0
+    move.l	#screen_data,d0
     moveq #NB_PLANES-1,d1
     lea	bitplanes+2,a0
 .mkcl:
@@ -306,7 +298,7 @@ set_bitplanes:
     swap d0
     move.w d0,(4,a0)    
     addq.w  #8,a0
-    add.l #SCREEN_PLANE_SIZE,d0       ; next plane of maze
+    add.l #SCREEN_PLANE_SIZE,d0
     dbf d1,.mkcl
     rts
 	
@@ -350,10 +342,7 @@ palette:
 		.bss
 
 		.align 4
-_copperlist_start:
-	ds.l	1
-_screen_start:
-	ds.l	1
+
 * using 2 tiles/sprite only
 *scb1_shadow:									ds.w 	128*4*2
 scb3_shadow:									ds.w 	128*2
@@ -363,5 +352,62 @@ scb4_shadow:									ds.w 	128*2
 .align 2
 irq_cnt:											ds.w		1
 
+		.datachip
+screen_data:
+	ds.b	SCREEN_SIZE
+copperlist:
+bitplanes:
+   dc.l  0x00e00000
+   dc.l  0x00e20000
+   dc.l  0x00e40000
+   dc.l  0x00e60000
+   dc.l  0x00e80000
+   dc.l  0x00ea0000
+   dc.l  0x00ec0000
+   dc.l  0x00ee0000
+*   dc.l  $00f00000
+*   dc.l  $00f20000
+
+colors:
+   dc.w color,0
+sprites:
+score_sprite_white:
+    ; #0
+    dc.w    sprpt+0,0
+    dc.w    sprpt+2,0
+    ; #1
+    dc.w    sprpt+4,0
+    dc.w    sprpt+6,0
+score_sprite_red:
+    ; #2
+    dc.w    sprpt+8,0
+    dc.w    sprpt+10,0
+    ; #3
+    dc.w    sprpt+12,0
+    dc.w    sprpt+14,0   
+    ; #4
+    dc.w    sprpt+16,0
+    dc.w    sprpt+18,0
+    ; #5
+    dc.w    sprpt+20,0
+    dc.w    sprpt+22,0
+    ; #6
+    dc.w    sprpt+24,0
+    dc.w    sprpt+26,0
+    ; #7
+    dc.w    sprpt+28,0
+    dc.w    sprpt+30,0
+end_color_copper:
+   * proper sprite priority: above bitplanes
+   *dc.w  $0102,$0000            ;  BPLCON1 := 0x0000
+   *dc.w  $0104,$0024            ;  BPLCON2 := 
+   dc.w  0xFFDF,0xFFFE           
+   dc.w  0x2201,0xFFFE           
+   dc.w	 intreq,0x8010          
+    dc.l    -2					
+	
+
+	* padding (workaround for gas bug)
+	ds.b	4
 _end_of_ng_data:
 		
