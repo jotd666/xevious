@@ -2,8 +2,7 @@ import os,re,bitplanelib,ast
 from PIL import Image
 
 import collections
-tile_width = 8
-tile_height = 8
+
 
 block_dict = {}
 
@@ -41,24 +40,25 @@ bitplanelib.palette_dump(palette,os.path.join(src_dir,"palette.68k"),bitplanelib
 
 raw_blocks = collections.defaultdict(list)
 for table,data in block_dict.items():
-    if data["size"] == 64:
+    if data["size"] in [64,256]:
+        side = int(data["size"]**0.5)
         pics = data["data"]
-        dump_width = 128
-        img = Image.new("RGB",(dump_width,tile_height*(len(pics)//(dump_width//tile_width))))
+        dump_width = side * 64
+        img = Image.new("RGB",(dump_width,side*(len(pics)//(dump_width//side))))
         cur_x = 0
         cur_y = 0
         for pic in pics:
-            input_image = Image.new("RGB",(tile_width,tile_height))
+            input_image = Image.new("RGB",(side,side))
             for i,p in enumerate(pic):
                 col = palette[p]
-                y,x = divmod(i,8)
+                y,x = divmod(i,side)
                 img.putpixel((cur_x+x,cur_y+y),col)  # for dump
                 input_image.putpixel((x,y),col)
 
-            cur_x += 8
+            cur_x += side
             if cur_x == dump_width:
                 cur_x = 0
-                cur_y += 8
+                cur_y += side
             raw = bitplanelib.palette_image2raw(input_image,output_filename=None,palette=palette[0:16],forced_nb_planes=4,
                     palette_precision_mask=0xF0)
             raw_blocks[table].append(raw)
@@ -67,17 +67,17 @@ for table,data in block_dict.items():
         maxcol = max(max(pic) for pic in pics)
 
 with open(os.path.join(src_dir,"graphics.68k"),"w") as f:
-    t = "fg_tile"
-    f.write("\t.global\t_{0}\n_{0}:".format(t))
-    c = 0
-    for block in raw_blocks[t]:
-        for d in block:
-            if c==0:
-                f.write("\n\t.byte\t")
-            else:
-                f.write(",")
-            f.write("0x{:02x}".format(d))
-            c += 1
-            if c == 8:
-                c = 0
-    f.write("\n")
+    for t in ["fg_tile","bg_tile"]:
+        f.write("\t.global\t_{0}\n_{0}:".format(t))
+        c = 0
+        for block in raw_blocks[t]:
+            for d in block:
+                if c==0:
+                    f.write("\n\t.byte\t")
+                else:
+                    f.write(",")
+                f.write("0x{:02x}".format(d))
+                c += 1
+                if c == 8:
+                    c = 0
+        f.write("\n")

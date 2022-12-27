@@ -13,7 +13,8 @@ _custom = 0xDFF000
 NB_PLANES = 4
 COPPERLIST_SIZE = 200
 NB_BYTES_PER_ROW = 40
-SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*288
+NB_LINES = 288
+SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_LINES
 SCREEN_SIZE = NB_PLANES*SCREEN_PLANE_SIZE
 
 
@@ -353,13 +354,28 @@ osd_w_bg_colorram:
 osd_w_fg_videoram:
 	movem.l	d0-d1/a0-a1,-(a7)
 	lea		_fg_tile,a0
+	bsr		process_bg_fg_tile
+	movem.l	(a7)+,d0-d1/a0-a1
+	rts
+
+* d0=offset (preserved), d1=tile (preserved)
+osd_w_bg_videoram:
+	movem.l	d0-d1/a0-a1,-(a7)
+	lea		_bg_tile,a0
+	;bsr		process_bg_fg_tile
+	movem.l	(a7)+,d0-d1/a0-a1
+	rts
+	
+process_bg_fg_tile:
 	lsl.w	#5,d1		| *32 (each tile has 8 bytes ATM)
 	add.w	d1,a0
-	lea		screen_data,a1
 	move.w	d0,d1
 	and.w	#0x3F,d1		| row
-	mulu.w	#NB_BYTES_PER_ROW,d1
+	subq.w	#4,d1
+	bmi.b	.fg_out
+	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use table
 	lsl.w	#3,d1	| *8
+	lea		screen_data,a1
 	add.w	d1,a1
 	lsr.w	#6,d0
 	neg.w	d0
@@ -370,14 +386,9 @@ osd_w_fg_videoram:
 	move.b	(a0)+,(a1)
 	add.w	#NB_BYTES_PER_ROW,a1
 	dbf		d0,.fg_copy
-	
-	movem.l	(a7)+,d0-d1/a0-a1
+.fg_out:
 	rts
-
-* d0=offset (preserved), d1=tile (preserved)
-osd_w_bg_videoram:
-		rts
-				
+	
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
 		rts
