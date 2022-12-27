@@ -1,10 +1,19 @@
+PROGNAME = xevious
+HDBASE = K:\jff\AmigaHD
+WHDBASE = $(HDBASE)\PROJETS\HDInstall\DONE\WHDLoad
+WHDLOADER = ../$(PROGNAME).slave
+SOURCE = $(PROGNAME)HD.s
+MAIN = ..\$(PROGNAME)
 
 GCC_BIN = C:\amiga-gcc\bin
 ASM = $(GCC_BIN)/m68k-amigaos-as -c 
 OBJS = amiga.o xevious_main.o graphics.o xevious_sub.o map_rom.o 
-MAIN = ../xevious
-all: $(MAIN)
 
+all: $(MAIN) $(WHDLOADER)
+
+clean:
+	del $(OBJS) "$(MAIN)"
+	
 $(MAIN): $(OBJS)
 	$(GCC_BIN)/m68k-amigaos-ld -o $(MAIN) $(OBJS)
 
@@ -18,3 +27,7 @@ amiga.o: amiga/amiga.68k
 	$(ASM) -Iamiga amiga/amiga.68k -o amiga.o
 graphics.o: amiga/graphics.68k
 	$(ASM) amiga/graphics.68k -o graphics.o
+
+$(WHDLOADER) : $(SOURCE)
+	wdate.py> datetime
+	vasmm68k_mot -DDATETIME -I$(HDBASE)/amiga39_JFF_OS/include -I$(WHDBASE)\Include -I$(WHDBASE) -devpac -nosym -Fhunkexe -o $(WHDLOADER) $(SOURCE)

@@ -5,15 +5,15 @@
 
 .include "../src/xevious.inc"
 .include "custom.i"
-
-_LVOSuperState  =     -150
+.include "exec_lvos.i"
 
 
 _custom = 0xDFF000
 
 NB_PLANES = 4
 COPPERLIST_SIZE = 200
-SCREEN_PLANE_SIZE = 32*288
+NB_BYTES_PER_ROW = 40
+SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*288
 SCREEN_SIZE = NB_PLANES*SCREEN_PLANE_SIZE
 
 
@@ -32,7 +32,7 @@ loop\@:
 	addq.w	#1,d0
 	bra.b	loop\@
 out\@:
-
+	move.w	(a7)+,d0
 .endm
 
 * exports
@@ -141,6 +141,76 @@ TRAP:
 	rte
 	    
 _user:
+    * if D0 contains "WHDL"
+    * A0 contains resload
+        
+    cmp.l   #0x05748444c,D0	| WHDL
+    bne.b   .standard
+    move.l a0,_resload
+    *move.b  d1,_keyexit
+    *move.l  a0,a2
+    *lea	_tags(pc),a0
+    *jsr	resload_Control(a2)
+    *bsr load_highscores
+    bra.b   .startup
+	nop
+.standard:
+    * open dos library, graphics library
+    *move.l  $4.W,a6
+    *lea dosname(pc),a1
+    *moveq.l #0,d0
+    *jsr _LVOOpenLibrary(a6)
+    *move.l  d0,_dosbase
+    *lea graphicsname(pc),a1
+    *moveq.l #0,d0
+    *jsr _LVOOpenLibrary(a6)
+    *move.l  d0,_gfxbase
+    
+    *bsr load_highscores
+
+    * check if "floppy" file is here
+    
+    *move.l  _dosbase(pc),a6
+    *move.l   #floppy_file,d1
+    *move.l  #MODE_OLDFILE,d2
+    *jsr     _LVOOpen(a6)
+    *move.l  d0,d1
+    *beq.b   .no_floppy
+    
+    * "floppy" file found
+    *jsr     _LVOClose(a6)
+    * wait 2 seconds for floppy drive to switch off
+    *move.l  #100,d1
+    *jsr     _LVODelay(a6)
+.no_floppy:
+	* stop cdtv device if found, avoids that cd device
+	* sends spurious interrupts
+    *move.l  #CMD_STOP,d0
+    *bsr send_cdtv_command
+.startup:
+
+    
+    lea  _custom,a5
+    *move.b  #0,controller_joypad_1
+    
+
+* no multitask
+    tst.l   _resload
+    bne.b   .no_forbid
+    *move.l  _gfxbase(pc),a4
+    *move.l StartList(a4),gfxbase_copperlist
+
+    move.l  4,a6
+    jsr _LVOForbid(a6)
+    
+	sub.l	A1,A1
+	jsr	_LVOFindTask(a6)		| find ourselves
+	move.l	D0,A0
+	*move.l	#-1,pr_WindowPtr(A0)	| no more system requesters (insert volume, write protected...)
+
+.no_forbid:
+
+
 		moveq			#2,d0
 		*move.b		(BIOS_USER_REQUEST),d0
 		lsl.w			#2,d0
@@ -168,8 +238,11 @@ eye_catcher:
 
 
 demo_game:
+		tst.l   _resload
+		bne.b   .no_super
+		move.l	4,A6
 		jsr		_LVOSuperState(a6)
-		
+.no_super:	
 		move		#0x4000,_custom+intena						| disable interrupts
 		bsr			platform_init					| amiga-specific init
 		jmp			xevious_reset					| pass control to the xevious core
@@ -195,7 +268,19 @@ _vblank:
 	move.w	_custom+intreqr,d0
 	btst	#5,d0
 	beq.b	.no_vblank
-  	jsr			xevious_im1_irq
+	
+	jsr		xevious_im1_irq
+	
+    move.w  vbl_counter(pc),d0
+    addq.w  #1,d0
+    cmp.w   #5,d0
+    bne.b   .normal
+    * update a second time, simulate 60Hz
+    jsr	xevious_im1_irq
+    clr.w d0    
+.normal:
+    move.w  d0,vbl_counter
+			
 .no_vblank:
     movem.l (a7)+,d0-d7/a0-a6
 	move.w	#0x70,_custom+intreq
@@ -205,10 +290,24 @@ osd_kick_wdog:
     rts
 
 platform_init:
+	lea		_custom,a5
+	move.w	#0x7FFF,dmacon(a5)
+    move.w #0x3081,diwstrt(a5)
+    move.w #0x30C1,diwstop(a5)
+    move.w #0x0038,ddfstrt(a5)
+    move.w #0x00D0,ddfstop(a5)
+    move.w #0x4200,bplcon0(a5)
+    clr.w bplcon1(a5) 
+    clr.w bplcon2(a5)                     
+    move.w #0,bpl1mod(a5) 
+    move.w #0,bpl2mod(a5)
+
+	bsr		set_bitplanes
+
 	* load copperlist
 	
 	* set copperlist
-	move.l	#copperlist,_custom+cop1lc
+	move.l	#copperlist,cop1lc(a5)
 	* load palette
 	lea		palette(pc),a0
 	lea		_custom+color,a1
@@ -217,17 +316,19 @@ platform_init:
 	move.w	(a0)+,(a1)+
 	dbf		d0,.copy
 	
+    * init sprite, bitplane, whatever dma
+    move.w #0x83E0,dmacon(a5)
+
 	* install vblank handler
 	pea		_vblank(pc)
 	move.l	(a7)+,0x6C.W
 	
-	blitz
     rts
 
 * 60Hz VBLANK interrupt
 osd_enable_vblank_interrupt:
-	move.w	#0x8020,_custom+intena
-		rts
+	move.w	#0xC020,_custom+intena
+	rts
 
 osd_ack_vblank_interrupt:
 	move.w	#0x20,_custom+intreq
@@ -235,7 +336,7 @@ osd_ack_vblank_interrupt:
 		
 osd_disable_vblank_interrupt:
 	move.w	#0x0020,_custom+intena
-		rts
+	rts
 		
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_fg_colorram:
@@ -250,7 +351,28 @@ osd_w_bg_colorram:
 *  Bottom 6 bits of D0 is the row, upper 5 bits are the column.
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_fg_videoram:
-		rts
+	movem.l	d0-d1/a0-a1,-(a7)
+	lea		_fg_tile,a0
+	lsl.w	#5,d1		| *32 (each tile has 8 bytes ATM)
+	add.w	d1,a0
+	lea		screen_data,a1
+	move.w	d0,d1
+	and.w	#0x3F,d1		| row
+	mulu.w	#NB_BYTES_PER_ROW,d1
+	lsl.w	#3,d1	| *8
+	add.w	d1,a1
+	lsr.w	#6,d0
+	neg.w	d0
+	add.w	#32,d0	| mirror
+	add.w	d0,a1
+	move.w	#7,d0
+.fg_copy:
+	move.b	(a0)+,(a1)
+	add.w	#NB_BYTES_PER_ROW,a1
+	dbf		d0,.fg_copy
+	
+	movem.l	(a7)+,d0-d1/a0-a1
+	rts
 
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_bg_videoram:
@@ -330,6 +452,11 @@ osd_read_coin:
 		
 osd_read_start:
 9:	rts
+		
+vbl_counter:
+		dc.w	0
+_resload:
+		dc.l	0
 		
 _end_of_ng_code:
 		
