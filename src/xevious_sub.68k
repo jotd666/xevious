@@ -38,7 +38,7 @@ sub_start:
 * d0 holds col,row
 calc_colour_video_ram_offset: | $0038
 		move.w		d0,d6
-		add.w			#3,d6
+		addq.w		#3,d6
 		and.w			#0x003f,d6
 		add.w			#0x0300,d0
 		lsr.w			#2,d0
@@ -111,23 +111,40 @@ sub_fn_1__update_scroll_hw: | $0218
 		move.w		(bg_scroll_x_shadow),d6
 		bra				osd_update_scroll_hw
 
+* handling of reading coins and start buttons
+* is done by the NAMCO chips
+* - do it completely differently here
 sub_fn_4__handle_credits_and_start: | $0227
 		jsr				osd_read_coin
 		beq				1f
-	* this needs to have BCD conversion
-		add.b			#1,(num_credits)
-* ignore credits atm		
-1:	jsr				osd_read_start
-		tst.b			d0
-		beq				9f
+		* add a credit
+		moveq     #1,d0
+		move.b    (num_credits),d1
+		abcd      d0,d1
+		move.b    d1,(num_credits)
+		* process 1P, 2P
+1:	moveq     #0,d2
+    jsr				osd_read_start
+    beq       9f
 		btst.b		#0,d0															| P1START?
 		beq				2f																| no, skip
-		clr.b			(two_player_game)
-		bra				8f
-2:	btst			#1,d0															| P2START?
-		beq				9f																| no, skip
-		move.b		#1,(two_player_game)
-8:	move.b		#1,(start_pressed)
+		cmp.b     #1,(num_credits)                  | enough for 1P?
+		bcs       9f                                | no, exit
+    moveq     #1,d2                             | 1 credit/player
+    bra       8f
+2:  btst.b    #1,d0                             | P2START?
+    beq       9f                                | no, return
+    cmp.b     #2,(num_credits)                  | enough for 2P?
+    bcs       9f                                | no, exit
+    moveq     #2,d2                             | 2 credits/players
+    * can start a game here
+8:  andi      #0x0f,ccr                         | clear X
+    move.b    (num_credits),d1
+    sbcd      d2,d1                             | calc new credits
+    move.b    d1,(num_credits)
+    subq.b    #1,d2                             | 0=1P/1=2P
+    move.b    d2,(two_player_game)
+	  move.b		#1,(start_pressed)
 9:	rts
 
 sub_fn_5__handle_pulsing_colours: | $0264
@@ -204,7 +221,7 @@ get_map_row: | $02D4
 		jsr				osd_w_bg_videoram
 		movem.l		(a7)+,d0-d2
 		add.w			#0x0100,d0
-		add.b			#1,d2
+		addq.b		#1,d2
 		dbf				d7,2b
 9:	rts
 
@@ -220,24 +237,37 @@ sub_fn_31__update_sprite_shadow: | $031E
 sub_2_fn_2__set_flying_enemies: | $03BD
 		moveq			#0,d0
 		move.b		(a0),d0
-		ext.w			d0
+		ext.w			d0                                | can be -ve
 		adda			#1,a0
 loc_3BF:
 		movea.l		#flying_enemy_type_offset_tbl,a1
-		add.w			d0,d0
+		lsl.w     #1,d0
 		move.b		(a1,d0.w),(num_flying_enemies)
 		move.b		(1,a1,d0.w),(flying_enemy_type_tbl_offset)
 		move.l		a0,(area_obj_ptr)
 		rts
-		
+
+* depending on difficulty setting, this function
+* increases enemy_AI_level, and then uses it
+* to index into the flying enemy type offset table
 * a0 = ptr byte 3
-sub_2_fn_3__set_enemy_AI_and_flying_enemies: | $03D1
-		***
-		move.l		a0,(area_obj_ptr)
-		rts
+sub_2_fn_3__inc_enemy_AI_and_flying_enemies: | $03D1
+		move.b    (dswb_0115),d1
+		not.b     d1
+		rol.b     #3,d1
+		and.w     #3,d1
+		movea.l   #difficulty_tbl,a1
+		move.b    (a1,d1.w),d0
+		add.b     (enemy_AI_level),d0
+		cmp.b     #0x80,d0
+		bcs       1f
+		sub.b     #0x40,d0
+1:	move.b    d0,(enemy_AI_level)
+		bra       loc_3BF
 
 sub_2_fn_5__reset_flying_enemies: | $03FD
 		clr.b			(num_flying_enemies)
+		clr.b     (flying_enemy_type_tbl_offset)
 		move.l		a0,(area_obj_ptr)
 		rts
 
@@ -247,57 +277,82 @@ difficulty_tbl:
     .byte   6
     .byte 	0x10
 
-sub_2_fn_23: | $040C
+sub_2_fn_23__adjust_AI_level: | $040C
 		move.l		a0,(area_obj_ptr)
-		***
+		move.w    (curr_player_score_msb),d1        
+		move.b    (solvalou_number),d0
+		jsr       avg_score_per_solvalou
+    cmp.w     #16,d1
+    ble       1f
+    move.w    #16,d1
+1:  add.b     d1,(enemy_AI_level)    
+		rts
+
+* Divides score (K's) by sovlalou#
+* (technically - treats BCD as binary)
+* IOW - averge score per solvalou
+* d1=score (K's,BCD), d0=#solvalou
+* Returns 16-bit result in d1
+avg_score_per_solvalou: | $0E23
+		move.b		d0,d2
+		moveq			#0,d0
+		moveq			#16-1,d7
+1:	lsl.w			#1,d1
+		roxl.b		#1,d0
+		bcs				2f
+		cmp.b			d2,d0
+		bcs				3f
+2:	sub.b			d2,d0
+		addq.w		#1,d1
+3:	dbf				d7,1b
 		rts
 						
 * a0 = ptr byte 3
 sub_2_fn_8__fire_freq_mask_derota: | $043E
-		move.b		(a0),(fire_freq_mask_derota)		
+		move.b		(a0),(ffreq_mask_derota)		
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
 		
 * a0 = ptr byte 3
 sub_2_fn_9__fire_freq_mask_logram: | $0448
-		move.b		(a0),(fire_freq_mask_logram)		
+		move.b		(a0),(ffreq_mask_logram)		
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
 
-sub_2_fn_11__fire_freq_mask_81A4: | $0452
-		move.b		(a0),(fire_freq_mask_81A4)		
+sub_2_fn_11__fire_freq_mask_zoshi: | $0452
+		move.b		(a0),(ffreq_mask_zoshi)		
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
 
 sub_2_fn_12__fire_freq_mask_terrazi: | $045C
-		move.b		(a0),(fire_freq_mask_terrazi)		
+		move.b		(a0),(ffreq_mask_terrazi)		
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
 
 sub_2_fn_13__fire_freq_mask_kapi: | $0466
-		move.b		(a0),(fire_freq_mask_kapi)		
+		move.b		(a0),(ffreq_mask_kapi)		
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
 
 sub_2_fn_16__fire_freq_mask_boza_logram: | $0470
-		move.b		(a0),(fire_freq_mask_boza_logram)		
+		move.b		(a0),(ffreq_mask_boza_logram)		
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
 
 sub_2_fn_17__fire_freq_mask_domogram: | $047A
-		move.b		(a0),(fire_freq_mask_domogram)		
+		move.b		(a0),(ffreq_mask_domogram)		
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
 
-sub_2_fn_22__set_81A7: | $0484
-		move.b		(a0),(byte_81A7)		
+sub_2_fn_22__fire_freq_mask_andor_genesis: | $0484
+		move.b		(a0),(ffreq_mask_andor_genesis)		
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
@@ -334,8 +389,8 @@ flying_enemy_type_offset_tbl:
     .byte 3, 0x4E, 4, 0x4E, 4, 0x4E, 5, 0x4E, 6, 7, 6, 7, 6, 7, 6, 7
     .byte 1, 0x54, 2, 0x54, 6, 7, 6, 7, 6, 7, 6, 7, 1, 0x58, 2, 0x58
 
-sub_2_fn_7__reset_max_bacura: | $05D8
-		clr.b			(max_bacura)
+sub_2_fn_7__reset_num_bacura: | $05D8
+		clr.b			(num_bacura)
 		move.l		a0,(area_obj_ptr)
 		rts
 		
@@ -364,12 +419,11 @@ sub_2_fn_15__domogram: | $05E1
 		movea.l		#domogram_tbl,a2
 		lea				(a2,d0.w),a2											| address in table
 		move.l		a2,(_EXTRA,a5)										| store ptr
-sub_debug1:
 		moveq			#64,d7														| 64 bytes (max) to copy
 1:	move.b		(a1)+,(a2)+												| copy path data
 		dbf				d7,1b
 		move.w		(next_domogram),d0
-		add.b			#1,d0
+		addq.b		#1,d0
 		cmp.b			#12,d0														| wrap?
 		bcs				2f
 		clr.w			d0
@@ -377,36 +431,52 @@ sub_debug1:
 		rts
 
 sub_2_fn_18__sheonite_start: | $062E
-		move.b		#0x31,(obj_tbl+_OBJSIZE*0x3f)			| 6th flying object
-		move.b		#0x32,(obj_tbl+_OBJSIZE*0x3e)			| 5th flying object
-		**
+    movea.l   #obj_tbl+_OBJSIZE*0x3f,a5         | 6th flying object
+    move.b    #0x31,(_TYPE,a5)
+    suba.l    #_OBJSIZE,a5                      | 5th flying object
+    move.b    #0x32,(_TYPE,a5)
+		clr.b     (sheonite_end_flag)
 		move.l		a0,(area_obj_ptr)
 		rts		
 		
 sub_2_fn_19__sheonite_end: | $0640
-		**
+		move.b    #1,(sheonite_end_flag)            | flag time to leave
 		move.l		a0,(area_obj_ptr)
 		rts		
 
-sub_2_fn_20__andor_genesis: | $064A
+sub_2_fn_20__andor_genesis_start: | $064A
 		movea.l		#obj_tbl+_OBJSIZE*0x0F,a5
+		** Another Xevious BUG!!!
+		** state=2 causes this object to award points when
+		** the core is bombed
+		** - points are awarded from the last object #15
 		move.b		#2,(_STATE,a5)
 		clr.b			(_ATTR,a5)												| size=1x1
-		move.b		#0xf8,(_X,a5)
+		move.b		#0xf8,(_X,a5)                     | MSB
 		move.w		#0x0e80,(_Y,a5)
 		clr.b			(_CODE,a5)
 		move.l		a0,(area_obj_ptr)
-		**
+		clr.b     (andor_genesis_end_flag)
+		movea.l   #andor_genesis_data,a0
+		movea.l   #obj_tbl+_OBJSIZE*1,a1            | object1
+		moveq     #15-1,d7                          | 15 objects
+1:	move.b    (a0)+,(_TYPE,a1)
+		adda.l    #_OBJSIZE,a1
+		dbf       d7,1b
 		rts		
 
-sub_2_fn_21__flag_gen_andor_genesis: | $0685
+andor_genesis_data: | $0676
+    .byte 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x52, 0x51, 0x50, 0x4F, 0x4A, 0x4B
+    .align 2
+    
+sub_2_fn_21__andor_genesis_end: | $0685
 		move.l		a0,(area_obj_ptr)
-		**
+		move.b    #1,(andor_genesis_end_flag)
 		rts		
 								
 sub_fn_2__handle_objects: | $068F
 		movea.l		(area_obj_ptr),a0
-		** Another Xevious bug!!!
+		** Another Xevious BUG!!!
 		** We need to check for zero here, because this
 		** gets executed before area_obj_ptr and scroll_cntr
 		** are initialised by the MAIN CPU.
@@ -445,15 +515,15 @@ sub_fn_2_handler:
 		.long			sub_2_fb_0__type_only
 		.long			sub_2_fn_1__ground_object
 		.long			sub_2_fn_2__set_flying_enemies
-		.long			sub_2_fn_3__set_enemy_AI_and_flying_enemies
+		.long			sub_2_fn_3__inc_enemy_AI_and_flying_enemies
 		.long			null_fn														| UNUSED
 		.long			sub_2_fn_5__reset_flying_enemies
 		.long			sub_2_fn_6__set_8422
-		.long			sub_2_fn_7__reset_max_bacura
+		.long			sub_2_fn_7__reset_num_bacura
 		.long			sub_2_fn_8__fire_freq_mask_derota
 		.long			sub_2_fn_9__fire_freq_mask_logram
 		.long			sub_2_fn_10__gnd_stop_firing_row
-		.long			sub_2_fn_11__fire_freq_mask_81A4
+		.long			sub_2_fn_11__fire_freq_mask_zoshi
 		.long			sub_2_fn_12__fire_freq_mask_terrazi
 		.long			sub_2_fn_13__fire_freq_mask_kapi
 		.long			null_fn														| UNUSED
@@ -462,10 +532,10 @@ sub_fn_2_handler:
 		.long			sub_2_fn_17__fire_freq_mask_domogram
 		.long			sub_2_fn_18__sheonite_start
 		.long			sub_2_fn_19__sheonite_end
-		.long			sub_2_fn_20__andor_genesis
-		.long			sub_2_fn_21__flag_gen_andor_genesis
-		.long			sub_2_fn_22__set_81A7
-		.long			sub_2_fn_23
+		.long			sub_2_fn_20__andor_genesis_start
+		.long			sub_2_fn_21__andor_genesis_end
+		.long			sub_2_fn_22__fire_freq_mask_andor_genesis
+		.long			sub_2_fn_23__adjust_AI_level
 
 * a0 = ptr byte 3
 sub_2_fb_0__type_only: | $0731
@@ -498,7 +568,7 @@ sub_2_fn_1__ground_object: | $073F
 		rts
 
 sub_2_fn_6__set_8422: | $075D
-		**
+		move.b    (a0),(bacura_inc_cnt)
 		adda.w		#1,a0
 		move.l		a0,(area_obj_ptr)
 		rts
@@ -512,7 +582,7 @@ sub_fn_3__handle_next_area: | $078B
 		bne				9f																| not finished
 		move.w		(area),d0
 		.ifeq OPT_LOOP_AREA
-		add.w			#1,d0															| inc area
+		addq.w		#1,d0															| inc area
 		.endif
 		cmp.w			#16,d0														| last area?
 		bne				1f																| no, skip
@@ -527,7 +597,7 @@ sub_fn_3__handle_next_area: | $078B
 		.ifne OPT_DISPLAY_AREA
 		move.w		#0x0123,d0												| screen col,row
 		move.w		(area),d1
-		add.w			#1,d1
+		addq.w		#1,d1
 		moveq			#BANK_FG_VIDEORAM,d2
 		jsr				display_char
 		.endif

@@ -1,5 +1,5 @@
 import os,re,bitplanelib,ast
-from PIL import Image
+from PIL import Image,ImageOps
 
 import collections
 
@@ -59,9 +59,11 @@ for table,data in block_dict.items():
             if cur_x == dump_width:
                 cur_x = 0
                 cur_y += side
-            raw = bitplanelib.palette_image2raw(input_image,output_filename=None,palette=palette[0:16],forced_nb_planes=4,
-                    palette_precision_mask=0xF0)
-            raw_blocks[table].append(raw)
+            for the_tile in [input_image,ImageOps.mirror(input_image)]:
+                raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,palette=palette[0:16],forced_nb_planes=4,
+                        palette_precision_mask=0xF0)
+                raw_blocks[table].append(raw)
+
 
         img.save(table+".png")
         maxcol = max(max(pic) for pic in pics)
@@ -70,6 +72,7 @@ with open(os.path.join(src_dir,"graphics.68k"),"w") as f:
     for t in ["fg_tile","bg_tile"]:
         f.write("\t.global\t_{0}\n_{0}:".format(t))
         c = 0
+        print(t,len(raw_blocks[t]))
         for block in raw_blocks[t]:
             for d in block:
                 if c==0:

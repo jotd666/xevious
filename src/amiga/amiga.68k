@@ -12,6 +12,7 @@ _custom = 0xDFF000
 
 NB_PLANES = 4
 COPPERLIST_SIZE = 200
+GRID_SIZE = 1<<11   | 6+5 bits to encode position
 NB_BYTES_PER_ROW = 40
 NB_LINES = 288
 SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_LINES
@@ -34,6 +35,7 @@ loop\@:
 	bra.b	loop\@
 out\@:
 	move.w	(a7)+,d0
+	nop
 .endm
 
 * exports
@@ -341,39 +343,73 @@ osd_disable_vblank_interrupt:
 		
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_fg_colorram:
-		rts
+	movem.l	d0-d5/a0-a1,-(a7)
+	and.w	#0x7FF,d0   | useful?
+	lea		_fg_color_data,a1
+	move.b	d1,(a1,d0.w)	| store color X/Y flip attribute in fg table
+	lea		_fg_char_data,a1
+	move.b	d1,d2
+	move.b	(a1,d0.w),d1	| fetch tile
+	* now update tile to reflect the color change
+	lea		_fg_tile,a0
+	bsr	update_bg_fg_tile
+	movem.l	(a7)+,d0-d5/a0-a1
+	rts
 
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_bg_colorram:
-		rts
+	movem.l	d0-d5/a0-a1,-(a7)
+	lea		_bg_color_data,a1
+	move.b	d1,(a1,d0.w)	| store attribute in bg table
+	lea		_bg_tile,a0
+	*bsr	update_bg_fg_tile
+	movem.l	(a7)+,d0-d5/a0-a1
+	rts
 		
 * the first 4 rows are not visible, then the next 36 rows
 * are visible. Screen is 32 tiles wide but only 28 visible.
 *  Bottom 6 bits of D0 is the row, upper 5 bits are the column.
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_fg_videoram:
-	movem.l	d0-d1/a0-a1,-(a7)
+	movem.l	d0-d5/a0-a2,-(a7)
+	lea		_fg_color_data,a1
 	lea		_fg_tile,a0
+	lea		_fg_char_data,a2
 	bsr		process_bg_fg_tile
-	movem.l	(a7)+,d0-d1/a0-a1
+	movem.l	(a7)+,d0-d5/a0-a2
 	rts
 
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_bg_videoram:
-	movem.l	d0-d1/a0-a1,-(a7)
+	movem.l	d0-d5/a0-a2,-(a7)
 	lea		_bg_tile,a0
+	lea		_bg_color_data,a1
+	lea		_bg_char_data,a2
 	;bsr		process_bg_fg_tile
-	movem.l	(a7)+,d0-d1/a0-a1
+	movem.l	(a7)+,d0-d5/a0-a2
 	rts
 	
 process_bg_fg_tile:
-	lsl.w	#5,d1		| *32 (each tile has 8 bytes ATM)
+	and.w	#0x7FF,d0   | useful?
+	
+	move.b	d1,(a2,d0.w)	| update logical grid
+	move.b	(a1,d0.w),d2	| color & X/Y flip data
+* d1: tile code
+* d2: attribute
+* a0: tile map start (fg/bg)
+update_bg_fg_tile:
+	and.w	#0xFF,d1
+	lsl.w	#6,d1			| *64 (each tile+mirror tile has 8 bytes ATM)
+	btst	#6,d2			| X-flip?
+	beq.b	.no_xflip
+	add.w	#32,d1			| mirror version
+.no_xflip:
 	add.w	d1,a0
 	move.w	d0,d1
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
-	bmi.b	.fg_out
-	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use table
+	bmi		.u0
+	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use mul table
 	lsl.w	#3,d1	| *8
 	lea		screen_data,a1
 	add.w	d1,a1
@@ -381,12 +417,49 @@ process_bg_fg_tile:
 	neg.w	d0
 	add.w	#32,d0	| mirror
 	add.w	d0,a1
-	move.w	#7,d0
-.fg_copy:
-	move.b	(a0)+,(a1)
-	add.w	#NB_BYTES_PER_ROW,a1
-	dbf		d0,.fg_copy
-.fg_out:
+	
+	moveq	#NB_PLANES-1,d3
+	move.w	d2,d4
+.u0:
+	btst	#0,d2
+	beq.b	.u1
+	* draw
+	btst	#7,d4
+	bne.b	.yflip
+	move.b	(a0),(a1)
+	move.b	(1,a0),(NB_BYTES_PER_ROW,a1)
+	move.b	(2,a0),(NB_BYTES_PER_ROW*2,a1)
+	move.b	(3,a0),(NB_BYTES_PER_ROW*3,a1)
+	move.b	(4,a0),(NB_BYTES_PER_ROW*4,a1)
+	move.b	(5,a0),(NB_BYTES_PER_ROW*5,a1)
+	move.b	(6,a0),(NB_BYTES_PER_ROW*6,a1)
+	move.b	(7,a0),(NB_BYTES_PER_ROW*7,a1)
+	bra.b	.u3
+.yflip:
+	move.b	(7,a0),(a1)
+	move.b	(6,a0),(NB_BYTES_PER_ROW,a1)
+	move.b	(5,a0),(NB_BYTES_PER_ROW*2,a1)
+	move.b	(4,a0),(NB_BYTES_PER_ROW*3,a1)
+	move.b	(3,a0),(NB_BYTES_PER_ROW*4,a1)
+	move.b	(2,a0),(NB_BYTES_PER_ROW*5,a1)
+	move.b	(1,a0),(NB_BYTES_PER_ROW*6,a1)
+	move.b	(a0),(NB_BYTES_PER_ROW*7,a1)
+	bra.b	.u3
+.u1:
+	* clear
+	clr.b	(a1)
+	clr.b	(NB_BYTES_PER_ROW,a1)
+	clr.b	(NB_BYTES_PER_ROW*2,a1)
+	clr.b	(NB_BYTES_PER_ROW*3,a1)
+	clr.b	(NB_BYTES_PER_ROW*4,a1)
+	clr.b	(NB_BYTES_PER_ROW*5,a1)
+	clr.b	(NB_BYTES_PER_ROW*6,a1)
+	clr.b	(NB_BYTES_PER_ROW*7,a1)
+.u3:
+    lsr.w   #1,d2
+    lea   (SCREEN_PLANE_SIZE,a1),a1
+    dbf d3,.u0
+.u4:
 	rts
 	
 * d6 = bg_scroll_x_shadow
@@ -459,8 +532,10 @@ osd_read_p2_inputs:
 		rts
 
 osd_read_coin:
+	moveq	#0,d0
 9:	rts
 		
+		* D0 bit0=P1, bit1=P2.
 osd_read_start:
 9:	rts
 		
@@ -489,10 +564,20 @@ scb4_shadow:									ds.w 	128*2
 
 .align 2
 irq_cnt:											ds.w		1
-
-		.datachip
+		.data
+_fg_color_data:
+	ds.b	GRID_SIZE
+_bg_color_data:
+	ds.b	GRID_SIZE
+_fg_char_data:
+	ds.b	GRID_SIZE
+_bg_char_data:
+	ds.b	GRID_SIZE
+		.bsschip
 screen_data:
 	ds.b	SCREEN_SIZE
+	ds.b	100	| small margin (I suspect that gas is buggy with ds directive)
+	.datachip
 copperlist:
 bitplanes:
    dc.l  0x00e00000
@@ -503,8 +588,6 @@ bitplanes:
    dc.l  0x00ea0000
    dc.l  0x00ec0000
    dc.l  0x00ee0000
-*   dc.l  $00f00000
-*   dc.l  $00f20000
 
 colors:
    dc.w color,0
