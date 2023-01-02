@@ -34,7 +34,7 @@
 		.global main_debug1
 		.global main_debug2
 
-.include "src/xevious.inc"
+.include "xevious.inc"
 
 .macro SET_REENTRY_ADDR_HERE
 		move.l		#0f,(a6)
@@ -185,7 +185,7 @@ xevious_nmi: | $0066
 		rts
 				
 update_sprite_hw_and_other_things: | $0096
-		* copy sprites from shadow to Neo Geo
+		* copy sprites from shadow to OSD
 		move.w		#0,d0															| start at sprite 0
 		jsr				osd_update_32_sprite_hw
 		jsr				read_dipswitches_0115
@@ -1911,47 +1911,40 @@ dir_delta_tbl: | $1633
     .byte 0, 0																	| none/invalid
 
 check_solvalou_hit: | $1645
-    *** THIS IS NEO-GEO SPECIFIC
-    move.w    (scb3_shadow+2*2*0x23),d3         | solvalou spriteY
-    move.w    (scb4_shadow+2*2*0x23),d4         | solvalou spriteX
+    move.b    (sprite_shadow_msb+2*0x23+0),d3   | solvalou spriteY
+    move.b    (sprite_shadow_msb+2*0x23+1),d4   | solvalou spriteX
     
     movea.l   #obj_tbl+_OBJSIZE*0x27,a1         | 1st bullet
-    movea.l   #scb3_shadow+2*2*0x27,a3
-    movea.l   #scb4_shadow+2*2*0x27,a4
+    movea.l   #sprite_shadow_msb+2*0x27,a3
     moveq     #25-1,d7                          | 19 bullets + 6 flying enemies
 check_bullets_and_flying: | $1655
     jsr       check_bullet_or_flying_hit_solvalou
     bcs       9f
     adda.l    #_OBJSIZE,a1                      | next object
-    adda.l    #2*2,a3
-    adda.l    #2*2,a4
+    adda.l    #2,a3
     dbf       d7,check_bullets_and_flying
     
     movea.l   #obj_tbl+_OBJSIZE*0x10,a1         | 1st bacura
-    movea.l   #scb3_shadow+2*2*0x10,a3
-    movea.l   #scb4_shadow+2*2*0x10,a4
+    movea.l   #sprite_shadow_msb+2*0x10,a3
     moveq     #16-1,d7                          | 16 bacura
 check_bacura: | $1665
     jsr       check_bacura_hit_solvalou
     bcs       9f
     adda.l    #_OBJSIZE,a1                      | next object
-    adda.l    #2*2,a3
-    adda.l    #2*2,a4
+    adda.l    #2,a3
     dbf       d7,check_bacura
 9:	rts
 
 check_bullet_or_flying_hit_solvalou: | $1670
     cmp.b     #2,(_STATE,a1)                    | active?
     bne       loc_1693                          | no, exit
-    move.w    d3,d0                             | solvalou spriteY
-    sub.w     (a3),d0                           | sub object spriteY
-    lsr.w     #7,d0                             | to low byte
+    move.b    d3,d0                             | solvalou spriteY
+    sub.b     (0,a3),d0                         | sub object spriteY
     subq.b    #8,d0
     add.b     #16,d0
     bcc       9f
-    move.w    (a4),d0                           | object spriteX
-    sub.w     d4,d0                             | sub solvalou spriteX
-    lsr.w     #8,d0                             | to low byte
+    move.b    (1,a3),d0                         | object spriteX
+    sub.b     d4,d0                             | sub solvalou spriteX
     subq.b    #4,d0
     addq.b    #8,d0
 9:  rts
@@ -1963,15 +1956,13 @@ loc_1693: | $1693
 check_bacura_hit_solvalou: | $1695
     cmp.b     #2,(_STATE,a1)                    | active?
     bne       loc_1693                          | no, exit
-    move.w    d3,d0                             | solvalou spriteY
-    sub.w     (a3),d0                           | sub object spriteY
-    lsr.w     #7,d0                             | to low byte
+    move.b    d3,d0                             | solvalou spriteY
+    sub.b     (0,a3),d0                         | sub object spriteY
     sub.b     #28,d0
     add.b     #40,d0
     bcc       9f
-    move.w    (a4),d0                           | object spriteX
-    sub.w     d4,d0                             | sub solvalou spriteX
-    lsr.w     #8,d0                             | to low byte
+    move.b    (1,a3),d0                         | object spriteX
+    sub.b     d4,d0                             | sub solvalou spriteX
     subq.b    #8,d0
     add.b     #16,d0
 9:  rts
@@ -1987,17 +1978,14 @@ handle_crosshairs: | $16B8
 		move.b		(countup_timer_1),d1
 		and.b			#4,d1															| time to check bombed objects?
 		beq				update_crosshair									| no, skip
-		*** THIS IS NEO-GEO SPECIFIC
-		move.w		(scb3_shadow+2*2*0x22),d3					| crosshairs spriteY
-		move.w		(scb4_shadow+2*2*0x22),d4					| crosshairs spriteX
-		movea.l		#scb3_shadow+2*2*0x02,a3
-		movea.l		#scb4_shadow+2*2*0x02,a4
+		move.b		(sprite_shadow_msb+2*0x22+0),d3		| crosshairs spriteY
+		move.b		(sprite_shadow_msb+2*0x22+1),d4		| crosshairs spriteX
+		movea.l		#sprite_shadow_msb+2*0x02,a3
 		movea.l		#obj_tbl+_OBJSIZE*0x02,a5					| ground_based objects
 		moveq			#14-1,d7													| 14 object to check
 2:	jsr				check_targeted_ground_object
 		bcs				set_active_crosshair_colour
-		adda.l		#2*2,a3
-		adda.l		#2*2,a4
+		adda.l		#2,a3
 		adda.l		#_OBJSIZE,a5
 		dbf				d7,2b
 		moveq			#0,d7															| to match Z80 exit condition
@@ -2022,20 +2010,17 @@ loc_1702:
 		rts
 		
 * d3=crosshairs spriteY[7:0]??, d4=crosshairs spriteX[8:1]??
-* a3=scb3(object) a4=scb4(object) a5=obj_tbl(object)
+* a3=sprite_shadow_msb (object) a5=obj_tbl(object)
 check_targeted_ground_object: | $1704
 		cmp.b			#2,(_STATE,a5)										| active?
 		bne				loc_1702
-		*** THIS IS NEO-GEO SPECIFIC
-		move.w		d3,d0														  | object spriteY shadow
-		sub.w			(a3),d0														| compare object spriteY
-		lsr.w			#7,d0															| 7:0
+		move.b		d3,d0														  | object spriteY shadow
+		sub.b			(0,a3),d0													| compare object spriteY
 		sub.b			#0x0a,d0
 		add.b			#0x14,d0
 		bcc				9f
-		move.w		(a4),d0														| object spriteX shadow
-		sub.w			d4,d0
-		lsr.w			#8,d0															| 8:1
+		move.b		(1,a3),d0													| object spriteX shadow
+		sub.b			d4,d0
 		subq.b		#5,d0
 		add.b			#0x0a,d0
 9:	rts
@@ -2063,8 +2048,7 @@ main_fn_30__handle_shooting: | $1727
 		jsr				handle_shooting
 2:	movea.l		#main_30_fn_tbl,a6
 		movea.l		#obj_tbl+_OBJSIZE*0x24,a5
-		movea.l   #scb3_shadow+2*2*0x24,a3
-		movea.l   #scb4_shadow+2*2*0x24,a4
+		movea.l   #sprite_shadow_msb+2*0x24,a3
 		moveq			#3-1,d7                           | 3 bullet objects
 3:	movea.l		(a6),a0
     movem.l   d7/a3/a4/a6,-(a7)
@@ -2072,8 +2056,7 @@ main_fn_30__handle_shooting: | $1727
 		movem.l   (a7)+,d7/a3/a4/a6
 		adda.l		#4,a6
 		adda.l		#_OBJSIZE,a5                      | next object
-		adda.l    #2*2,a3
-		adda.l    #2*2,a4
+		adda.l    #2,a3
 		dbf				d7,3b
 		clr.b			(shot_flag)
 9:	rts
@@ -2258,12 +2241,11 @@ check_bomb_finished: | $190B
 9:	rts
 
 check_flying_enemies_shot: | $1928
-    move.w    (a3),d3                           | shot spriteY
-    move.w    (a4),d4                           | shot spriteX
+    move.b    (0,a3),d3                         | shot spriteY
+    move.b    (1,a3),d4                         | shot spriteX
     
     movea.l   #obj_tbl+_OBJSIZE*0x3a,a1         | 1st flying enemy
-    movea.l   #scb3_shadow+2*2*0x3a,a3
-    movea.l   #scb4_shadow+2*2*0x3a,a4
+    movea.l   #sprite_shadow_msb+2*0x3a,a3
     moveq     #6-1,d7                           | 6 enemies to check
 1:  jsr       check_shot_hit_flying_enemy
     bcc       loc_1972
@@ -2283,21 +2265,18 @@ check_flying_enemies_shot: | $1928
     
 loc_1972: | 1972
     adda.l    #_OBJSIZE,a1                      | next enemy
-    adda.l    #2*2,a3
-    adda.l    #2*2,a4
+    adda.l    #2,a3
     dbf       d7,1b
     
     move.b    (_EXTRA,a5),(_STATE,a5)           | update shot state
 
     movea.l   #obj_tbl+_OBJSIZE*0x10,a1         | 1st bacura
-    movea.l   #scb3_shadow+2*2*0x10,a3
-    movea.l   #scb4_shadow+2*2*0x10,a4
+    movea.l   #sprite_shadow_msb+2*0x10,a3
     moveq     #16-1,d7                          | 16 bacura to check
 2:  jsr       check_shot_bacura
     bcs       unactivate_shot
     adda.l    #_OBJSIZE,a1
-    adda.l    #2*2,a3
-    adda.l    #2*2,a4
+    adda.l    #2,a3
     dbf       d7,2b
 		rts
 
@@ -2307,19 +2286,17 @@ unactivate_shot: | $1997
     rts
 
 * d3=shot spriteY, d4=shot_spriteX, 
-* a1=enemy object a3=enemy scb3, a4=enemy scb4
+* a1=enemy object a3=enemy sprite_shadow_msb
 check_shot_hit_flying_enemy: | $19A6
     cmp.b     #2,(_STATE,a1)                    | active?
     bne       loc_19C9                          | no, go
-    move.w    d3,d0
-    sub.w     (a3),d0
-    lsr.w     #7,d0                             | spriteY[7:0]
+    move.b    d3,d0
+    sub.b     (0,a3),d0
     sub.b     #16,d0
     add.b     #32,d0
     bcc       9f
-    move.w    (a4),d0
-    sub.w     d4,d0
-    lsr.w     #8,d0                             | spriteX[8:1]
+    move.b    (1,a3),d0
+    sub.b     d4,d0
     subq.b    #8,d0
     add.b     #16,d0
 9:  rts
@@ -2331,27 +2308,23 @@ loc_19C9: | $19C9
 check_shot_bacura: | $19CB
     cmp.b     #2,(_STATE,a1)                    | active?
     bne       loc_19C9                          | no, go
-    move.w    d3,d0
-    sub.w     (a3),d0
-    lsr.w     #7,d0                             | spriteY[7:0]
+    move.b    d3,d0                             | solvalou spriteY
+    sub.b     (0,a3),d0                         | bacura spriteY
     sub.b     #24,d0
     add.b     #32,d0
     bcc       9f
-    move.w    (a4),d0
-    sub.w     d4,d0
-    lsr.w     #8,d0                             | spriteX[8:1]
+    move.b    (1,a3),d0                         | bacura spriteX[8:1]
+    sub.b     d4,d0                             | solvalou spriteX[8:1]
     subq.b    #8,d0
     add.b     #16,d0
 9:  rts
         		
 handle_bombed_obj_and_award_points: | $19EE
-		*** THIS IS NEOGEO SPECIFIC
 		movem.l		a0/a5,-(a7)
-		move.w		(scb3_shadow+2*2*0x20),d3					| bomb target spriteY
-		move.w		(scb4_shadow+2*2*0x20),d4					| bomb target spriteX
+		move.b		(sprite_shadow_msb+2*0x20+0),d3		| bomb target spriteY
+		move.b		(sprite_shadow_msb+2*0x20+1),d4		| bomb target spriteX
 		movea.l		#obj_tbl,a5
-		movea.l		#scb3_shadow,a3
-		movea.l		#scb4_shadow,a4
+		movea.l		#sprite_shadow_msb,a3
 		moveq			#16-1,d7
 1:	jsr				check_object_on_target						| on target?
 		bcc				loc_1A2C													| no, skip	
@@ -2368,8 +2341,7 @@ handle_bombed_obj_and_award_points: | $19EE
 		movem.l		(a7)+,d0-d7/a0-a6
 loc_1A2C:
 		adda.l		#_OBJSIZE,a5
-		adda.l		#2*2,a3
-		adda.l		#2*2,a4
+		adda.l		#2,a3
 		dbf				d7,1b
 		movem.l		(a7)+,a0/a5
 		rts
@@ -2381,15 +2353,13 @@ loc_1A34:
 check_object_on_target: | $1A3D
 		cmp.b			#2,(_STATE,a5)										| active?
 		bne				loc_1A34
-		move.w		d3,d0															| bomb target spriteY
-		sub.w			(a3),d0														| compare object spriteY
-		lsr.w			#7,d0															| 7:0
+		move.b		d3,d0															| bomb target spriteY
+		sub.b			(0,a3),d0													| compare object spriteY
 		sub.b			#10,d0
 		add.b			#20,d0
 		bcc				9f
-		move.w		(a4),d0														| bomb target spriteX
-		sub.w			d4,d0														  | compare object spriteX
-		lsr.w			#8,d0															| 8:1
+		move.b		(1,a3),d0													| bomb target spriteX
+		sub.b			d4,d0														  | compare object spriteX
 		subq.b		#5,d0
 		add.b			#10,d0
 9:	rts
@@ -2901,16 +2871,13 @@ remove_bonus_flag: | $1FC3
 		bra				add_obj_handler
 		
 check_flag_collected: | $1FD6
-		*** THIS IS NEOGEO SPECIFIC
-		move.w		(scb3_shadow+2*2*0x23),d3					| solvalou spriteY
-		sub.w			(scb3_shadow+2*2*0x00),d3						
-		lsr.w			#7,d3															| 7:0
+		move.b    (sprite_shadow_msb+2*0x23+0),d3   | solvolou spriteY
+		sub.b			(sprite_shadow_msb+2*0x00+0),d3						
 		sub.b			#0x0a,d3
 		add.b			#0x14,d3
 		bcc				9f
-		move.w		(scb4_shadow+2*2*0x23),d4					| solvalou spriteX
-		sub.w			(scb4_shadow+2*2*0x00),d4
-		lsr.w			#8,d4															| 8:1
+		move.b		(sprite_shadow_msb+2*0x23+1),d4		| solvalou spriteX[8:1]
+		sub.b			(sprite_shadow_msb+2*0x00+1),d4
 		subq.b		#5,d4
 		add.b			#0x0a,d4
 9:	rts
@@ -5546,7 +5513,7 @@ display_easter_egg: | $3AC9
 		moveq			#BANK_FG_COLORRAM,d2
 		move.w		#0x1a,d1
 		jsr				display_char_B_times
-		.ifeq OPT_NEOGEO_EASTER_EGG
+		.ifeq OPT_TCDEV_EASTER_EGG
 		lea				str_program_by_EVEZOO,a0
 		.else
 		lea				str_NEOGEO_by_tcdev,a0
@@ -6056,3 +6023,8 @@ bg_colorram:														ds.b	0x800
 fg_videoram:														ds.b	0x800
 bg_videoram:														ds.b	0x800
 
+* hitbox routines use sprite shadow register values
+* - but for efficiency they're in OSD format
+* - so maintain a 'raw' copy of X{8:1] & Y[7:0]
+* - layout is 64x Y,X pairs
+sprite_shadow_msb:                      ds.b  64*2

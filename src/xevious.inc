@@ -12,13 +12,13 @@
 		OPT_DISABLE_DISPLAY_MASKS=0
 
 		* game options		
-		OPT_START_AREA=1
+		OPT_START_AREA=3
 		OPT_LOOP_AREA=0
 		OPT_INVINCIBLE=0
 		OPT_INFINITE_LIVES=0
-		OPT_NEOGEO_EASTER_EGG=1
+		OPT_TCDEV_EASTER_EGG=1
 		OPT_REVEAL_SOL_TOWER=0
-		OPT_REVEAL_BONUS_FLAG=0
+		OPT_REVEAL_BONUS_FLAG=1
 		OPT_DISPLAY_AREA=1
 
 ***
@@ -100,4 +100,6 @@
 *** global data structures
 ***
 		.global area_offset_in_map_tbl
+		.global sprite_shadow_msb
+
 		

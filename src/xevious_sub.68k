@@ -18,7 +18,7 @@
 		.global sub_debug1
 		.global sub_debug2
 
-.include "src/xevious.inc"
+.include "xevious.inc"
 
 * this doesn't return in the real code
 * but we are calling from main, so we
