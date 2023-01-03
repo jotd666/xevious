@@ -344,7 +344,6 @@ osd_disable_vblank_interrupt:
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_fg_colorram:
 	movem.l	d0-d5/a0-a1,-(a7)
-	and.w	#0x7FF,d0   | useful?
 	lea		_fg_color_data,a1
 	move.b	d1,(a1,d0.w)	| store color X/Y flip attribute in fg table
 	lea		_fg_char_data,a1
@@ -390,7 +389,6 @@ osd_w_bg_videoram:
 	rts
 	
 process_bg_fg_tile:
-	and.w	#0x7FF,d0   | useful?
 	
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
