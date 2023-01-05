@@ -7,7 +7,9 @@ MAIN = ..\$(PROGNAME)
 
 GCC_BIN = C:\amiga-gcc\bin
 ASM = $(GCC_BIN)/m68k-amigaos-as -c 
-OBJS = ReadJoyPad.o amiga.o xevious_main.o graphics.o xevious_sub.o map_rom.o 
+MAIN_OBJ = amiga.o
+# leave MAIN_OBJ first
+OBJS = $(MAIN_OBJ) xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o 
 
 all: $(MAIN) $(WHDLOADER)
 
@@ -23,9 +25,9 @@ map_rom.o: map_rom.68k xevious.inc
 	$(ASM) map_rom.68k -o map_rom.o
 xevious_sub.o: xevious_sub.68k xevious.inc
 	$(ASM) xevious_sub.68k -o xevious_sub.o
-amiga.o: amiga/amiga.68k xevious.inc
+amiga.o: amiga/amiga.68k xevious.inc amiga/ReadJoyPad.inc
 	$(ASM) -Iamiga amiga/amiga.68k -o amiga.o
-ReadJoyPad.o: amiga/ReadJoyPad.68k
+ReadJoyPad.o: amiga/ReadJoyPad.68k amiga/ReadJoyPad.inc
 	$(ASM) -Iamiga amiga/ReadJoyPad.68k -o ReadJoyPad.o
 graphics.o: amiga/graphics.68k xevious.inc
 	$(ASM) amiga/graphics.68k -o graphics.o
