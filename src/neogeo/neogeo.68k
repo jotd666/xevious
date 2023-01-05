@@ -383,6 +383,9 @@ platform_init:
     move.w    #(SCB3+FGSS),-2(a0)               | VRAM_ADDR=SCB3
     move.w    #(SPRITEY_0-2)<<7,d0              | YPOS=0
     moveq     #4-1,d7
+    *** FIXME!!!
+    *** WTF? why does removing this break it?
+    ori.w     #33,d0                            | SIZE=33
 3:  move.w    d0,(a0)                           | 1st 4 sprites size=0
     dbf       d7,3b   
     ori.w     #33,d0                            | SIZE=33
