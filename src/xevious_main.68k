@@ -1492,7 +1492,7 @@ score_lower_than_entry: | $1191
     add.w     d1,d0                             | screen col,row
     move.w    #24,d7
     moveq     #BANK_FG_COLORRAM,d2
-    move.b    #0x1B,d1
+    move.w    #0x1B,d1
     jsr       display_char_B_times
     and.w     #0x00ff,d0                        | screen row
     or.w      #0x0b00,d0                        | screen col
