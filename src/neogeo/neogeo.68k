@@ -1,5 +1,5 @@
 *
-*	Neo Geo-specific portions of Xevious
+* Neo Geo-specific portions of Xevious
 *
 
 * Neo Geo hardware definitions
@@ -11,32 +11,32 @@
     .global _jp_config
     .global _us_config
     .global _sp_config
-   	.global IRQ1
-   	.global IRQ3
-   	.global DUMMY
-   	.global TRAP
-	  .global _user
-		.global _player_start
-		.global _demo_end
-		.global _coin_sound
+    .global IRQ1
+    .global IRQ3
+    .global DUMMY
+    .global TRAP
+    .global _user
+    .global _player_start
+    .global _demo_end
+    .global _coin_sound
 
-* osd layer		
-		.global osd_enable_vblank_interrupt
-		.global osd_ack_vblank_interrupt
-		.global osd_disable_vblank_interrupt
-		.global osd_kick_wdog
-		.global osd_w_fg_colorram
-		.global osd_w_bg_colorram
-		.global osd_w_fg_videoram
-		.global osd_w_bg_videoram
-		.global osd_update_scroll_hw
-		.global osd_update_sprite_shadow
-		.global osd_update_32_sprite_hw
-		.global osd_read_dipswitches
-		.global osd_read_p1_inputs
-		.global osd_read_p2_inputs
-		.global osd_read_coin
-		.global osd_read_start
+* osd layer   
+    .global osd_enable_vblank_interrupt
+    .global osd_ack_vblank_interrupt
+    .global osd_disable_vblank_interrupt
+    .global osd_kick_wdog
+    .global osd_w_fg_colorram
+    .global osd_w_bg_colorram
+    .global osd_w_fg_videoram
+    .global osd_w_bg_videoram
+    .global osd_update_scroll_hw
+    .global osd_update_sprite_shadow
+    .global osd_update_32_sprite_hw
+    .global osd_read_dipswitches
+    .global osd_read_p1_inputs
+    .global osd_read_p2_inputs
+    .global osd_read_coin
+    .global osd_read_start
 
 * debugging only
     .global osd_debug1
@@ -46,7 +46,7 @@
     .global _end_of_ng_code
     .global _end_of_ng_data
     
-		.text
+    .text
 
 TRAP00=TRAP
 TRAP01=TRAP
@@ -82,7 +82,7 @@ _sp_config:
     .byte     0x38                | bonus life (20,60,*60)
     .byte     0x24                | lives (3)
     .byte     0x02                | flags award bonus life (yes)
-    .byte     0x14								| difficulty (normal)
+    .byte     0x14                | difficulty (normal)
     .byte     0x02                | cabinet
     .byte     0x00
     .byte     0x00
@@ -107,7 +107,7 @@ _sp_config:
     .ascii    "FLAGS LIFE  "      | item 7
     .ascii    "YES         "
     .ascii    "NO          "
-    .ascii		"DIFFICULTY  "			| item 8
+    .ascii    "DIFFICULTY  "      | item 8
     .ascii    "NORMAL      "
     .ascii    "EASY        "
     .ascii    "HARD        "
@@ -116,66 +116,66 @@ _sp_config:
     .ascii    "VERTICAL    "
     .ascii    "HORIZONTAL  "
 
-	.align 4
+  .align 4
 IRQ1:
-	move.w	#2, 0x3C000C
-	rte
+  move.w  #2, 0x3C000C
+  rte
     
-	.align 4
+  .align 4
 IRQ3:
-	move.w	#1, 0x3C000C
-	rte
+  move.w  #1, 0x3C000C
+  rte
 
 DUMMY:
-	rte
-	    
+  rte
+      
 TRAP:
-	rte
-	    
+  rte
+      
 _user:
-		moveq			#0,d0
-		move.b		(BIOS_USER_REQUEST),d0
-		lsl.w			#2,d0
+    moveq     #0,d0
+    move.b    (BIOS_USER_REQUEST),d0
+    lsl.w     #2,d0
     movea.l   1f(pc,d0.w),a0
     jmp       (a0)
     .align 4
-1:	.long			startup_init
-		.long			eye_catcher
-		.long			demo_game
-		.long			title_display
+1:  .long     startup_init
+    .long     eye_catcher
+    .long     demo_game
+    .long     title_display
 
 startup_init:
 * we're not doing things the NeoGeo way
-		jmp				BIOSF_SYSTEM_RETURN
+    jmp       BIOSF_SYSTEM_RETURN
 
 eye_catcher:
 * we're not doing things the NeoGeo way
-		jmp				BIOSF_SYSTEM_RETURN
+    jmp       BIOSF_SYSTEM_RETURN
 
 demo_game:
-		move		#0x2700,sr						| disable interrupts
+    move    #0x2700,sr            | disable interrupts
     lea     0x10F300,sp
     move.b  #2,BIOS_USER_MODE     | tell BIOS we're running the game
-		bsr			platform_init					| neo geo-specific init
-		jmp			xevious_reset					| pass control to the xevious core
+    bsr     platform_init         | neo geo-specific init
+    jmp     xevious_reset         | pass control to the xevious core
 
 title_display:
 * we're not doing things the NeoGeo way
     move.b  BIOS_SELECT_TIMER,d0
-		jmp				BIOSF_SYSTEM_RETURN
+    jmp       BIOSF_SYSTEM_RETURN
 
 _player_start:
 * we're not doing things the NeoGeo way
-		rts
-				
+    rts
+        
 _demo_end:
 * we're not doing things the NeoGeo way
-		rts
-				
+    rts
+        
 _coin_sound:
 * we're not doing things the NeoGeo way
-		rts
-				
+    rts
+        
 _vblank:
     btst    #7,BIOS_SYSTEM_MODE
     bne     .gamemode
@@ -184,7 +184,7 @@ _vblank:
     movem.l d0-d7/a0-a6,-(a7)
     KICK_WDOG
     jsr     BIOSF_SYSTEM_IO
-  	jsr			xevious_im1_irq
+    jsr     xevious_im1_irq
 .nothing:
     movem.l (a7)+,d0-d7/a0-a6
     move.w  #4,REG_IRQACK
@@ -192,7 +192,7 @@ _vblank:
 
 .if 0
 nmi: | 0066
-		clr.b			(_nmi_mask)
+    clr.b     (_nmi_mask)
 *   ignore bit0 of IN2 test
     tst.b     (_upright)                        | only 1 set of controls?
     bne       1f                                | yes, skip
@@ -232,19 +232,19 @@ nmi: | 0066
     move.b    d0,(_controller_in)
 *   ignore reset input
 nmi_exit:
-		move.b		#1,(_nmi_mask)
-		rts
+    move.b    #1,(_nmi_mask)
+    rts
 .endif
 
 osd_kick_wdog:
     KICK_WDOG
     rts
 
-		.equ		SPRITEX_0,				8
-		.equ		SPRITEY_0,				(0x1F0)
+    .equ    SPRITEX_0,        8
+    .equ    SPRITEY_0,        (0x1F0)
 
-		.equ		SCB3_STICKY,			(1<<6)
-		
+    .equ    SCB3_STICKY,      (1<<6)
+    
 * NEO GEO sprite allocations
 * -   0- 31 (unused)
 * -  32- 95 (64) background tilemap
@@ -252,120 +252,120 @@ osd_kick_wdog:
 * - 224-263 (36+4) foreground tilemap
 * - 264-265 (2) visible display masking sprites
 
-		.equ		BGSS,							32
-		.equ		XSSS,							96
-		.equ		FGSS,							224
-		.equ		DMSS,							264
+    .equ    BGSS,             32
+    .equ    XSSS,             96
+    .equ    FGSS,             224
+    .equ    DMSS,             264
 
-		.equ		BGNS,							64
-		.equ		XSNS,							128
-		.equ		FGNS,							36+4
-		.equ		DMNS,							2
+    .equ    BGNS,             64
+    .equ    XSNS,             128
+    .equ    FGNS,             36+4
+    .equ    DMNS,             2
 
-		.equ		FG_TILE_BASE,			0x0200
-		.equ		BG_TILE_BASE,			0x0600
-		.equ		XS_TILE_BASE,			0x0A00
-		
-		* fg and bg tiles share the first 128 palettes
-		* - fg uses colours 0-1 in each palette
-		* - bg uses colours 8-11 in each palette
-		.equ		FG_PAL_BASE,			0
-		.equ		BG_PAL_BASE,			0
-		* sprites use the second 128 palettes
-		.equ		XS_PAL_BASE,			128						
-		
+    .equ    FG_TILE_BASE,     0x0200
+    .equ    BG_TILE_BASE,     0x0600
+    .equ    XS_TILE_BASE,     0x0A00
+    
+    * fg and bg tiles share the first 128 palettes
+    * - fg uses colours 0-1 in each palette
+    * - bg uses colours 8-11 in each palette
+    .equ    FG_PAL_BASE,      0
+    .equ    BG_PAL_BASE,      0
+    * sprites use the second 128 palettes
+    .equ    XS_PAL_BASE,      128           
+    
 platform_init:
 
     KICK_WDOG
-*		acknowlede interrupts
-    move.w  	#7,REG_IRQACK
+*   acknowlede interrupts
+    move.w    #7,REG_IRQACK
 
 * clear fix layer (not used)
-		jsr				BIOSF_FIX_CLEAR
-		jsr				BIOSF_LSP_1ST
+    jsr       BIOSF_FIX_CLEAR
+    jsr       BIOSF_LSP_1ST
 
 * setup palette(s)
-		lea				_xevious_tile_palette.l,a0
-		lea				PALETTES,a1               				| start at palette #0
-		move.w		#128-1,d7					                | 128 palettes
-1:	moveq			#16-1,d6					                | 16 colours/palette
+    lea       _xevious_tile_palette.l,a0
+    lea       PALETTES,a1                       | start at palette #0
+    move.w    #128-1,d7                         | 128 palettes
+1:  moveq     #16-1,d6                          | 16 colours/palette
     KICK_WDOG
-2:	move.w		(a0)+,(a1)+
-		dbf				d6,2b
-		dbf				d7,1b
-		lea				_xevious_sprite_palette.l,a0
-		move.w		#128-1,d7					                | 128 palettes
-3:	moveq			#16-1,d6					                | 16 colours/palette
+2:  move.w    (a0)+,(a1)+
+    dbf       d6,2b
+    dbf       d7,1b
+    lea       _xevious_sprite_palette.l,a0
+    move.w    #128-1,d7                         | 128 palettes
+3:  moveq     #16-1,d6                          | 16 colours/palette
     KICK_WDOG
-4:	move.w		(a0)+,(a1)+
-		dbf				d6,4b
-		dbf				d7,3b
-		move.w  	#0x0000,(BACKDROPCOLOR)
-		
+4:  move.w    (a0)+,(a1)+
+    dbf       d6,4b
+    dbf       d7,3b
+    move.w    #0x0000,(BACKDROPCOLOR)
+    
 * setup tilemaps and sprites
 
-		lea				VRAM_RW.l,a0
-		move.w		#1,2(a0)					                | VRAM_MOD=1
+    lea       VRAM_RW.l,a0
+    move.w    #1,2(a0)                          | VRAM_MOD=1
 
 * clear all sprite tiles & attributes
-		move.w		#SCB1,-2(a0)			          			| VRAM_ADDR=SCB1
-		moveq			#0,d7
-		move.w		#448*32-1,d7											| 448 sprites
-1:	move.w		#0,(a0)														| clear tile
-		move.w		#0,(a0)														| clear palette, attributes
-		dbf				d7,1b		
+    move.w    #SCB1,-2(a0)                      | VRAM_ADDR=SCB1
+    moveq     #0,d7
+    move.w    #448*32-1,d7                      | 448 sprites
+1:  move.w    #0,(a0)                           | clear tile
+    move.w    #0,(a0)                           | clear palette, attributes
+    dbf       d7,1b   
 * set all zoom to 1
-		move.w		#SCB2,-2(a0)											| VRAM_ADDR=SCB2
-		move.w		#448-1,d7													| 448 sprites
-2:	move.w		#0xFFF,(a0)												| clear zoom
-		dbf				d7,2b		
+    move.w    #SCB2,-2(a0)                      | VRAM_ADDR=SCB2
+    move.w    #448-1,d7                         | 448 sprites
+2:  move.w    #0xFFF,(a0)                       | clear zoom
+    dbf       d7,2b   
 * set all size to 0 (make inactive)
-		move.w		#SCB3,-2(a0)											| VRAM_ADDR=SCB3
-		move.w		#448-1,d7													| 448 sprites
-2:	move.w		#0x0000,(a0)											| clear size
-		dbf				d7,2b		
+    move.w    #SCB3,-2(a0)                      | VRAM_ADDR=SCB3
+    move.w    #448-1,d7                         | 448 sprites
+2:  move.w    #0x0000,(a0)                      | clear size
+    dbf       d7,2b   
 
 .ifeq OPT_DISABLE_BG_LAYER
 
 * background tilemap
 
 *   - shrinking coefficients
-		move.w		#(SCB2+BGSS),-2(a0)			      		| VRAM_ADDR=SCB2
-		moveq			#BGNS-1,d7
-2:	move.w		#0x077F,(a0)			                | 50% H&V (8x8)
-		dbf				d7,2b
+    move.w    #(SCB2+BGSS),-2(a0)               | VRAM_ADDR=SCB2
+    moveq     #BGNS-1,d7
+2:  move.w    #0x077F,(a0)                      | 50% H&V (8x8)
+    dbf       d7,2b
 
 *   - vertical position, sticky, size=0 (inactive)           
-		move.w		#(SCB3+BGSS),-2(a0)			      		| VRAM_ADDR=SCB3
-		move.w		#SPRITEY_0<<7,d0							    | YPOS=0
-		*ori.w			#33,d0						                | SIZE=33
-		move.w		d0,(a0)						                | 1st sprite not sticky
-		ori.w			#SCB3_STICKY,d0				            | set sticky bit
-		moveq			#BGNS-2,d7					             	| 
-3:	move.w		d0,(a0)						                | SCB3 data
-		dbf				d7,3b
-		
-*		- horizontal position
-		move.w		#(SCB4+BGSS),-2(a0)			      		| VRAM_ADDR=SCB4
-		moveq			#BGNS-1,d7
-		move.w		#SPRITEX_0<<7,d0
-5:	move.w		d0,(a0)						                | XPOS=0
-		addq.w		#8,d0
-		*dbf				d7,5b
+    move.w    #(SCB3+BGSS),-2(a0)               | VRAM_ADDR=SCB3
+    move.w    #SPRITEY_0<<7,d0                  | YPOS=0
+    *ori.w      #33,d0                            | SIZE=33
+    move.w    d0,(a0)                           | 1st sprite not sticky
+    ori.w     #SCB3_STICKY,d0                   | set sticky bit
+    moveq     #BGNS-2,d7                        | 
+3:  move.w    d0,(a0)                           | SCB3 data
+    dbf       d7,3b
+    
+*   - horizontal position
+    move.w    #(SCB4+BGSS),-2(a0)               | VRAM_ADDR=SCB4
+    moveq     #BGNS-1,d7
+    move.w    #SPRITEX_0<<7,d0
+5:  move.w    d0,(a0)                           | XPOS=0
+    addq.w    #8,d0
+    *dbf        d7,5b
 
-	* show a tile on each BG sprite so we can see it
-	.if 0
-		lea				(SCB1+BGSS*64),a1
-		moveq			#BGNS-1,d7
-0:	move.w		a1,-2(a0)
-		move.w		#63,d6
-		sub.w			d7,d6
-		ori.w			#FG_TILE_BASE,d6
-		move.w		d6,(a0)
-		move.w		#0x0100,(a0)
-		lea				(64,a1),a1
-		dbf				d7,0b
-	.endif
+  * show a tile on each BG sprite so we can see it
+  .if 0
+    lea       (SCB1+BGSS*64),a1
+    moveq     #BGNS-1,d7
+0:  move.w    a1,-2(a0)
+    move.w    #63,d6
+    sub.w     d7,d6
+    ori.w     #FG_TILE_BASE,d6
+    move.w    d6,(a0)
+    move.w    #0x0100,(a0)
+    lea       (64,a1),a1
+    dbf       d7,0b
+  .endif
 
 .endif | OPT_DISABLE_BG_LAYER
 
@@ -374,29 +374,29 @@ platform_init:
 * foreground tilemap
 
 *   - shrinking coefficients
-		move.w		#(SCB2+FGSS),-2(a0)			      		| VRAM_ADDR=SCB2
-		moveq			#FGNS-1,d7
-2:	move.w		#0x077F,(a0)			                | 50% H&V (8x8)
-		dbf				d7,2b
+    move.w    #(SCB2+FGSS),-2(a0)               | VRAM_ADDR=SCB2
+    moveq     #FGNS-1,d7
+2:  move.w    #0x077F,(a0)                      | 50% H&V (8x8)
+    dbf       d7,2b
 
 *   - vertical position, sticky, size           
-		move.w		#(SCB3+FGSS),-2(a0)			      		| VRAM_ADDR=SCB3
-		move.w		#(SPRITEY_0-2)<<7,d0							| YPOS=0
-		moveq     #4-1,d7
-3:	move.w		d0,(a0)						                | 1st 4 sprites size=0
+    move.w    #(SCB3+FGSS),-2(a0)               | VRAM_ADDR=SCB3
+    move.w    #(SPRITEY_0-2)<<7,d0              | YPOS=0
+    moveq     #4-1,d7
+3:  move.w    d0,(a0)                           | 1st 4 sprites size=0
     dbf       d7,3b   
-		ori.w			#33,d0						                | SIZE=33
-		moveq			#FGNS-4-1,d7					            | more sprites
-4:	move.w		d0,(a0)						                | SCB3 data
-		dbf				d7,4b
-		
-*		- horizontal position
-		move.w		#(SCB4+FGSS),-2(a0)			      		| VRAM_ADDR=SCB4
-		moveq			#FGNS-1,d7
-		move.w		#(SPRITEX_0+8)<<7,d0              | XPOS=0
-5:	move.w		d0,(a0)						  
-		add.w		  #(8<<7),d0                        | next XPOS
-		dbf				d7,5b
+    ori.w     #33,d0                            | SIZE=33
+    moveq     #FGNS-4-1,d7                      | more sprites
+4:  move.w    d0,(a0)                           | SCB3 data
+    dbf       d7,4b
+    
+*   - horizontal position
+    move.w    #(SCB4+FGSS),-2(a0)               | VRAM_ADDR=SCB4
+    moveq     #FGNS-1,d7
+    move.w    #(SPRITEX_0+8)<<7,d0              | XPOS=0
+5:  move.w    d0,(a0)             
+    add.w     #(8<<7),d0                        | next XPOS
+    dbf       d7,5b
 
 .endif | OPT_DISABLE_FG_LAYER
 
@@ -407,38 +407,38 @@ platform_init:
 *
 
 * - tiles and palettes
-		move.w		#(SCB1+DMSS)*64,-2(a0)						| VRAM_ADDR=SCB1
-		moveq			#2,d6
-1:	moveq			#32-1,d7
-		move.w		#BG_TILE_BASE,d0									| tile code from BG
-2:	move.w		d0,(a0)														| TILE
-		addq.w		#1,d0															| this is for debugging
+    move.w    #(SCB1+DMSS)*64,-2(a0)            | VRAM_ADDR=SCB1
+    moveq     #2,d6
+1:  moveq     #32-1,d7
+    move.w    #BG_TILE_BASE,d0                  | tile code from BG
+2:  move.w    d0,(a0)                           | TILE
+    addq.w    #1,d0                             | this is for debugging
 * change the palette for debugging these sprites
-		move.w		#(128+3)<<8,(a0)									| PALETTE (black on black)
-		dbf				d7,2b
-		dbf				d6,1b
-		
+    move.w    #(128+3)<<8,(a0)                  | PALETTE (black on black)
+    dbf       d7,2b
+    dbf       d6,1b
+    
 *   - shrinking coefficients
-		move.w		#(SCB2+DMSS),-2(a0)			      		| VRAM_ADDR=SCB2
-		moveq			#0,d7
-		moveq			#2-1,d7					              		| 2 sprites
-2:	move.w		#0x077F,(a0)			                | 50% H&V (8x8)
-		dbf				d7,2b
+    move.w    #(SCB2+DMSS),-2(a0)               | VRAM_ADDR=SCB2
+    moveq     #0,d7
+    moveq     #2-1,d7                           | 2 sprites
+2:  move.w    #0x077F,(a0)                      | 50% H&V (8x8)
+    dbf       d7,2b
 
 *   - vertical position, sticky, size           
-		move.w		#(SCB3+DMSS),-2(a0)			      		| VRAM_ADDR=SCB3
-		move.w		#SPRITEY_0<<7,d0							    | YPOS=0
-		ori.w			#33,d0						                | SIZE
-		moveq			#2-1,d7					              		| 2 sprites
-3:	move.w		d0,(a0)						                | SCB3 data
-		dbf				d7,3b
+    move.w    #(SCB3+DMSS),-2(a0)               | VRAM_ADDR=SCB3
+    move.w    #SPRITEY_0<<7,d0                  | YPOS=0
+    ori.w     #33,d0                            | SIZE
+    moveq     #2-1,d7                           | 2 sprites
+3:  move.w    d0,(a0)                           | SCB3 data
+    dbf       d7,3b
 
-*		- horizontal position
-		move.w		#(SCB4+DMSS),-2(a0)			      		| VRAM_ADDR=SCB4
-		move.w		#SPRITEX_0<<7,d0									| X POSITION (bottom)
-		move.w		d0,(a0)
-		move.w		#(SPRITEX_0+37*8)<<7,d0						| X POSITION (top)
-		move.w		d0,(a0)
+*   - horizontal position
+    move.w    #(SCB4+DMSS),-2(a0)               | VRAM_ADDR=SCB4
+    move.w    #SPRITEX_0<<7,d0                  | X POSITION (bottom)
+    move.w    d0,(a0)
+    move.w    #(SPRITEX_0+37*8)<<7,d0           | X POSITION (top)
+    move.w    d0,(a0)
 
     * generate lookup-table for osd_w_fg_colorram
     lea       fg_colorram_lookup_tbl,a0
@@ -475,10 +475,10 @@ platform_init:
     and.w     #0x0100,d1                        | 8
     lsl.w     #4,d1                             | into place
     or.w      d1,d0                             | X|1|0|8|5|4|3|2|..|7|6
-		move.w    d0,(a0)+
-		addq.w    #1,d7
-		cmp.w     #512,d7
-		blt       5b
+    move.w    d0,(a0)+
+    addq.w    #1,d7
+    cmp.w     #512,d7
+    blt       5b
     
 .endif | OPT_DISABLE_DISPLAY_MASKS
 
@@ -488,124 +488,124 @@ platform_init:
     move.b    #1,(REG_ENVIDEO)                  | enable video
 .endif
 
-5:	KICK_WDOG
+5:  KICK_WDOG
     rts
 
 * 60Hz VBLANK interrupt
 osd_enable_vblank_interrupt:
-		move			#0x2000,sr						            | enable interrupts
-		rts
+    move      #0x2000,sr                        | enable interrupts
+    rts
 
 osd_ack_vblank_interrupt:
-   	move.w    #4,REG_IRQACK                     
-		rts
-		
+    move.w    #4,REG_IRQACK                     
+    rts
+    
 osd_disable_vblank_interrupt:
-		move			#0x2400,sr						            | enable interrupts
-		rts
-		
+    move      #0x2400,sr                        | enable interrupts
+    rts
+    
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_fg_colorram:
-		.ifeq OPT_DISABLE_FG_LAYER
-		movem.l		d0-d3/a0/a1,-(a7)
-		lea				fg_colorram,a0
-		move.b		d1,(d0.w,a0)											| save to fg_colorram
-		move.w		d0,d3															| copy offset
-		and.w			#0x3f,d3													| row (sprite number indirectly)
-		cmp.w			#FGNS,d3													| visible?
-		bge				9f																| no, skip
-		move.w		#35+4,d2													| first 4 rows not visible
-		sub.w			d3,d2															| sprite #
-		lsl.w			#6,d2															| d2=sprite offset in SCB1
-		lsr.w			#6,d0															| sprite tile #
-		not.w			d0																| reverse column
-		subq.w		#2,d0															| adjust for visible display
-		and.w			#0x1f,d0													| column (tile number)
-		lsl.w			#1,d0															| d0=tile offset in SCB1
-		add.w			d0,d2
-		lea				SCB1+(FGSS*64),a1
-		lea				(1,d2.w,a1),a1
-		* re-arrange attribute colour, flip bits for Neo Geo
+    .ifeq OPT_DISABLE_FG_LAYER
+    movem.l   d0-d3/a0/a1,-(a7)
+    lea       fg_colorram,a0
+    move.b    d1,(d0.w,a0)                      | save to fg_colorram
+    move.w    d0,d3                             | copy offset
+    and.w     #0x3f,d3                          | row (sprite number indirectly)
+    cmp.w     #FGNS,d3                          | visible?
+    bge       9f                                | no, skip
+    move.w    #35+4,d2                          | first 4 rows not visible
+    sub.w     d3,d2                             | sprite #
+    lsl.w     #6,d2                             | d2=sprite offset in SCB1
+    lsr.w     #6,d0                             | sprite tile #
+    not.w     d0                                | reverse column
+    subq.w    #2,d0                             | adjust for visible display
+    and.w     #0x1f,d0                          | column (tile number)
+    lsl.w     #1,d0                             | d0=tile offset in SCB1
+    add.w     d0,d2
+    lea       SCB1+(FGSS*64),a1
+    lea       (1,d2.w,a1),a1
+    * re-arrange attribute colour, flip bits for Neo Geo
 .if 0
     * generate attribute on-the-fly (156 cycles)
-		move.w		d1,d0															| d0=attr
-		move.w		d1,d2															| d2=attr
-		and.w			#0x03,d1                          | colour bits
-		lsl.w			#4,d1                             | shift into place
-		and.w			#0x3c,d0                          | more colour bits
-		lsr.w			#2,d0                             | shift into place
-		or.w			d0,d1                             | combine
-		lsl.w			#8,d1															| palette bits
-		lsr.b			#6,d2															| flip (6,7->1,0)
-		or.w			d2,d1															| combine with palette
+    move.w    d1,d0                             | d0=attr
+    move.w    d1,d2                             | d2=attr
+    and.w     #0x03,d1                          | colour bits
+    lsl.w     #4,d1                             | shift into place
+    and.w     #0x3c,d0                          | more colour bits
+    lsr.w     #2,d0                             | shift into place
+    or.w      d0,d1                             | combine
+    lsl.w     #8,d1                             | palette bits
+    lsr.b     #6,d2                             | flip (6,7->1,0)
+    or.w      d2,d1                             | combine with palette
 .else
     * use lookup table for attribute (32 cycles)
     lsl.w     #1,d1                             | x2 for entry offset
     lea       fg_colorram_lookup_tbl,a0
     move.w    (a0,d1.w),d1
 .endif
-		* update tilemap tiles
-		move			#0x2400,sr						            | disable vblank
-		lea				VRAM_RW.l,a0
-		move.w		a1,(-2,a0)	        							| VRAM_ADDR=SCB1
-		move.w		d1,(a0)														| set attribute
-		move			#0x2000,sr						            | enable interrupts
-9:	movem.l		(a7)+,d0-d3/a0/a1
-		.endif | OPT_DISABLE_FG_LAYER
-		rts
+    * update tilemap tiles
+    move      #0x2400,sr                        | disable vblank
+    lea       VRAM_RW.l,a0
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB1
+    move.w    d1,(a0)                           | set attribute
+    move      #0x2000,sr                        | enable interrupts
+9:  movem.l   (a7)+,d0-d3/a0/a1
+    .endif | OPT_DISABLE_FG_LAYER
+    rts
 
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_bg_colorram:
-		.ifeq OPT_DISABLE_BG_LAYER
-		movem.l		d0-d3/a0/a1,-(a7)
-		lea				bg_colorram,a0
-		move.b		d1,(d0.w,a0)											| save to bg_colorram
-		move.w		d0,d3															| copy offset
-		and.w			#0x3f,d3													| 63-sprite number
-		move.w		#63,d2														|
-		sub.w			d3,d2															| sprite #
-		lsl.w			#6,d2															| sprite offset in SCB1
-		lsr.w			#6,d0															| sprite tile #
-		not.w			d0																| reverse column
-		subq.w		#2,d0															| adjust for visible display
-		and.w			#0x1f,d0													| column (tile number)
-		lsl.w			#1,d0															| tile offset in SCB1
-		add.w			d0,d2
-		lea				SCB1+(BGSS*64),a1
-		lea				(d2.w,a1),a1
-		* update tilemap
-		move			#0x2400,sr						            | disable vblank
-		lea				VRAM_RW.l,a0
-		move.w		#1,(2,a0)					                | VRAM_MOD=1
-		move.w		a1,(-2,a0)	        							| VRAM_ADDR=SCB1
-		* fix tile
-		move.w		(a0),d3														| READ tile
-		and.w			#~(1<<8),d3												| mask off bit from attr
-		move.w		d1,d2															| d2=attr
-		and.w			#1,d2															| (attr&0x01)
-		ror.b     #1,d2                             | 0->7
-		lsl.w			#1,d2                             | 7->8
-		or.w			d2,d3															| add bit from attr
-		move.w		d3,(a0)														| update tile
-		* now handle attribute
-		* this could be a 256-entry lookup table...
+    .ifeq OPT_DISABLE_BG_LAYER
+    movem.l   d0-d3/a0/a1,-(a7)
+    lea       bg_colorram,a0
+    move.b    d1,(d0.w,a0)                      | save to bg_colorram
+    move.w    d0,d3                             | copy offset
+    and.w     #0x3f,d3                          | 63-sprite number
+    move.w    #63,d2                            |
+    sub.w     d3,d2                             | sprite #
+    lsl.w     #6,d2                             | sprite offset in SCB1
+    lsr.w     #6,d0                             | sprite tile #
+    not.w     d0                                | reverse column
+    subq.w    #2,d0                             | adjust for visible display
+    and.w     #0x1f,d0                          | column (tile number)
+    lsl.w     #1,d0                             | tile offset in SCB1
+    add.w     d0,d2
+    lea       SCB1+(BGSS*64),a1
+    lea       (d2.w,a1),a1
+    * update tilemap
+    move      #0x2400,sr                        | disable vblank
+    lea       VRAM_RW.l,a0
+    move.w    #1,(2,a0)                         | VRAM_MOD=1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB1
+    * fix tile
+    move.w    (a0),d3                           | READ tile
+    and.w     #~(1<<8),d3                       | mask off bit from attr
+    move.w    d1,d2                             | d2=attr
+    and.w     #1,d2                             | (attr&0x01)
+    ror.b     #1,d2                             | 0->7
+    lsl.w     #1,d2                             | 7->8
+    or.w      d2,d3                             | add bit from attr
+    move.w    d3,(a0)                           | update tile
+    * now handle attribute
+    * this could be a 256-entry lookup table...
 .if 0
     * generate SCB1 attribute on-the-fly (180 cycles)
-		and.b			#0x80,d3												  | code&0x80
-		move.w		d1,d2															| d2=attr
-		and.b     #0x3f,d2                          | 0|0|$3C|$03
+    and.b     #0x80,d3                          | code&0x80
+    move.w    d1,d2                             | d2=attr
+    and.b     #0x3f,d2                          | 0|0|$3C|$03
     or.b      d2,d3                             | code&$80|0|$3C|$0
-		ror.b     #2,d3                             | $03|code&$80|0|$3C
+    ror.b     #2,d3                             | $03|code&$80|0|$3C
     move.b    d3,d2
     and.b     #0xe0,d2                          | d2=$03|code&$80|00000
     lsr.b     #1,d2                             | 0|$03|code&$80|0000
     and.b     #0x0f,d3                          | d3=0000|$3C
-		or.b			d2,d3															| d3=<colour>
-		lsl.w			#8,d3															| colour<<8
-		lsr.b			#6,d1															| (attr>>6)
-		and.w			#3,d1															| (attr>>6)&0x03
-		or.b			d1,d3															| d3=neogeo attr
-		move.w		d3,(a0)														| set tileattrib
+    or.b      d2,d3                             | d3=<colour>
+    lsl.w     #8,d3                             | colour<<8
+    lsr.b     #6,d1                             | (attr>>6)
+    and.w     #3,d1                             | (attr>>6)&0x03
+    or.b      d1,d3                             | d3=neogeo attr
+    move.w    d3,(a0)                           | set tileattrib
 .else
     * use lookup table for SCB1 attribute (84 cycles)
     and.w     #0x0080,d3                        | code&0x80
@@ -615,377 +615,377 @@ osd_w_bg_colorram:
     lea       bg_colorram_lookup_tbl,a1
     move.w    (a1,d1.w),(a0)                    | get entry
 .endif
-		move			#0x2000,sr						            | enable interrupts
-9:	movem.l		(a7)+,d0-d3/a0/a1
-		.endif | OPT_DISABLE_BG_LAYER
-		rts
-		
+    move      #0x2000,sr                        | enable interrupts
+9:  movem.l   (a7)+,d0-d3/a0/a1
+    .endif | OPT_DISABLE_BG_LAYER
+    rts
+    
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_fg_videoram:
-		.ifeq OPT_DISABLE_FG_LAYER
-		movem.l		d0-d3/a0/a1,-(a7)
-		lea				fg_videoram,a0
-		move.b		d1,(d0.w,a0)											| save to fg_videoram
-		move.w		d0,d3															| copy offset
-		and.w			#0x3f,d3													| row (sprite # indirectly)
-		cmp.w			#FGNS,d3												  | visible?
-		bge				9f																| no, skip
-		move.w		#35+4,d2													| first 4 rows not visible
-		sub.w			d3,d2															| sprite #
-		lsl.w			#6,d2															| d2=sprite offset in SCB1
-		lsr.w			#6,d0															| sprite tile #
-		not.w			d0																| reverse column
-		subq.w		#2,d0															| adjust for visible display
-		and.w			#0x1f,d0													| column (tile number)
-		lsl.w			#1,d0															| d0=tile offset in SCB1
-		add.w			d0,d2
-		lea				SCB1+(FGSS*64),a1
-		lea				(d2.w,a1),a1
-		ori.w			#FG_TILE_BASE,d1									| map to NG tile
-		* update tilemap
-		move			#0x2400,sr						            | disable vblank
-		lea				VRAM_RW.l,a0
-		move.w		a1,(-2,a0)	        							| VRAM_ADDR=SCB1
-		move.w		d1,(a0)														| set tile
-		move			#0x2000,sr						            | enable interrupts
-9:	movem.l		(a7)+,d0-d3/a0/a1
-		.endif | OPT_DISABLE_FG_LAYER
-		rts
+    .ifeq OPT_DISABLE_FG_LAYER
+    movem.l   d0-d3/a0/a1,-(a7)
+    lea       fg_videoram,a0
+    move.b    d1,(d0.w,a0)                      | save to fg_videoram
+    move.w    d0,d3                             | copy offset
+    and.w     #0x3f,d3                          | row (sprite # indirectly)
+    cmp.w     #FGNS,d3                          | visible?
+    bge       9f                                | no, skip
+    move.w    #35+4,d2                          | first 4 rows not visible
+    sub.w     d3,d2                             | sprite #
+    lsl.w     #6,d2                             | d2=sprite offset in SCB1
+    lsr.w     #6,d0                             | sprite tile #
+    not.w     d0                                | reverse column
+    subq.w    #2,d0                             | adjust for visible display
+    and.w     #0x1f,d0                          | column (tile number)
+    lsl.w     #1,d0                             | d0=tile offset in SCB1
+    add.w     d0,d2
+    lea       SCB1+(FGSS*64),a1
+    lea       (d2.w,a1),a1
+    ori.w     #FG_TILE_BASE,d1                  | map to NG tile
+    * update tilemap
+    move      #0x2400,sr                        | disable vblank
+    lea       VRAM_RW.l,a0
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB1
+    move.w    d1,(a0)                           | set tile
+    move      #0x2000,sr                        | enable interrupts
+9:  movem.l   (a7)+,d0-d3/a0/a1
+    .endif | OPT_DISABLE_FG_LAYER
+    rts
 
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_bg_videoram:
-		.ifeq OPT_DISABLE_BG_LAYER
-		movem.l		d0-d3/a0/a1,-(a7)
-		lea				bg_videoram,a0
-		move.b		d1,(d0.w,a0)											| save to bg_videoram
-		move.w		d0,d3															| copy offset
-		and.w			#0x3f,d3													| 63-sprite number
-		move.w		#63,d2														|
-		sub.w			d3,d2															| sprite #
-		lsl.w			#6,d2															| d2=sprite offset in SCB1
-		lsr.w			#6,d0															| sprite tile #
-		not.w			d0																| reverse column
-		subq.w		#2,d0															| adjust for visible display
-		and.w			#0x1f,d0													| column (tile number)
-		lsl.w			#1,d0															| tile offset in SCB1
-		add.w			d0,d2
-		lea				SCB1+(BGSS*64),a1
-		lea				(d2.w,a1),a1
-		* update tilemap
-		move			#0x2400,sr						            | disable vblank
-		lea				VRAM_RW.l,a0
-		move.w		#1,(2,a0)					                | VRAM_MOD=1
-		move.w		a1,(-2,a0)	        							| VRAM_ADDR=SCB1
-		move.w		(a0),d0														| read tile
-		and.w			#0xff00,d0												| mask off LSB
-		or.w			d0,d1															| add MSB to tile
-		ori.w			#BG_TILE_BASE,d1									| map to NG tile
-		move.w		d1,(a0)														| set tile
-		* now fix colour
-		and.w			#0x0080,d1                        | tile bit7 is part of colour
-		lsl.w			#5,d1                             | shift into Neo Geo palette bit
-		move.w		(a0),d2														| read palette,flip word
-		and.w			#~(1<<12),d2                      | mask off old palette bit
-		or.w			d2,d1                             | combine new palette bit
-		move.w		d1,(a0)														| fix colour
-		move			#0x2000,sr						            | enable interrupts
-9:	movem.l		(a7)+,d0-d3/a0/a1
-		.endif | OPT_DISABLE_BG_LAYER
-		rts
-				
+    .ifeq OPT_DISABLE_BG_LAYER
+    movem.l   d0-d3/a0/a1,-(a7)
+    lea       bg_videoram,a0
+    move.b    d1,(d0.w,a0)                      | save to bg_videoram
+    move.w    d0,d3                             | copy offset
+    and.w     #0x3f,d3                          | 63-sprite number
+    move.w    #63,d2                            |
+    sub.w     d3,d2                             | sprite #
+    lsl.w     #6,d2                             | d2=sprite offset in SCB1
+    lsr.w     #6,d0                             | sprite tile #
+    not.w     d0                                | reverse column
+    subq.w    #2,d0                             | adjust for visible display
+    and.w     #0x1f,d0                          | column (tile number)
+    lsl.w     #1,d0                             | tile offset in SCB1
+    add.w     d0,d2
+    lea       SCB1+(BGSS*64),a1
+    lea       (d2.w,a1),a1
+    * update tilemap
+    move      #0x2400,sr                        | disable vblank
+    lea       VRAM_RW.l,a0
+    move.w    #1,(2,a0)                         | VRAM_MOD=1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB1
+    move.w    (a0),d0                           | read tile
+    and.w     #0xff00,d0                        | mask off LSB
+    or.w      d0,d1                             | add MSB to tile
+    ori.w     #BG_TILE_BASE,d1                  | map to NG tile
+    move.w    d1,(a0)                           | set tile
+    * now fix colour
+    and.w     #0x0080,d1                        | tile bit7 is part of colour
+    lsl.w     #5,d1                             | shift into Neo Geo palette bit
+    move.w    (a0),d2                           | read palette,flip word
+    and.w     #~(1<<12),d2                      | mask off old palette bit
+    or.w      d2,d1                             | combine new palette bit
+    move.w    d1,(a0)                           | fix colour
+    move      #0x2000,sr                        | enable interrupts
+9:  movem.l   (a7)+,d0-d3/a0/a1
+    .endif | OPT_DISABLE_BG_LAYER
+    rts
+        
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
-		.ifeq OPT_DISABLE_BG_LAYER
-		movem.l		d0-d2/a0-a2,-(a7)
-		move.w		d6,d1															| copy of scroll register
-		lsr.w			#3,d1															| byte offset
-		move.w		#24,d0
-		sub.w			d1,d0															| d0=sprite of bottom row
-		and.w			#0x3f,d0													| fix wrap
-		move.w		d0,d2															| copy
-		lea				VRAM_RW.l,a0
-		move.w		#1,2(a0)					                | VRAM_MOD=1
-		lea				SCB3+BGSS,a1
-		move.w		a1,-2(a0)	        								| VRAM_ADDR=SCB3
-		* deactivate all sprites
-		moveq			#64-1,d7
-1:	move.w		#0,(a0)														| deactivate sprite
-		dbf				d7,1b
-		* activate visible sprites
-		lea				SCB3+BGSS,a1
-		moveq			#38-1,d7
-		move.w		#(SPRITEY_0<<7),d1
-		ori.w			#33,d1														| bottom sprite not sticky
-2:	lea				(d0.w,a1),a2
-		move.w		a2,-2(a0)	        								| VRAM_ADDR=SCB3
-		move.w		d1,(a0)														| ypos,sticky,size
-		addq.w		#1,d0
-		and.w			#0x3f,d0													| next sprite
-		cmp.w			#0,d0															| sprite 0?
-		bne				3f																| no, skip
-		and.w			#~SCB3_STICKY,d1									| sprite 0 is never sticky
-		bra				4f
-3:	ori.w			#SCB3_STICKY,d1
-4:	dbf				d7,2b
-		* position all sprites (only non-sticky will work)
-		lea				SCB4+BGSS,a1
-		move.w		#(SPRITEX_0-4)<<7,d0
-		and.w			#7,d6
-		lsl.w			#7,d6
-		add.w			d6,d0
-		moveq			#38-1,d7
-5:	lea				(d2.w,a1),a2
-		move.w		a2,-2(a0)													| VRAM_ADDR=SCB4
-		move.w		d0,(a0)														| X POSITION
-		addq.w		#1,d2
-		and.w			#0x3f,d2													| next sprite
-		add.w			#(8<<7),d0												| next position
-		dbf				d7,5b
-		movem.l		(a7)+,d0-d2/a0-a2
-		.endif | OPT_DISABLE_BG_LAYER
-		rts
+    .ifeq OPT_DISABLE_BG_LAYER
+    movem.l   d0-d2/a0-a2,-(a7)
+    move.w    d6,d1                             | copy of scroll register
+    lsr.w     #3,d1                             | byte offset
+    move.w    #24,d0
+    sub.w     d1,d0                             | d0=sprite of bottom row
+    and.w     #0x3f,d0                          | fix wrap
+    move.w    d0,d2                             | copy
+    lea       VRAM_RW.l,a0
+    move.w    #1,2(a0)                          | VRAM_MOD=1
+    lea       SCB3+BGSS,a1
+    move.w    a1,-2(a0)                         | VRAM_ADDR=SCB3
+    * deactivate all sprites
+    moveq     #64-1,d7
+1:  move.w    #0,(a0)                           | deactivate sprite
+    dbf       d7,1b
+    * activate visible sprites
+    lea       SCB3+BGSS,a1
+    moveq     #38-1,d7
+    move.w    #(SPRITEY_0<<7),d1
+    ori.w     #33,d1                            | bottom sprite not sticky
+2:  lea       (d0.w,a1),a2
+    move.w    a2,-2(a0)                         | VRAM_ADDR=SCB3
+    move.w    d1,(a0)                           | ypos,sticky,size
+    addq.w    #1,d0
+    and.w     #0x3f,d0                          | next sprite
+    cmp.w     #0,d0                             | sprite 0?
+    bne       3f                                | no, skip
+    and.w     #~SCB3_STICKY,d1                  | sprite 0 is never sticky
+    bra       4f
+3:  ori.w     #SCB3_STICKY,d1
+4:  dbf       d7,2b
+    * position all sprites (only non-sticky will work)
+    lea       SCB4+BGSS,a1
+    move.w    #(SPRITEX_0-4)<<7,d0
+    and.w     #7,d6
+    lsl.w     #7,d6
+    add.w     d6,d0
+    moveq     #38-1,d7
+5:  lea       (d2.w,a1),a2
+    move.w    a2,-2(a0)                         | VRAM_ADDR=SCB4
+    move.w    d0,(a0)                           | X POSITION
+    addq.w    #1,d2
+    and.w     #0x3f,d2                          | next sprite
+    add.w     #(8<<7),d0                        | next position
+    dbf       d7,5b
+    movem.l   (a7)+,d0-d2/a0-a2
+    .endif | OPT_DISABLE_BG_LAYER
+    rts
 
 * a5=obj_tbl
 osd_update_sprite_shadow:
-		lea				scb1_shadow,a1
-		lea       sprite_shadow_msb,a2
-		lea				scb3_shadow,a3
-		lea				scb4_shadow,a4
-		moveq			#64-1,d7
-1:	jsr				update_sprite_shadow
-		adda.w		#_OBJSIZE,a5
-		dbf				d7,1b
-		rts
+    lea       scb1_shadow,a1
+    lea       sprite_shadow_msb,a2
+    lea       scb3_shadow,a3
+    lea       scb4_shadow,a4
+    moveq     #64-1,d7
+1:  jsr       update_sprite_shadow
+    adda.w    #_OBJSIZE,a5
+    dbf       d7,1b
+    rts
 
 osd_debug1:
 update_sprite_shadow: | $0332
-		move.b		(_STATE,a5),d0										| state
-		subq.b		#1,d0															| =1?
-		bne				0f																| no, skip
-		adda.w		#2*4*2,a1
-		adda.w    #2,a2
-		adda.w		#2*2,a3
-		adda.w		#2*2,a4
-		rts
-0:	addq.b		#1,d0
-		bne				1f																| NZ? yes, skip
-		clr.w			(_X,a5)														| spriteX=0
-		clr.w			(_Y,a5)														| spriteY=0
-		move.b		#1,(_STATE,a5)										| state=1
-		** SCB1
-1:	moveq			#0,d0
-		move.b		(_ATTR,a5),d0											| bank,xflip,yflip,size
-		move.b		d0,d3															| save
-		and.w			#(1<<7),d0												| bank only
-		lsl.w			#1,d0															| :8=bank
-		move.b		(_CODE,a5),d0											| 7:0=code
-		ori.w			#XS_TILE_BASE,d0									| d0=code
-		moveq			#0,d1						
-		move.b		(_COLOUR,a5),d1										| colour
-		ori.w			#XS_PAL_BASE,d1
-		lsl.w			#8,d1															| 15:8=colour
-		move.b		(_ATTR,a5),d2											| bank,xflip,yflip,size
-		and.b			#0x0c,d2													| xflip,yflip only
-		lsr.b			#2,d2
-		or.b			d2,d1															| d1=colour
-		and.b			#3,d3                             | size only
-		cmp.b			#0,d3															| size=1x1?
-		bne				2f																| no, go
-		* 1x1
-  	move.w		d0,(0,a1)													| SCB1 code (sprite0,tile0)
-		move.w		d1,(2,a1)													| SCB1 colour (sprite0,tile0)
-		bra				0f		
-2:	cmp.b     #2,d3                             | size=1x2?
+    move.b    (_STATE,a5),d0                    | state
+    subq.b    #1,d0                             | =1?
+    bne       0f                                | no, skip
+    adda.w    #2*4*2,a1
+    adda.w    #2,a2
+    adda.w    #2*2,a3
+    adda.w    #2*2,a4
+    rts
+0:  addq.b    #1,d0
+    bne       1f                                | NZ? yes, skip
+    clr.w     (_X,a5)                           | spriteX=0
+    clr.w     (_Y,a5)                           | spriteY=0
+    move.b    #1,(_STATE,a5)                    | state=1
+    ** SCB1
+1:  moveq     #0,d0
+    move.b    (_ATTR,a5),d0                     | bank,xflip,yflip,size
+    move.b    d0,d3                             | save
+    and.w     #(1<<7),d0                        | bank only
+    lsl.w     #1,d0                             | :8=bank
+    move.b    (_CODE,a5),d0                     | 7:0=code
+    ori.w     #XS_TILE_BASE,d0                  | d0=code
+    moveq     #0,d1           
+    move.b    (_COLOUR,a5),d1                   | colour
+    ori.w     #XS_PAL_BASE,d1
+    lsl.w     #8,d1                             | 15:8=colour
+    move.b    (_ATTR,a5),d2                     | bank,xflip,yflip,size
+    and.b     #0x0c,d2                          | xflip,yflip only
+    lsr.b     #2,d2
+    or.b      d2,d1                             | d1=colour
+    and.b     #3,d3                             | size only
+    cmp.b     #0,d3                             | size=1x1?
+    bne       2f                                | no, go
+    * 1x1
+    move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile0)
+    move.w    d1,(2,a1)                         | SCB1 colour (sprite0,tile0)
+    bra       0f    
+2:  cmp.b     #2,d3                             | size=1x2?
     bne       6f                                | no, go
     * 1x2
     and.b     #~2,d0                            | code
-  	move.w		d0,(4,a1)												  | SCB1 code (sprite0,tile0)
-		move.w		d1,(6,a1)												  | SCB1 colour (sprite0,tile0)
-		addq.w		#2,d0                             | code+2
-		move.w		d0,(0,a1)													| SCB1 code (sprite0,tile1)
-		move.w		d1,(2,a1)												  | SCB1 colour (sprite0,tile1)
+    move.w    d0,(4,a1)                         | SCB1 code (sprite0,tile0)
+    move.w    d1,(6,a1)                         | SCB1 colour (sprite0,tile0)
+    addq.w    #2,d0                             | code+2
+    move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile1)
+    move.w    d1,(2,a1)                         | SCB1 colour (sprite0,tile1)
     bra       0f  
-		* 2x2
-6:  and.b			#~3,d0                            | code
-  	move.w		d0,(12,a1)												| SCB1 code (sprite0,tile0)
-		move.w		d1,(14,a1)												| SCB1 colour (sprite0,tile0)
-		addq.w		#2,d0                             | code+2
-		move.w		d0,(8,a1)													| SCB1 code (sprite0,tile1)
-		move.w		d1,(10,a1)												| SCB1 colour (sprite0,tile1)
-		subq.w		#1,d0                             | code+1
-		move.w		d0,(4,a1)													| SCB1 code (sprite1,tile0)
-		move.w		d1,(6,a1)													| SCB1 colour (sprite1,tile0)
-		addq.w		#2,d0                             | code+3
-		move.w		d0,(0,a1)													| SCB1 code (sprite1,tile1)
-		move.w		d1,(2,a1)													| SCB1 colour (sprite1,tile1)
-0:	adda.l		#2*8,a1
-		** SCB3
-		move.w		(_Y,a5),d0												| spriteY
-		lsr.w			#5,d0															| back to original
-		move.b    d0,(a2)+                          | store Y[7:0] for hit-box calcs
-		btst			#8,d0
-		beq				3f
-		and.w			#0xff00,d0												| max=256
-3: 	add.w			#0x110,d0
-		lsl.w			#7,d0
-		cmp.b			#2,(_STATE,a5)										| state=0/1? (fix me)
-		bcs				4f																| yes, skip
-		ori.w			#1,d0															| size=1 (default)
-		btst.b		#1,(_ATTR,a5)											| double height?
-		beq				4f																| no, skip
-		addq.w		#1,d0															| size=2
-4:	move.w		d0,(a3)+													| SCB3 YPOS
-		move.b		(_ATTR,a5),d1
-		and.w			#1,d1															| double width only
-		lsl.w			#6,d1															| move to sticky bit
-		or.w			d1,d0
-		move.w		d0,(a3)+
-		** SCB4
-		move.w		(_X,a5),d0												| spriteX
-		lsr.w			#5,d0															| back to original
-		move.w    d0,d1
-		lsr.w     #1,d1
-		move.b    d1,(a2)+                          | store X[8:1] for hit-box calcs
-		cmp.w			#0x0200,d0												| too big?
-		bcs				5f
-		clr.w			d0
-5:	move.w		#319,d1
-		sub.w			d0,d1
-		btst.b		#0,(_ATTR,a5)											| double width?
-		beq				6f																| no, skip
-		sub.w			#16,d1														| adjust
-6:	lsl.w			#7,d1
-		move.w		d1,(a4)														| SCB4 XPOS
-		* no need to write SCB4 for the chained sprite
-		adda.w		#4,a4
-9:	rts
-				
+    * 2x2
+6:  and.b     #~3,d0                            | code
+    move.w    d0,(12,a1)                        | SCB1 code (sprite0,tile0)
+    move.w    d1,(14,a1)                        | SCB1 colour (sprite0,tile0)
+    addq.w    #2,d0                             | code+2
+    move.w    d0,(8,a1)                         | SCB1 code (sprite0,tile1)
+    move.w    d1,(10,a1)                        | SCB1 colour (sprite0,tile1)
+    subq.w    #1,d0                             | code+1
+    move.w    d0,(4,a1)                         | SCB1 code (sprite1,tile0)
+    move.w    d1,(6,a1)                         | SCB1 colour (sprite1,tile0)
+    addq.w    #2,d0                             | code+3
+    move.w    d0,(0,a1)                         | SCB1 code (sprite1,tile1)
+    move.w    d1,(2,a1)                         | SCB1 colour (sprite1,tile1)
+0:  adda.l    #2*8,a1
+    ** SCB3
+    move.w    (_Y,a5),d0                        | spriteY
+    lsr.w     #5,d0                             | back to original
+    move.b    d0,(a2)+                          | store Y[7:0] for hit-box calcs
+    btst      #8,d0
+    beq       3f
+    and.w     #0xff00,d0                        | max=256
+3:  add.w     #0x110,d0
+    lsl.w     #7,d0
+    cmp.b     #2,(_STATE,a5)                    | state=0/1? (fix me)
+    bcs       4f                                | yes, skip
+    ori.w     #1,d0                             | size=1 (default)
+    btst.b    #1,(_ATTR,a5)                     | double height?
+    beq       4f                                | no, skip
+    addq.w    #1,d0                             | size=2
+4:  move.w    d0,(a3)+                          | SCB3 YPOS
+    move.b    (_ATTR,a5),d1
+    and.w     #1,d1                             | double width only
+    lsl.w     #6,d1                             | move to sticky bit
+    or.w      d1,d0
+    move.w    d0,(a3)+
+    ** SCB4
+    move.w    (_X,a5),d0                        | spriteX
+    lsr.w     #5,d0                             | back to original
+    move.w    d0,d1
+    lsr.w     #1,d1
+    move.b    d1,(a2)+                          | store X[8:1] for hit-box calcs
+    cmp.w     #0x0200,d0                        | too big?
+    bcs       5f
+    clr.w     d0
+5:  move.w    #319,d1
+    sub.w     d0,d1
+    btst.b    #0,(_ATTR,a5)                     | double width?
+    beq       6f                                | no, skip
+    sub.w     #16,d1                            | adjust
+6:  lsl.w     #7,d1
+    move.w    d1,(a4)                           | SCB4 XPOS
+    * no need to write SCB4 for the chained sprite
+    adda.w    #4,a4
+9:  rts
+        
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
 .if 0
-		move.w		(irq_cnt),d1
-		addq.w		#1,d1
-		and.w			#0x0f,d1
-		move.w		d1,(irq_cnt)
-		bne				9f
-.endif		
-		.ifeq OPT_DISABLE_SPRITES
-		lea				VRAM_RW.l,a0
-		move.w		#1,2(a0)					                | VRAM_MOD=1
-		lsl.w			#1,d0															| 2x Neo Geo sprites
-		move.w		d0,d6															| save base sprite (0/64)
-		* SCB1 (code,colour,flip)
-		lsl.w			#3,d6															| 2 tiles (8 bytes)/entry
-		lea				scb1_shadow,a1
-		lea				(a1,d6.w),a1
-		lsl.w			#3,d6															| 64 words/entry
-		lea				SCB1+(XSSS*64),a4
-		move.w		#64-1,d7
-1:	lea				(a4,d6.w),a2
-		move.w		a2,(-2,a0)												| VRAM_ADDR=SCB1
-		move.w		(a1)+,(a0)												| SCB1 TILE
-		move.w		(a1)+,(a0)												| SCB1 PALETTTE,FLIP
-		move.w		(a1)+,(a0)												| SCB1 TILE
-		move.w		(a1)+,(a0)												| SCB1 PALETTTE,FLIP
-		add.w			#64,d6														| next sprite VRAM offset
-		dbf				d7,1b
-		* SCB3 (ypos,size)
-		move.w		d0,d6
-		lea				SCB3+XSSS,a4
-		lea				(a4,d6.w),a4
-		move.w		a4,(-2,a0)												| VRAM_ADDR=SCB3
-		lsl.w			#1,d6															| 2 bytes/entry
-		lea				scb3_shadow,a1
-		lea				(a1,d6.w),a1
-		moveq			#64-1,d7
-3:	move.w		(a1)+,(a0)												| SCB3 YPOS,SIZE
-		dbf				d7,3b
-		* SCB4 (xpos)
-		move.w		d0,d6
-		lea				SCB4+XSSS,a4
-		lea				(a4,d6.w),a4
-		move.w		a4,(-2,a0)												| VRAM_ADDR=SCB4
-		lsl.w			#1,d6															| 2 bytes/entry
-		lea				scb4_shadow,a1
-		lea				(a1,d6.w),a1
-		moveq			#64-1,d7
-4:	move.w		(a1)+,(a0)												| SCB4 XPOS
-		dbf				d7,4b
-		.endif | OPT_DISABLE_SPRITES
-		rts
-		
+    move.w    (irq_cnt),d1
+    addq.w    #1,d1
+    and.w     #0x0f,d1
+    move.w    d1,(irq_cnt)
+    bne       9f
+.endif    
+    .ifeq OPT_DISABLE_SPRITES
+    lea       VRAM_RW.l,a0
+    move.w    #1,2(a0)                          | VRAM_MOD=1
+    lsl.w     #1,d0                             | 2x Neo Geo sprites
+    move.w    d0,d6                             | save base sprite (0/64)
+    * SCB1 (code,colour,flip)
+    lsl.w     #3,d6                             | 2 tiles (8 bytes)/entry
+    lea       scb1_shadow,a1
+    lea       (a1,d6.w),a1
+    lsl.w     #3,d6                             | 64 words/entry
+    lea       SCB1+(XSSS*64),a4
+    move.w    #64-1,d7
+1:  lea       (a4,d6.w),a2
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB1
+    move.w    (a1)+,(a0)                        | SCB1 TILE
+    move.w    (a1)+,(a0)                        | SCB1 PALETTTE,FLIP
+    move.w    (a1)+,(a0)                        | SCB1 TILE
+    move.w    (a1)+,(a0)                        | SCB1 PALETTTE,FLIP
+    add.w     #64,d6                            | next sprite VRAM offset
+    dbf       d7,1b
+    * SCB3 (ypos,size)
+    move.w    d0,d6
+    lea       SCB3+XSSS,a4
+    lea       (a4,d6.w),a4
+    move.w    a4,(-2,a0)                        | VRAM_ADDR=SCB3
+    lsl.w     #1,d6                             | 2 bytes/entry
+    lea       scb3_shadow,a1
+    lea       (a1,d6.w),a1
+    moveq     #64-1,d7
+3:  move.w    (a1)+,(a0)                        | SCB3 YPOS,SIZE
+    dbf       d7,3b
+    * SCB4 (xpos)
+    move.w    d0,d6
+    lea       SCB4+XSSS,a4
+    lea       (a4,d6.w),a4
+    move.w    a4,(-2,a0)                        | VRAM_ADDR=SCB4
+    lsl.w     #1,d6                             | 2 bytes/entry
+    lea       scb4_shadow,a1
+    lea       (a1,d6.w),a1
+    moveq     #64-1,d7
+4:  move.w    (a1)+,(a0)                        | SCB4 XPOS
+    dbf       d7,4b
+    .endif | OPT_DISABLE_SPRITES
+    rts
+    
 * d0=DSWA, d1=DSWB
 osd_read_dipswitches:
-		lea				BIOS_GAME_DIP,a0
-		* coinage 2,1 (1,0)
-		move.b		6(a0),d0													| bonus life
-		lsl.b			#2,d0															| SW=5,4,3 (bit=4,3,2)
-		move.b		7(a0),d2													| lives
-		lsl.b			#5,d2															| SW=7,6 (bit=6,5)
-		or.b			d2,d0
-		not.b			d0
-		move.b		8(a0),d1													| flag awards bonus life
-		lsl.b			#1,d1															| SW=2 (bit=1)
-		move.b		9(a0),d2													| difficulty
-		lsl.b			#5,d2															| SW=7,6 (bit=6,5)
-		or.b			d2,d1
-		move.b    BIOS_P2CURRENT,d2                 | read P2 inputs
-		and.b			#(1<<5),d2												| B2 only
-		lsr.b			#1,d2															| 4=B2
-		or.b			d2,d1															| add to DSWB
-		move.b    BIOS_P1CURRENT,d2                 | read P1 inputs
-		and.b			#(1<<5),d2												| B2 only
-		lsr.b			#5,d2															| 0=B2
-		or.b			d2,d1															| add to DSWB
-		not.b			d1
-		rts
+    lea       BIOS_GAME_DIP,a0
+    * coinage 2,1 (1,0)
+    move.b    6(a0),d0                          | bonus life
+    lsl.b     #2,d0                             | SW=5,4,3 (bit=4,3,2)
+    move.b    7(a0),d2                          | lives
+    lsl.b     #5,d2                             | SW=7,6 (bit=6,5)
+    or.b      d2,d0
+    not.b     d0
+    move.b    8(a0),d1                          | flag awards bonus life
+    lsl.b     #1,d1                             | SW=2 (bit=1)
+    move.b    9(a0),d2                          | difficulty
+    lsl.b     #5,d2                             | SW=7,6 (bit=6,5)
+    or.b      d2,d1
+    move.b    BIOS_P2CURRENT,d2                 | read P2 inputs
+    and.b     #(1<<5),d2                        | B2 only
+    lsr.b     #1,d2                             | 4=B2
+    or.b      d2,d1                             | add to DSWB
+    move.b    BIOS_P1CURRENT,d2                 | read P1 inputs
+    and.b     #(1<<5),d2                        | B2 only
+    lsr.b     #5,d2                             | 0=B2
+    or.b      d2,d1                             | add to DSWB
+    not.b     d1
+    rts
 
 * - neogeo   5=B2, 4=B1, 3=right, 2=left, 1=down,  0=up
-		
+    
 osd_read_p1_inputs:
-		move.b    BIOS_P1CURRENT,d0                 | read IN1
-		move.b		d0,d1															| copy
-		and.w			#0x0f,d0
-		movem.l		a0,-(a7)
-		movea.l		#input_map_tbl,a0
-		move.b		(a0,d0.w),d0
-		move.b    d1,d2
-		and.b			#(1<<4),d1												| B1 only
-		lsl.b			#1,d1															| 5=B1
-		eor.b			d1,d0															| add to joystick
-		* looks like bit4 is a debounced version of bit5
-		* - this is the only way to get name input to work
-		btst.b    #5,d0                             | B1?
-		bne       1f                                | no, skip
-		btst.b    #5,(p1_input_r)                   | B1 last time?
-		beq       1f                                | yes, skip
-	  and.b     #~(1<<4),d0                       | flag B1 (active low)	
-1:	move.b    d0,(p1_input_r)                   | save for next time
-		movem.l		(a7)+,a0
-9:	rts
+    move.b    BIOS_P1CURRENT,d0                 | read IN1
+    move.b    d0,d1                             | copy
+    and.w     #0x0f,d0
+    movem.l   a0,-(a7)
+    movea.l   #input_map_tbl,a0
+    move.b    (a0,d0.w),d0
+    move.b    d1,d2
+    and.b     #(1<<4),d1                        | B1 only
+    lsl.b     #1,d1                             | 5=B1
+    eor.b     d1,d0                             | add to joystick
+    * looks like bit4 is a debounced version of bit5
+    * - this is the only way to get name input to work
+    btst.b    #5,d0                             | B1?
+    bne       1f                                | no, skip
+    btst.b    #5,(p1_input_r)                   | B1 last time?
+    beq       1f                                | yes, skip
+    and.b     #~(1<<4),d0                       | flag B1 (active low)  
+1:  move.b    d0,(p1_input_r)                   | save for next time
+    movem.l   (a7)+,a0
+9:  rts
 
 input_map_tbl:
-		.byte			0xf8															|  0, none
-		.byte			0xf0															|  1, up
-		.byte			0xf4															|  2, down
-		.byte			0xf8															|  3, down+up (invalid)
-		.byte			0xf6															|  4, left
-		.byte			0xf7															|  5, left+up
-		.byte			0xf5															|  6, left+down
-		.byte			0xf8															|  7, left+down+up (invalid)
-		.byte			0xf2															|  8, right
-		.byte			0xf1															|  9, right+up
-		.byte			0xf3															|  A, right+down
-		.byte			0xf8															|  B, right+down+up (invalid)
-		.byte			0xf8															|  C, right+left (invalid)
-		.byte			0xf8															|  D, right+left+up (invalid)
-		.byte			0xf8															|  E, right+left+down (invalid)
-		.byte			0xf8															|  F, right+left+down+up (invalid)
-		
+    .byte     0xf8                              |  0, none
+    .byte     0xf0                              |  1, up
+    .byte     0xf4                              |  2, down
+    .byte     0xf8                              |  3, down+up (invalid)
+    .byte     0xf6                              |  4, left
+    .byte     0xf7                              |  5, left+up
+    .byte     0xf5                              |  6, left+down
+    .byte     0xf8                              |  7, left+down+up (invalid)
+    .byte     0xf2                              |  8, right
+    .byte     0xf1                              |  9, right+up
+    .byte     0xf3                              |  A, right+down
+    .byte     0xf8                              |  B, right+down+up (invalid)
+    .byte     0xf8                              |  C, right+left (invalid)
+    .byte     0xf8                              |  D, right+left+up (invalid)
+    .byte     0xf8                              |  E, right+left+down (invalid)
+    .byte     0xf8                              |  F, right+left+down+up (invalid)
+    
 osd_read_p2_inputs:
-		*move.b    BIOS_P2CURRENT,d0                 | read IN1
-		bra				osd_read_p1_inputs
-		rts
+    *move.b    BIOS_P2CURRENT,d0                 | read IN1
+    bra       osd_read_p1_inputs
+    rts
 
 osd_read_coin:
     tst.b     (BIOS_MVS_FLAG)
@@ -993,134 +993,134 @@ osd_read_coin:
 *   The NEO GEO BIOS handles credits and coins for you
 *   so we always use 1C1C here and let DK handle the
 *   actual credits itself
-		lea				0x10fdb0.l,a0
-		move.w		#0x0100,(a0)
-		jsr				BIOSF_CREDIT_CHECK
-		lea				0x10fdb0.l,a0
-		move.w		(a0),d0
-		cmpi.w		#0x0100,d0
-		beq       1f
-		moveq			#0,d0
-		bra				9f
-1:	jsr				BIOSF_CREDIT_DOWN
-		bra				coin_inserted
-home_use:		
-		* fix me
+    lea       0x10fdb0.l,a0
+    move.w    #0x0100,(a0)
+    jsr       BIOSF_CREDIT_CHECK
+    lea       0x10fdb0.l,a0
+    move.w    (a0),d0
+    cmpi.w    #0x0100,d0
+    beq       1f
+    moveq     #0,d0
+    bra       9f
+1:  jsr       BIOSF_CREDIT_DOWN
+    bra       coin_inserted
+home_use:   
+    * fix me
     move.b    (BIOS_STATCHANGE),d6
-    btst.b		#1,d6															| <SELECT> changed?
-    beq				1f																| no, skip
-		move.b    BIOS_STATCURNT,d0                 | read start buttons
-		btst.b		#1,d0															| <SELECT> pressed?
-		beq				9f
-coin_inserted:		
-		moveq			#1,d0
-9:	rts
-		
+    btst.b    #1,d6                             | <SELECT> changed?
+    beq       1f                                | no, skip
+    move.b    BIOS_STATCURNT,d0                 | read start buttons
+    btst.b    #1,d0                             | <SELECT> pressed?
+    beq       9f
+coin_inserted:    
+    moveq     #1,d0
+9:  rts
+    
 osd_read_start:
-		move.b    BIOS_STATCURNT,d0                 | bit0=P1, bit2=P2
-		move.b		d0,d6
-		and.b			#1,d0															| P1 only
-		lsr.b			#1,d6															| P2->bit1
-		and.b			#2,d6															| P2 only
-		or.b			d6,d0															| bit0=P1, bit1=P2
-9:	rts
-		
+    move.b    BIOS_STATCURNT,d0                 | bit0=P1, bit2=P2
+    move.b    d0,d6
+    and.b     #1,d0                             | P1 only
+    lsr.b     #1,d6                             | P2->bit1
+    and.b     #2,d6                             | P2 only
+    or.b      d6,d0                             | bit0=P1, bit1=P2
+9:  rts
+    
 * render xevious bg tilemap
 
 render_bg_tilemap:
-		rts
-		lea				VRAM_RW.l,a0
-		lea				SCB1+(BGSS+28)*64,a1
-		move.w		a1,-2(a0)	        								| VRAM_ADDR=SCB1
-		move.w		#1,2(a0)					                | VRAM_MOD=1
-		lea				bg_videoram+35,a2
-		lea       bg_colorram+35,a3
-		moveq			#36-1,d7													| 36 sprites
-1:	moveq			#32-1,d6													| 32 tiles/sprite
-		move.w		#31*64,d4
-2:  moveq			#0,d1
-		move.b		(d4,a2),d1												| tile code
-		move.b		(d4,a3),d2												| attr
-		lsl.w			#8,d2															| 8 bits
-		and.w			#0x0100,d2
-		or.w			d2,d1		
-		or.w			#BG_TILE_BASE,d1									| map to NG tile code
-		cmp.w			#31,d6
-		bne				6f
-		move.w		(a0),d1
-6:	move.w		d1,(a0)														| set SCB1 tile
-7:	and.w			#0x80,d1													| code&0x80
-		lsr.b			#3,d1															| (code&0x80)>>3
-		move.b		(d4,a3),d2												| attr
-		and.b			#0x3C,d2													| attr&0x3C
-		lsr.b			#2,d2															| (attr&0x3C)>>2
-		or.b			d2,d1
-		move.b		(d4,a3),d2												| attr
-		and.b			#0x03,d2													| attr&0x03
-		lsl.b			#5,d2															| (attr%0x03)<<5
-		or.b			d2,d1
-3:	lsl.w			#8,d1															| colour<<8
-		move.b		(d4,a3),d2												| attr
-		lsr.b			#6,d2
-		and.b			#3,d2
-		*eor.b			#3,d2
-		or.b			d2,d1
-		cmp.w			#31,d6
-		bne				7f
-		move.w		(a0),d1
-7:	move.w		d1,(a0)														| set SCB1 colour
-8:	sub.w			#64,d4
-		dbf				d6,2b															| 1 sprite
-		subq.w		#1,a2
-		subq.w		#1,a3
-		dbf				d7,1b
-9:	KICK_WDOG
+    rts
+    lea       VRAM_RW.l,a0
+    lea       SCB1+(BGSS+28)*64,a1
+    move.w    a1,-2(a0)                         | VRAM_ADDR=SCB1
+    move.w    #1,2(a0)                          | VRAM_MOD=1
+    lea       bg_videoram+35,a2
+    lea       bg_colorram+35,a3
+    moveq     #36-1,d7                          | 36 sprites
+1:  moveq     #32-1,d6                          | 32 tiles/sprite
+    move.w    #31*64,d4
+2:  moveq     #0,d1
+    move.b    (d4,a2),d1                        | tile code
+    move.b    (d4,a3),d2                        | attr
+    lsl.w     #8,d2                             | 8 bits
+    and.w     #0x0100,d2
+    or.w      d2,d1   
+    or.w      #BG_TILE_BASE,d1                  | map to NG tile code
+    cmp.w     #31,d6
+    bne       6f
+    move.w    (a0),d1
+6:  move.w    d1,(a0)                           | set SCB1 tile
+7:  and.w     #0x80,d1                          | code&0x80
+    lsr.b     #3,d1                             | (code&0x80)>>3
+    move.b    (d4,a3),d2                        | attr
+    and.b     #0x3C,d2                          | attr&0x3C
+    lsr.b     #2,d2                             | (attr&0x3C)>>2
+    or.b      d2,d1
+    move.b    (d4,a3),d2                        | attr
+    and.b     #0x03,d2                          | attr&0x03
+    lsl.b     #5,d2                             | (attr%0x03)<<5
+    or.b      d2,d1
+3:  lsl.w     #8,d1                             | colour<<8
+    move.b    (d4,a3),d2                        | attr
+    lsr.b     #6,d2
+    and.b     #3,d2
+    *eor.b      #3,d2
+    or.b      d2,d1
+    cmp.w     #31,d6
+    bne       7f
+    move.w    (a0),d1
+7:  move.w    d1,(a0)                           | set SCB1 colour
+8:  sub.w     #64,d4
+    dbf       d6,2b                             | 1 sprite
+    subq.w    #1,a2
+    subq.w    #1,a3
+    dbf       d7,1b
+9:  KICK_WDOG
     rts
 
 * d6 has videoram offset of next row
 render_tilemap_2:
 
-		rts
-		lea				VRAM_RW.l,a0
-		lea				SCB1+BGSS*64,a1
-		move.w		a1,-2(a0)	        								| VRAM_ADDR=SCB1
-		move.w		#1,2(a0)					                | VRAM_MOD=1
-		lea				bg_videoram,a2
-		lea       bg_colorram,a3
-		move			d6,d5
-		moveq			#37-1,d7													| 36 sprites
-1:	moveq			#32-1,d6													| 32 tiles/sprite
-2:  clr.l			d1
-		move.b		(d5.w,a2),d1											| tile code
-		move.b		(d5.w,a3),d2											| attr
-		lsl.w			#8,d2															| 8 bits
-		and.w			#0x0100,d2
-		or.w			d2,d1		
-		or.w			#0x400,d1													| map to NG tile code
-		move.w		d1,(a0)														| set SCB1 tile
-		and.w			#0x80,d1													| code&0x80
-		lsr.b			#3,d1															| (code&0x80)>>3
-		move.b		(d5.w,a3),d2											| attr
-		and.b			#0x3C,d2													| attr&0x3C
-		lsr.b			#2,d2															| (attr&0x3C)>>2
-		or.b			d2,d1
-		move.b		(d5.w,a3),d2											| attr
-		and.b			#0x03,d2													| attr&0x03
-		lsl.b			#5,d2															| (attr%0x03)<<5
-		or.b			d2,d1
-		lsl.w			#8,d1															| colour<<8
-		move.b		(d5.w,a3),d2											| attr
-		lsr.b			#6,d2
-		and.b			#3,d2
-		eor.b			#3,d2
-		or.b			d2,d1
-		move.w		d1,(a0)														| set SCB1 colour
-		addq.w		#1,d5
-		dbf				d6,2b															| 1 sprite
-		and.w			#0x07ff,d5
-		add.w			#64,a1														| next SCB1
-		dbf				d7,1b
-9:	KICK_WDOG
+    rts
+    lea       VRAM_RW.l,a0
+    lea       SCB1+BGSS*64,a1
+    move.w    a1,-2(a0)                         | VRAM_ADDR=SCB1
+    move.w    #1,2(a0)                          | VRAM_MOD=1
+    lea       bg_videoram,a2
+    lea       bg_colorram,a3
+    move      d6,d5
+    moveq     #37-1,d7                          | 36 sprites
+1:  moveq     #32-1,d6                          | 32 tiles/sprite
+2:  clr.l     d1
+    move.b    (d5.w,a2),d1                      | tile code
+    move.b    (d5.w,a3),d2                      | attr
+    lsl.w     #8,d2                             | 8 bits
+    and.w     #0x0100,d2
+    or.w      d2,d1   
+    or.w      #0x400,d1                         | map to NG tile code
+    move.w    d1,(a0)                           | set SCB1 tile
+    and.w     #0x80,d1                          | code&0x80
+    lsr.b     #3,d1                             | (code&0x80)>>3
+    move.b    (d5.w,a3),d2                      | attr
+    and.b     #0x3C,d2                          | attr&0x3C
+    lsr.b     #2,d2                             | (attr&0x3C)>>2
+    or.b      d2,d1
+    move.b    (d5.w,a3),d2                      | attr
+    and.b     #0x03,d2                          | attr&0x03
+    lsl.b     #5,d2                             | (attr%0x03)<<5
+    or.b      d2,d1
+    lsl.w     #8,d1                             | colour<<8
+    move.b    (d5.w,a3),d2                      | attr
+    lsr.b     #6,d2
+    and.b     #3,d2
+    eor.b     #3,d2
+    or.b      d2,d1
+    move.w    d1,(a0)                           | set SCB1 colour
+    addq.w    #1,d5
+    dbf       d6,2b                             | 1 sprite
+    and.w     #0x07ff,d5
+    add.w     #64,a1                            | next SCB1
+    dbf       d7,1b
+9:  KICK_WDOG
     rts
     
     
@@ -1134,16 +1134,16 @@ check_coin_inserted: | 017B
 *   The NEO GEO BIOS handles credits and coins for you
 *   so we always use 1C1C here and let DK handle the
 *   actual credits itself
-		lea				0x10fdb0.l,a0
-		move.w		#0x0100,(a0)
-		jsr				BIOSF_CREDIT_CHECK
-		lea				0x10fdb0.l,a0
-		move.w		(a0),d0
-		cmpi.w		#0x0100,d0
-		bne       9f
-		jsr				BIOSF_CREDIT_DOWN
-		bra				coin_inserted
-home_use:		
+    lea       0x10fdb0.l,a0
+    move.w    #0x0100,(a0)
+    jsr       BIOSF_CREDIT_CHECK
+    lea       0x10fdb0.l,a0
+    move.w    (a0),d0
+    cmpi.w    #0x0100,d0
+    bne       9f
+    jsr       BIOSF_CREDIT_DOWN
+    bra       coin_inserted
+home_use:   
 *   Use the SELECT button to coin-up the machine
     move.b    (BIOS_STATCHANGE),d1
     and.b     #2,d1                             | <SELECT> changed state?
@@ -1151,193 +1151,193 @@ home_use:
     move.b    (BIOS_STATCURNT),d0
     and.b     #2,d0                             | <SELECT> pressed?
     bne       coin_inserted                     | yes, go
-9:	move.b		#1,(_coin_state)
-		rts
+9:  move.b    #1,(_coin_state)
+    rts
 coin_inserted:
-*		cmpi.b		#3,(_nmi_sequencer)				        | in credit sequence?
-*		beq				1f												        | yes, skip
-*		jsr				stop_sound		
-*		move.b		#3,(digital_snd_tmr_coin_spring)
-1:	move.b		#0,(_coin_state)
-		addq.b		#1,(_uncredited_coins)		        | inc
-		lea				_coinage+2,a1                     
-		move.b		(a1)+,d0									        | number of coins/credit
-		sub.b			(_uncredited_coins),d0		        | enough for a credit?
-		bne				9f												        | no, skip
-		move.b		d0,(_uncredited_coins)		        | update coins not credited
-		move.b		(_no_of_credits),d0               
-		cmpi.b		#0x90,d0									        | max?
-		bcc				9f												        | yes, skip (and take coins)
-		move.b		(a1),d1										        | number of credits/coin
-		abcd			d1,d0											        | add credits
-		move.b		d0,(_no_of_credits)				        | update
-		move.w		#0x0400,d3								        | display credits if attract mode
-*		jsr				queue_fg_vector_fn
-9:	rts
+*   cmpi.b    #3,(_nmi_sequencer)               | in credit sequence?
+*   beq       1f                                | yes, skip
+*   jsr       stop_sound    
+*   move.b    #3,(digital_snd_tmr_coin_spring)
+1:  move.b    #0,(_coin_state)
+    addq.b    #1,(_uncredited_coins)            | inc
+    lea       _coinage+2,a1                     
+    move.b    (a1)+,d0                          | number of coins/credit
+    sub.b     (_uncredited_coins),d0            | enough for a credit?
+    bne       9f                                | no, skip
+    move.b    d0,(_uncredited_coins)            | update coins not credited
+    move.b    (_no_of_credits),d0               
+    cmpi.b    #0x90,d0                          | max?
+    bcc       9f                                | yes, skip (and take coins)
+    move.b    (a1),d1                           | number of credits/coin
+    abcd      d1,d0                             | add credits
+    move.b    d0,(_no_of_credits)               | update
+    move.w    #0x0400,d3                        | display credits if attract mode
+*   jsr       queue_fg_vector_fn
+9:  rts
 
-		
+    
 render_sprites:
 
-* palette helper		
-		move.b    (_palette_bank),d1
+* palette helper    
+    move.b    (_palette_bank),d1
     and.w     #0x00ff,d1
     lsl.b     #4,d1
     ori.w     #64,d1                            | base palette 64
     move.w    d1,(_render_palette_bank)
 
-		move.b		#2,d2															| flipx
-		move.b		#1,d3															| flipy
+    move.b    #2,d2                             | flipx
+    move.b    #1,d3                             | flipy
     move.w    #0,d4                             | offset of DKY(NGX)
     move.w    #3,d5                             | offset of DKX(NGY)
     tst.b     (_rotate)
     beq       0f
-    eor.b			#3,d2
-    eor.b			#3,d3
+    eor.b     #3,d2
+    eor.b     #3,d3
     exg       d4,d5
 
-0:	lea				VRAM_RW.l,a0
-		move.w		#32*2,2(a0)												| VRAM_MOD=64
+0:  lea       VRAM_RW.l,a0
+    move.w    #32*2,2(a0)                       | VRAM_MOD=64
 
 * - tile
-		move.w		#(SCB1+SPRSS*32*2),-2(a0)					| start sprite=<SPRSS>
-		moveq			#(NDKS-1),d7											| <NDKS> sprites to render
-		LEA_SRAM_A 0,a1															| start of sprite ram
-1:	move.b		1(a1),d0													| tile
-		and.w			#0x007f,d0
-		or.w			(_sprite_set),d0									| tileset for sprites
-		move.w		d0,(a0)														| tile
-		adda			#4,a1															| next sprite
-		dbf				d7,1b
+    move.w    #(SCB1+SPRSS*32*2),-2(a0)         | start sprite=<SPRSS>
+    moveq     #(NDKS-1),d7                      | <NDKS> sprites to render
+    LEA_SRAM_A 0,a1                             | start of sprite ram
+1:  move.b    1(a1),d0                          | tile
+    and.w     #0x007f,d0
+    or.w      (_sprite_set),d0                  | tileset for sprites
+    move.w    d0,(a0)                           | tile
+    adda      #4,a1                             | next sprite
+    dbf       d7,1b
 * - palette, flip
-*	  - color = (m_sprite_ram[offs + 2] & 0x0f) + 16 * m_palette_bank;
-		move.w		#(SCB1+SPRSS*32*2+1),-2(a0)				| start sprite=<SPRSS>
-		moveq			#(NDKS-1),d7											| <NDKS> sprites to render
-		LEA_SRAM_A 0,a1															| start of sprite ram
-2:	move.b		1(a1),d1													| flipy
-		move.b    2(a1),d0                          | flipx,colour
+*   - color = (m_sprite_ram[offs + 2] & 0x0f) + 16 * m_palette_bank;
+    move.w    #(SCB1+SPRSS*32*2+1),-2(a0)       | start sprite=<SPRSS>
+    moveq     #(NDKS-1),d7                      | <NDKS> sprites to render
+    LEA_SRAM_A 0,a1                             | start of sprite ram
+2:  move.b    1(a1),d1                          | flipy
+    move.b    2(a1),d0                          | flipx,colour
     and.w     #0x000f,d0
     or.w      (_render_palette_bank),d0         | 16 * m_palette_bank
     lsl.w     #8,d0
-    btst			#7,d1															| flipy?
-    beq				3f																| no, skip
-    or.b			d3,d0															| flip 'y'
+    btst      #7,d1                             | flipy?
+    beq       3f                                | no, skip
+    or.b      d3,d0                             | flip 'y'
 3:  move.b    2(a1),d1                          | flipx,colour
     btst      #7,d1                             | flipx?
     beq       4f                                | no, skip
     or.b      d2,d0                             | flip 'x'       
-4:  move.w		d0,(a0)														| palette
-		adda			#4,a1															| next sprite
-		dbf				d7,2b
+4:  move.w    d0,(a0)                           | palette
+    adda      #4,a1                             | next sprite
+    dbf       d7,2b
 
-		move.w		#1,2(a0)													| VRAM_MOD=1
+    move.w    #1,2(a0)                          | VRAM_MOD=1
 
 * vertical position, sticky, size
-		move.w		#(SCB3+SPRSS),-2(a0)							| VRAM_ADDR=SCB3
-		moveq			#(NDKS-1),d7											| <NDKS> sprites to render
-		LEA_SRAM_A 0,a1															| start of sprite ram
-3:	move.b		0(a1,d5.w),d0											| Y coordinate
-		tst.b			(_rotate)
+    move.w    #(SCB3+SPRSS),-2(a0)              | VRAM_ADDR=SCB3
+    moveq     #(NDKS-1),d7                      | <NDKS> sprites to render
+    LEA_SRAM_A 0,a1                             | start of sprite ram
+3:  move.b    0(a1,d5.w),d0                     | Y coordinate
+    tst.b     (_rotate)
     bne       4f
-		sub.b			#19,d0														| temp fudge for non-rotate
-    bra				5f
-4:	add.b			#24,d0														| temp fudge for rotate
-		not.w     d0		
-5: 	and.w     #0x00ff,d0
-		not.w			d0                      					| }
-		and.w			#0x1FF,d0               					| } from the video library
-		sub.w			#0xF,d0                 					| }
-		lsl.w			#7,d0                   					
-		ori.w			#1,d0						      						| size=1
-		move.w		d0,(a0)														| SCB3 data
-		adda			#4,a1															| next sprite
-		dbf				d7,3b
-*		- horizontal position		
-		move.w		#(SCB4+SPRSS),-2(a0)							| VRAM_ADDR=SCB4
-		moveq			#(NDKS-1),d7											| <NDKS> sprites to render
-		LEA_SRAM_A 0,a1															| start of sprite ram
-8:	move.b		0(a1,d4.w),d0											| X coordinate
+    sub.b     #19,d0                            | temp fudge for non-rotate
+    bra       5f
+4:  add.b     #24,d0                            | temp fudge for rotate
+    not.w     d0    
+5:  and.w     #0x00ff,d0
+    not.w     d0                                | }
+    and.w     #0x1FF,d0                         | } from the video library
+    sub.w     #0xF,d0                           | }
+    lsl.w     #7,d0                             
+    ori.w     #1,d0                             | size=1
+    move.w    d0,(a0)                           | SCB3 data
+    adda      #4,a1                             | next sprite
+    dbf       d7,3b
+*   - horizontal position   
+    move.w    #(SCB4+SPRSS),-2(a0)              | VRAM_ADDR=SCB4
+    moveq     #(NDKS-1),d7                      | <NDKS> sprites to render
+    LEA_SRAM_A 0,a1                             | start of sprite ram
+8:  move.b    0(a1,d4.w),d0                     | X coordinate
 *    add.b     #(0xf7+1),d0                      | MAME source
-		addq.b		#0x08,d0													| my fudge
-		and.w			#0x00ff,d0
-		lsl.w			#7,d0
-		move.w		d0,(a0)														| SCB4 data
-		adda			#4,a1															| next sprite
-		dbf				d7,8b
-		rts
+    addq.b    #0x08,d0                          | my fudge
+    and.w     #0x00ff,d0
+    lsl.w     #7,d0
+    move.w    d0,(a0)                           | SCB4 data
+    adda      #4,a1                             | next sprite
+    dbf       d7,8b
+    rts
 
 .endif
 
 _end_of_ng_code:
-		
+    
 /*
 * now read some out again
 
-		lea				junk,a1
+    lea       junk,a1
 
-		move.w		#SCB1,d1
-		move.w		#1024,d7
-1:	move.w		d1,(a0)						| VRAM_ADDR
-		move.w		(a0),(a1)+				| tile
-		move.w		(a0),(a1)+				| attributes
-		addq.w		#2,d1
-		dbf				d7,1b		
+    move.w    #SCB1,d1
+    move.w    #1024,d7
+1:  move.w    d1,(a0)           | VRAM_ADDR
+    move.w    (a0),(a1)+        | tile
+    move.w    (a0),(a1)+        | attributes
+    addq.w    #2,d1
+    dbf       d7,1b   
     KICK_WDOG
 
-		move.w		#SCB2,d1
-		moveq			#32-1,d7					| 32 tiles
-1:	move.w		d1,(a0)						| VRAM_ADDR
-		move.w		(a0),(a1)+				| shrinking coefficients
-		addq.w		#2,d1
-		dbf				d7,1b
+    move.w    #SCB2,d1
+    moveq     #32-1,d7          | 32 tiles
+1:  move.w    d1,(a0)           | VRAM_ADDR
+    move.w    (a0),(a1)+        | shrinking coefficients
+    addq.w    #2,d1
+    dbf       d7,1b
     KICK_WDOG
 
-		move.w		#SCB3,d1
-		moveq			#32-1,d7					| 31 more sprites
-1:	move.w		d1,(a0)						| VRAM_ADDR
-		move.w		(a0),(a1)+				| VPOS
-		addq.w		#2,d1
-		dbf				d7,1b
+    move.w    #SCB3,d1
+    moveq     #32-1,d7          | 31 more sprites
+1:  move.w    d1,(a0)           | VRAM_ADDR
+    move.w    (a0),(a1)+        | VPOS
+    addq.w    #2,d1
+    dbf       d7,1b
     KICK_WDOG
 
-		move.w		#SCB4,d1
-		moveq			#32-1,d7
-1:	move.w		d1,(a0)						| VRAM_ADDR
-		move.w		(a0),(a1)+				| HPOS
-		addq.w		#2,d1
-		dbf				d7,1b
+    move.w    #SCB4,d1
+    moveq     #32-1,d7
+1:  move.w    d1,(a0)           | VRAM_ADDR
+    move.w    (a0),(a1)+        | HPOS
+    addq.w    #2,d1
+    dbf       d7,1b
     KICK_WDOG
 
-		rts
+    rts
 */
-		
-		.text
+    
+    .text
 
-	.align 2	
-	.include "palette.68k"
+  .align 2  
+  .include "palette.68k"
 
-		.bss
+    .bss
 
-		.align 4
+    .align 4
 * using 2 tiles/sprite only
-scb1_shadow:									ds.w 	XSNS*4*2
-scb3_shadow:									ds.w 	XSNS*2
-scb4_shadow:									ds.w 	XSNS*2
+scb1_shadow:                  ds.w  XSNS*4*2
+scb3_shadow:                  ds.w  XSNS*2
+scb4_shadow:                  ds.w  XSNS*2
 
 fg_colorram_lookup_tbl:       ds.w  256
 bg_colorram_lookup_tbl:       ds.w  512
 
 .align 2
-bg_1st_row_sprite:						ds.w		1
-irq_cnt:											ds.w		1
+bg_1st_row_sprite:            ds.w    1
+irq_cnt:                      ds.w    1
 
 p1_input_r:                   ds.b    1
 p2_input_r:                   ds.b    1
 
 _sprite_bank:                 ds.b  1
-_palette_bank:								ds.b	1
-_dipsw:												ds.b	1
+_palette_bank:                ds.b  1
+_dipsw:                       ds.b  1
 _render_palette_bank:         ds.w  1
-_rotate:											ds.b	1
+_rotate:                      ds.b  1
 
 _end_of_ng_data:
-		
+    
