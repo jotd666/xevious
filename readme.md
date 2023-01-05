@@ -41,6 +41,7 @@ Prerequesites:
 - Windows
 - NeoDev kit (Fabrice Martinez, Jeff Kurtz, et al)  
   https://wiki.neogeodev.org/index.php?title=Development_tools
+- puzzledp ROM files
 
 Build process:
 
