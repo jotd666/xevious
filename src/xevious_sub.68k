@@ -212,12 +212,10 @@ get_map_row: | $02D4
     moveq     #0,d6
     jsr       xevious_bb_r                      | d6=attr
     move.w    d6,d1
-    move.w    #BANK_BG_COLORRAM,d2
     jsr       osd_w_bg_colorram
     moveq     #1,d6
     jsr       xevious_bb_r                      | d6=tile
     move.w    d6,d1
-    move.w    #BANK_BG_VIDEORAM,d2
     jsr       osd_w_bg_videoram
     movem.l   (a7)+,d0-d2
     add.w     #0x0100,d0
@@ -226,7 +224,7 @@ get_map_row: | $02D4
 9:  rts
 
 sub_fn_31__update_sprite_shadow: | $031E
-    movea.l   #obj_tbl,a5
+    lea       obj_tbl,a5
     jsr       osd_update_sprite_shadow
     rts
 
@@ -240,7 +238,7 @@ sub_2_fn_2__set_flying_enemies: | $03BD
     ext.w     d0                                | can be -ve
     adda      #1,a0
 loc_3BF:
-    movea.l   #flying_enemy_type_offset_tbl,a1
+    lea       flying_enemy_type_offset_tbl,a1
     lsl.w     #1,d0
     move.b    (a1,d0.w),(num_flying_enemies)
     move.b    (1,a1,d0.w),(flying_enemy_type_tbl_offset)
@@ -256,7 +254,7 @@ sub_2_fn_3__inc_enemy_AI_and_flying_enemies: | $03D1
     not.b     d1
     rol.b     #3,d1
     and.w     #3,d1
-    movea.l   #difficulty_tbl,a1
+    lea       difficulty_tbl,a1
     move.b    (a1,d1.w),d0
     add.b     (enemy_AI_level),d0
     cmp.b     #0x80,d0
@@ -416,7 +414,7 @@ sub_2_fn_15__domogram: | $05E1
     move.l    a0,(area_obj_ptr)
     move.w    (next_domogram),d0
     mulu      #64,d0                            | offset in table
-    movea.l   #domogram_tbl,a2
+    lea       domogram_tbl,a2
     lea       (a2,d0.w),a2                      | address in table
     move.l    a2,(_EXTRA,a5)                    | store ptr
     moveq     #64,d7                            | 64 bytes (max) to copy
@@ -588,9 +586,9 @@ sub_fn_3__handle_next_area: | $078B
     bne       1f                                | no, skip
     move.w    #6,d0                             | restart at area 7
 1:  move.w    d0,(area)                         | update area
-    movea.l   #area_offset_in_map_tbl,a0
+    lea       area_offset_in_map_tbl,a0
     move.b    (a0,d0.w),(area_offset_in_map)    | update offset
-    movea.l   #area_object_tbl_tbl,a0
+    lea       area_object_tbl_tbl,a0
     lsl.w     #2,d0                             | offset in table
     move.l    (a0,d0.w),(area_obj_ptr)          | new area ptr
     *** show area on screen for debugging
@@ -955,7 +953,7 @@ area_16_obj_tbl:
 * exit:  d6=bb(0)/bb(1)
 
 xevious_bb_r:
-    movem.l   d0-d5/a0-a3,-(a7)
+    movem.l   d0-d1,-(a7)
     lea       rom2a,a0
     lea       rom2b,a1
     lea       rom2c,a2
@@ -1000,7 +998,7 @@ xevious_bb_r:
     beq       5f
     or.w      #0x800,d2           | d2=(adr_2c|0x800)
     move.b    (d2.w,a2),d6        | BB1
-    movem.l   (a7)+,d0-d5/a0-a3
+    movem.l   (a7)+,d0-d1
     rts
 5:  move.b    (d2.w,a2),d6        | dat2=rom2c[adr_2c]
     move.b    d6,d3
@@ -1018,7 +1016,7 @@ xevious_bb_r:
 6:  btst      #9,d4               | (dat1 & 0x200)
     beq       7f
     eor.b     #0x80,d6    
-7:  movem.l   (a7)+,d0-d5/a0-a3
+7:  movem.l   (a7)+,d0-d1
     rts
     
 _end_of_xevious_sub_rom:
