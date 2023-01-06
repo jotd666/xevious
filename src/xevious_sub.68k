@@ -51,6 +51,10 @@ restart_main_fn_loop:
     tst.b     (vb_semaphore_sub)
     beq       9f
     clr.b     (vb_semaphore_sub)
+
+    move.w    #0x100F,d0                        | blue
+    jsr       osd_debug_hook
+
     lea       sub_fn_jump_tbl_RAM,a6
     moveq     #32-1,d7
 main_fn_loop:   
@@ -60,6 +64,10 @@ main_fn_loop:
     movem.l   (a7)+,d7/a6
     adda.l    #4,a6                             | next table entry
     dbf       d7,main_fn_loop
+
+    move.w    #0x8000,d0                        | black
+    jsr       osd_debug_hook
+
     * the Z80 code jumps back to restart_main_loop
     * - but we need to share CPU with the MAIN code
     * - so return here

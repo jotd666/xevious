@@ -170,7 +170,11 @@ xevious_reset: | $0000
 
 xevious_im1_irq: | $0038
     movem.l   d0-d7/a0-a6,-(a7)
+    move.w    #0x4F00,d0                        | red
+    jsr       osd_debug_hook
     jsr       update_sprite_hw_and_other_things
+    move.w    #0x8000,d0                        | black
+    jsr       osd_debug_hook
     movem.l   (a7)+,d0-d7/a0-a6
     *** hack
     jsr       xevious_nmi
@@ -178,9 +182,13 @@ xevious_im1_irq: | $0038
 
 xevious_nmi: | $0066
     movem.l   d0-d7/a0-a6,-(a7)
+    move.w    #0x4F00,d0                        | red
+    jsr       osd_debug_hook
     jsr       osd_read_p1_inputs
     move.b    d0,(P1_inputs)
     *jsr        osd_read_p2_inputs
+    move.w    #0x8000,d0                        | black
+    jsr       osd_debug_hook
     movem.l   (a7)+,d0-d7/a0-a6
     rts
         
@@ -232,6 +240,9 @@ restart_main_loop: | $0437
     jsr       xevious_sub_cpu
     ***
 
+    move.w    #0x20F0,d0                        | green
+    jsr       osd_debug_hook
+
     * loops through main function table
     * - A6 points to current function table entry
     lea       main_fn_tbl_RAM,a6
@@ -244,7 +255,8 @@ main_loop: | $0447
     adda.l    #4,a6                             | next table entry
     dbf       d7,main_loop
 
-    jsr       osd_kick_wdog
+    move.w    #0x8000,d0                        | black
+    jsr       osd_debug_hook
 
     jsr       osd_kick_wdog
     bra       restart_main_loop
@@ -5513,11 +5525,15 @@ display_easter_egg: | $3AC9
     moveq     #BANK_FG_COLORRAM,d2
     move.w    #0x1a,d1
     jsr       display_char_B_times
-    .ifeq OPT_TCDEV_EASTER_EGG
-    lea       str_program_by_EVEZOO,a0
-    .else
+    lea       str_program_by_EVEZOO,a0          | default
+.ifne OPT_TCDEV_EASTER_EGG
+    .ifdef __neogeo__
     lea       str_NEOGEO_by_tcdev,a0
     .endif
+    .ifdef __amiga__
+    lea       str_AMIGA_by_tcdev_jotd,a0
+    .endif
+.endif
     bra       cpl_and_display_string_24
 
 str_NAMCO_ORIGINAL:
@@ -5526,9 +5542,16 @@ str_NAMCO_ORIGINAL:
 str_program_by_EVEZOO:
     .byte 0xDB, 0xDB, 0xDB, 0xDB, 0xDB, 0xBA, 0xB8, 0xBB, 0xC3, 0xB8, 0xC9, 0xBD, 0xDB, 0xC8, 0xB1, 0xDB
     .byte 0xF1, 0xE0, 0xF1, 0xDC, 0xE7, 0xE7, 0xDB, 0xDB          | "     program by EVEZOO  "
+.ifdef __neogeo__
 str_NEOGEO_by_tcdev:
     .byte 0xDB, 0xDB, 0xDB, 0xDB, 0xDB, 0xE8, 0xF1, 0xE7, 0xEF, 0xF1, 0xE7, 0xDB, 0xC8, 0xB1, 0xDB, 0xB6
     .byte 0xC7, 0xC6, 0xC5, 0xB4, 0xDB, 0xDB, 0xDB, 0xDB          | "     NEOGEO by tcdev    "
+.endif
+.ifdef __amiga__
+str_AMIGA_by_tcdev_jotd:
+    .byte 0xDB, 0xF5, 0xE9, 0xED, 0xEF, 0xF5, 0xDB, 0xC8, 0xB1, 0xDB, 0xB6, 0xC7, 0xC6, 0xC5, 0xB4, 0xDB
+    .byte 0xD6, 0xDB, 0xC0, 0xBB, 0xB6, 0xC6, 0xDB, 0xDB          | " AMIGA by tcdev & jotd  "
+.endif
     
 cpl_and_display_string_16: | $3B48
     movea.l   #unk_8480,a1
