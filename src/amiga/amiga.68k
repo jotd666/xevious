@@ -6,6 +6,7 @@
 .include "../src/xevious.inc"
 .include "custom.i"
 .include "exec_lvos.i"
+.include "graphics_lvos.i"
 
 
 _custom = 0xDFF000
@@ -76,6 +77,7 @@ out\@:
     .global _end_of_ng_code
     .global _end_of_ng_data
     
+	.include	"ReadJoypad.inc"
 		.text
 
 
@@ -159,7 +161,7 @@ _user:
 	nop
 .standard:
     * open dos library, graphics library
-    *move.l  $4.W,a6
+    move.l  0x4.W,a6
     *lea dosname(pc),a1
     *moveq.l #0,d0
     *jsr _LVOOpenLibrary(a6)
@@ -168,7 +170,12 @@ _user:
     *moveq.l #0,d0
     *jsr _LVOOpenLibrary(a6)
     *move.l  d0,_gfxbase
-    
+    *move.l	d0,a6
+	*sub.l	a1,a1
+	*jsr	_LVOLoadView(a6)
+	*jsr	_LVOWaitTOF(a6)
+	*jsr	_LVOWaitTOF(a6)
+	*move.l  0x4.W,a6
     *bsr load_highscores
 
     * check if "floppy" file is here
@@ -191,8 +198,6 @@ _user:
     *move.l  #CMD_STOP,d0
     *bsr send_cdtv_command
 .startup:
-
-    
     lea  _custom,a5
     *move.b  #0,controller_joypad_1
     
@@ -212,6 +217,7 @@ _user:
 	*move.l	#-1,pr_WindowPtr(A0)	| no more system requesters (insert volume, write protected...)
 
 .no_forbid:
+	jsr	 _detect_controller_types 
 
 
 		moveq			#2,d0
@@ -271,6 +277,9 @@ _vblank:
 	move.w	_custom+intreqr,d0
 	btst	#5,d0
 	beq.b	.no_vblank
+	moveq	#1,d0
+	jsr	_read_joystick
+	move.l	d0,_joypad_state
 	
 	jsr		xevious_im1_irq
 	
@@ -293,6 +302,7 @@ osd_kick_wdog:
     rts
 
 platform_init:
+	
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
     move.w #0x3081,diwstrt(a5)
@@ -406,7 +416,7 @@ update_bg_fg_tile:
 	move.w	d0,d1
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
-	bmi		.u0
+	bmi		.u4
 	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use mul table
 	lsl.w	#3,d1	| *8
 	lea		screen_data,a1
@@ -530,18 +540,41 @@ osd_read_p2_inputs:
 		rts
 
 osd_read_coin:
-	moveq	#0,d0
+	move.l	d1,-(a7)
+	move.b	#0,d0
+	move.l	_joypad_state(pc),d1
+	btst	#JPB_BTN_GRN,d1
+	movem.l	(a7)+,d1
+	beq.b	osd_no_grn
+	bset	#0,d0
+osd_no_grn:
+	tst.b		d0	| required as API needs CCR!
 9:	rts
 		
 		* D0 bit0=P1, bit1=P2.
 osd_read_start:
+	move.l	d1,-(a7)
+	move.b	#0,d0
+	move.l	_joypad_state(pc),d1
+	btst	#JPB_BTN_YEL,d1
+	movem.l	(a7)+,d1
+	beq.b	osd_no_yel
+	bset	#0,d0
+osd_no_yel:
+	tst.b	d0
 9:	rts
 		
 vbl_counter:
 		dc.w	0
 _resload:
 		dc.l	0
-		
+_joypad_state:
+		dc.l	0
+_gfxbase:
+	dc.l	0
+*graphicsname:
+*	.ascii	"graphics.library"
+	
 _end_of_ng_code:
 		
 		.text
@@ -563,6 +596,7 @@ scb4_shadow:									ds.w 	128*2
 .align 2
 irq_cnt:											ds.w		1
 		.data
+
 _fg_color_data:
 	ds.b	GRID_SIZE
 _bg_color_data:

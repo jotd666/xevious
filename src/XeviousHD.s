@@ -79,11 +79,15 @@ start:
     
     IFD CHIP_ONLY
     lea  _expmem(pc),a0
-    move.l  #$100000,(a0)
+    move.l  #$80000,(a0)
     ENDC
     lea progstart(pc),a0
     move.l  _expmem(pc),(a0)
 
+	move.l	_expmem(pc),d0
+	add.l	#$80000,D0
+	move.l	d0,a7
+	
 	lea	exe(pc),a0
 	move.l  progstart(pc),a1
 	jsr	(resload_LoadFileDecrunch,a2)
