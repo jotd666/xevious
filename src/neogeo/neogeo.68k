@@ -37,6 +37,7 @@
     .global osd_read_p2_inputs
     .global osd_read_coin
     .global osd_read_start
+    .global osd_debug_hook
 
 * debugging only
     .global osd_debug1
@@ -1094,7 +1095,12 @@ osd_read_start:
     and.b     #2,d6                             | P2 only
     or.b      d6,d0                             | bit0=P1, bit1=P2
 9:  rts
-    
+
+* d0=backdropcolour
+osd_debug_hook:
+    move.w    d0,(BACKDROPCOLOR)
+    rts
+        
 _end_of_ng_code:
     
     .text
