@@ -311,6 +311,8 @@ platform_init:
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
     move.w #0x4200,bplcon0(a5)
+	*move.w #0x7610,bplcon0(a5) | 8 bitplanes, dual playfield	
+	
     clr.w bplcon1(a5) 
     clr.w bplcon2(a5)                     
     move.w #0,bpl1mod(a5) 
@@ -325,7 +327,7 @@ platform_init:
 	* load palette
 	lea		palette(pc),a0
 	lea		_custom+color,a1
-	move.w	#15,d0
+	move.w	#31,d0
 .copy:
 	move.w	(a0)+,(a1)+
 	dbf		d0,.copy
@@ -436,7 +438,7 @@ update_bg_tile:
 	bmi		.bg_u4
 	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use mul table
 	lsl.w	#3,d1	| *8
-	lea		screen_data,a1
+	lea		screen_data+NB_BYTES_PER_ROW*8,a1  | temp 8 pixel y shift
 	add.w	d1,a1
 	lsr.w	#6,d0
 	neg.w	d0
@@ -446,8 +448,6 @@ update_bg_tile:
 	moveq	#NB_PLANES-1,d3
 	move.w	d2,d4
 .bg_u0:
-	btst	#0,d2
-	beq.b	.bg_u1
 	* draw
 	btst	#7,d4
 	bne.b	.bg_yflip
@@ -469,21 +469,10 @@ update_bg_tile:
 	move.b	(2,a0),(NB_BYTES_PER_ROW*5,a1)
 	move.b	(1,a0),(NB_BYTES_PER_ROW*6,a1)
 	move.b	(a0),(NB_BYTES_PER_ROW*7,a1)
-	bra.b	.bg_u3
-.bg_u1:
-	* clear
-	clr.b	(a1)
-	clr.b	(NB_BYTES_PER_ROW,a1)
-	clr.b	(NB_BYTES_PER_ROW*2,a1)
-	clr.b	(NB_BYTES_PER_ROW*3,a1)
-	clr.b	(NB_BYTES_PER_ROW*4,a1)
-	clr.b	(NB_BYTES_PER_ROW*5,a1)
-	clr.b	(NB_BYTES_PER_ROW*6,a1)
-	clr.b	(NB_BYTES_PER_ROW*7,a1)
+
 .bg_u3:
-    lsr.w   #1,d2
 	lea		(8,a0),a0
-    lea   (SCREEN_PLANE_SIZE,a1),a1
+    lea   (SCREEN_PLANE_SIZE*2,a1),a1
     dbf d3,.bg_u0
 .bg_u4:
 	rts
@@ -509,7 +498,7 @@ update_fg_tile:
 	bmi		.u4
 	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use mul table
 	lsl.w	#3,d1	| *8
-	lea		screen_data,a1
+	lea		screen_data+SCREEN_PLANE_SIZE,a1
 	add.w	d1,a1
 	lsr.w	#6,d0
 	neg.w	d0
@@ -555,7 +544,7 @@ update_fg_tile:
 	clr.b	(NB_BYTES_PER_ROW*7,a1)
 .u3:
     lsr.w   #1,d2
-    lea   (SCREEN_PLANE_SIZE,a1),a1
+    lea   (SCREEN_PLANE_SIZE*2,a1),a1
     dbf d3,.u0
 .u4:
 	rts
@@ -594,7 +583,7 @@ osd_read_p1_inputs:
 
 set_bitplanes:
     move.l	#screen_data,d0
-    moveq #NB_PLANES-1,d1
+    moveq #NB_PLANES*2-1,d1
     lea	bitplanes+2,a0
 .mkcl:
     swap d0
@@ -697,7 +686,7 @@ _bg_char_data:
 	ds.b	GRID_SIZE
 		.bsschip
 screen_data:
-	ds.b	SCREEN_SIZE
+	ds.b	SCREEN_SIZE*2
 	ds.b	100	| small margin (I suspect that gas is buggy with ds directive)
 	.datachip
 copperlist:
@@ -710,7 +699,14 @@ bitplanes:
    dc.l  0x00ea0000
    dc.l  0x00ec0000
    dc.l  0x00ee0000
-
+   dc.l  0x00f00000
+   dc.l  0x00f20000
+   dc.l  0x00f40000
+   dc.l  0x00f60000
+   dc.l  0x00f80000
+   dc.l  0x00fa0000
+   dc.l  0x00fc0000
+   dc.l  0x00fe0000
 colors:
    dc.w color,0
 sprites:
