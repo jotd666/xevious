@@ -146,6 +146,7 @@ TRAP:
 	rte
 	    
 _user:
+	move.l	#_fg_color_data,0x100
     * if D0 contains "WHDL"
     * A0 contains resload
         
@@ -305,7 +306,7 @@ platform_init:
 	
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
-    move.w #0x3081,diwstrt(a5)
+    move.w #0x1C81,diwstrt(a5)
     move.w #0x30C1,diwstop(a5)
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
@@ -353,26 +354,33 @@ osd_disable_vblank_interrupt:
 		
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_fg_colorram:
+    .ifeq OPT_DISABLE_FG_LAYER
 	movem.l	d0-d5/a0-a1,-(a7)
 	lea		_fg_color_data,a1
 	move.b	d1,(a1,d0.w)	| store color X/Y flip attribute in fg table
 	lea		_fg_char_data,a1
 	move.b	d1,d2
-	move.b	(a1,d0.w),d1	| fetch tile
+	move.b	(a1,d0.w),d1	| fetch tile from character grid
 	* now update tile to reflect the color change
 	lea		_fg_tile,a0
-	bsr	update_bg_fg_tile
+	bsr	update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a1
+   .endif | OPT_DISABLE_FG_LAYER
 	rts
 
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_bg_colorram:
+    .ifeq OPT_DISABLE_BG_LAYER
 	movem.l	d0-d5/a0-a1,-(a7)
 	lea		_bg_color_data,a1
 	move.b	d1,(a1,d0.w)	| store attribute in bg table
+	lea		_bg_char_data,a1
+	move.b	d1,d2
+	move.b	(a1,d0.w),d1	| fetch tile from character grid
 	lea		_bg_tile,a0
-	*bsr	update_bg_fg_tile
+	bsr	update_bg_tile
 	movem.l	(a7)+,d0-d5/a0-a1
+   .endif | OPT_DISABLE_BG_LAYER
 	rts
 		
 * the first 4 rows are not visible, then the next 36 rows
@@ -380,32 +388,114 @@ osd_w_bg_colorram:
 *  Bottom 6 bits of D0 is the row, upper 5 bits are the column.
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_fg_videoram:
+    .ifeq OPT_DISABLE_FG_LAYER
 	movem.l	d0-d5/a0-a2,-(a7)
 	lea		_fg_color_data,a1
-	lea		_fg_tile,a0
 	lea		_fg_char_data,a2
-	bsr		process_bg_fg_tile
+	move.b	d1,(a2,d0.w)	| update logical grid
+	move.b	(a1,d0.w),d2	| color & X/Y flip data
+	lea		_fg_tile,a0
+	bsr		update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a2
+    .endif | OPT_DISABLE_FG_LAYER
 	rts
 
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_bg_videoram:
+    .ifeq OPT_DISABLE_BG_LAYER
 	movem.l	d0-d5/a0-a2,-(a7)
-	lea		_bg_tile,a0
 	lea		_bg_color_data,a1
 	lea		_bg_char_data,a2
-	;bsr		process_bg_fg_tile
+	move.b	d1,(a2,d0.w)	| update logical grid
+	move.b	(a1,d0.w),d2	| color & X/Y flip data
+	lea		_bg_tile,a0
+	bsr		update_bg_tile
 	movem.l	(a7)+,d0-d5/a0-a2
+    .endif | OPT_DISABLE_BG_LAYER
 	rts
 	
-process_bg_fg_tile:
+* d0: offset
+* d1: tile code
+* d2: attribute
+* a0: tile map start (fg/bg)
+update_bg_tile:
+	and.w	#0xFF,d1
+	btst	#0,d2
+	beq.b	.u_first_half
+	bset	#8,d1	| upper part of background tile code
+.u_first_half:
+	lsl.w	#6,d1			| *64 (each tile+mirror tile has 8 bytes ATM)
+	btst	#6,d2			| X-flip?
+	beq.b	.bg_no_xflip
+	add.w	#32,d1			| mirror version
+.bg_no_xflip:
+	add.w	d1,a0
+	move.w	d0,d1
+	and.w	#0x3F,d1		| row
+	subq.w	#4,d1
+	bmi		.bg_u4
+	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use mul table
+	lsl.w	#3,d1	| *8
+	lea		screen_data,a1
+	add.w	d1,a1
+	lsr.w	#6,d0
+	neg.w	d0
+	add.w	#32,d0	| mirror
+	add.w	d0,a1
+	
+	moveq	#NB_PLANES-1,d3
+	move.w	d2,d4
+.bg_u0:
+	btst	#0,d2
+	beq.b	.bg_u1
+	* draw
+	btst	#7,d4
+	bne.b	.bg_yflip
+	move.b	(a0),(a1)
+	move.b	(1,a0),(NB_BYTES_PER_ROW,a1)
+	move.b	(2,a0),(NB_BYTES_PER_ROW*2,a1)
+	move.b	(3,a0),(NB_BYTES_PER_ROW*3,a1)
+	move.b	(4,a0),(NB_BYTES_PER_ROW*4,a1)
+	move.b	(5,a0),(NB_BYTES_PER_ROW*5,a1)
+	move.b	(6,a0),(NB_BYTES_PER_ROW*6,a1)
+	move.b	(7,a0),(NB_BYTES_PER_ROW*7,a1)
+	bra.b	.bg_u3
+.bg_yflip:
+	move.b	(7,a0),(a1)
+	move.b	(6,a0),(NB_BYTES_PER_ROW,a1)
+	move.b	(5,a0),(NB_BYTES_PER_ROW*2,a1)
+	move.b	(4,a0),(NB_BYTES_PER_ROW*3,a1)
+	move.b	(3,a0),(NB_BYTES_PER_ROW*4,a1)
+	move.b	(2,a0),(NB_BYTES_PER_ROW*5,a1)
+	move.b	(1,a0),(NB_BYTES_PER_ROW*6,a1)
+	move.b	(a0),(NB_BYTES_PER_ROW*7,a1)
+	bra.b	.bg_u3
+.bg_u1:
+	* clear
+	clr.b	(a1)
+	clr.b	(NB_BYTES_PER_ROW,a1)
+	clr.b	(NB_BYTES_PER_ROW*2,a1)
+	clr.b	(NB_BYTES_PER_ROW*3,a1)
+	clr.b	(NB_BYTES_PER_ROW*4,a1)
+	clr.b	(NB_BYTES_PER_ROW*5,a1)
+	clr.b	(NB_BYTES_PER_ROW*6,a1)
+	clr.b	(NB_BYTES_PER_ROW*7,a1)
+.bg_u3:
+    lsr.w   #1,d2
+	lea		(8,a0),a0
+    lea   (SCREEN_PLANE_SIZE,a1),a1
+    dbf d3,.bg_u0
+.bg_u4:
+	rts
+	
+process_fg_tile:
 	
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
 * d1: tile code
 * d2: attribute
 * a0: tile map start (fg/bg)
-update_bg_fg_tile:
+update_fg_tile:
 	and.w	#0xFF,d1
 	lsl.w	#6,d1			| *64 (each tile+mirror tile has 8 bytes ATM)
 	btst	#6,d2			| X-flip?

@@ -39,7 +39,9 @@ palette = bitplanelib.palette_round(palette,0xF0)
 bitplanelib.palette_dump(palette,os.path.join(src_dir,"palette.68k"),bitplanelib.PALETTE_FORMAT_ASMGNU)
 
 raw_blocks = collections.defaultdict(list)
+
 for table,data in block_dict.items():
+    print("table",table)
     if data["size"] in [64,256]:
         side = int(data["size"]**0.5)
         pics = data["data"]
@@ -64,7 +66,6 @@ for table,data in block_dict.items():
                         palette_precision_mask=0xF0)
                 raw_blocks[table].append(raw)
 
-
         img.save(table+".png")
         maxcol = max(max(pic) for pic in pics)
 
@@ -72,7 +73,6 @@ with open(os.path.join(src_dir,"graphics.68k"),"w") as f:
     for t in ["fg_tile","bg_tile"]:
         f.write("\t.global\t_{0}\n_{0}:".format(t))
         c = 0
-        print(t,len(raw_blocks[t]))
         for block in raw_blocks[t]:
             for d in block:
                 if c==0:
