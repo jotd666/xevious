@@ -7,7 +7,7 @@
 
 _base	SLAVE_HEADER					; ws_security + ws_id
 	dc.w	17					; ws_version (was 10)
-	dc.w	WHDLF_NoError
+	dc.w	WHDLF_NoError|WHDLF_ReqAGA
     IFD CHIP_ONLY
 	dc.l	$100000					; ws_basememsize
     ELSE

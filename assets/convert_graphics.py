@@ -32,6 +32,8 @@ with open("xevious_gfx.c") as f:
     if block:
         txt = "".join(block).strip().strip(";")
         block_dict[block_name] = {"size":size,"data":ast.literal_eval(txt)}
+        # for fg, remove the upper 256 tiles as they're used only in cocktail mode
+        del block_dict["fg_tile"]["data"][256:]
 
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
 
@@ -41,8 +43,8 @@ bitplanelib.palette_dump(palette,os.path.join(src_dir,"palette.68k"),bitplanelib
 raw_blocks = collections.defaultdict(list)
 
 for table,data in block_dict.items():
-    print("table",table)
     if data["size"] in [64,256]:
+        is_sprite = table == "sprite"
         side = int(data["size"]**0.5)
         pics = data["data"]
         dump_width = side * 64
@@ -62,15 +64,22 @@ for table,data in block_dict.items():
                 cur_x = 0
                 cur_y += side
             for the_tile in [input_image,ImageOps.mirror(input_image)]:
-                raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,palette=palette[0:16],forced_nb_planes=4,
-                        palette_precision_mask=0xF0)
+                raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
+                palette=palette[0:16],forced_nb_planes=4,
+                palette_precision_mask=0xF0,
+                generate_mask=is_sprite,
+                blit_pad=is_sprite)
                 raw_blocks[table].append(raw)
 
         img.save(table+".png")
         maxcol = max(max(pic) for pic in pics)
 
-with open(os.path.join(src_dir,"graphics.68k"),"w") as f:
-    for t in ["fg_tile","bg_tile"]:
+outfile = os.path.join(src_dir,"graphics.68k")
+#print("writing {}".format(os.path.abspath(outfile)))
+with open(outfile,"w") as f:
+    for t in ["fg_tile","bg_tile","sprite"]:
+        if t == "sprite":
+            f.write("\t.datachip\n")
         f.write("\t.global\t_{0}\n_{0}:".format(t))
         c = 0
         for block in raw_blocks[t]:

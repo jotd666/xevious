@@ -25,11 +25,37 @@ SCREEN_SIZE = NB_PLANES*SCREEN_PLANE_SIZE
 ;.endm
 
 	bra	_user
+	
+.macro MUL_TABLE value
+mul\value\()_table:
+	.set    mulv,0
+	.rept	256
+	dc.w	mulv
+	.set	mulv,mulv+\value
+	.endr
+.endm
+
+.macro GET_XY_ADDRESS  base_address
+	* multiply D1 by 240
+	lea		mulNB_BYTES_PER_ROW_table(pc),a1
+	add.w	d1,d1
+	move.w	(a1,d1.w),d1
+	lea		\base_address,a1
+	lsl.w	#3,d1
+	* add y offset to screen data
+	add.w	d1,a1
+	* add x offset to screen data
+	lsr.w	#6,d0
+	neg.w	d0
+	add.w	#32,d0	| mirror
+	add.w	d0,a1
+.endm
+
 .macro blitz
 	move.w	d0,-(a7)
 	clr.w	d0
 loop\@:
-	move.w	d0,0xdff180
+	move.w	d0,_custom+color
 	btst	#6,0xbfe001
 	beq.b	out\@
 	addq.w	#1,d0
@@ -71,6 +97,7 @@ out\@:
 * debugging only
     .global osd_debug1
     .global osd_debug2
+    .global osd_debug_hook
     .global	scb1_shadow
     .global scb3_shadow
     .global scb4_shadow
@@ -436,14 +463,8 @@ update_bg_tile:
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
 	bmi		.bg_u4
-	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use mul table
-	lsl.w	#3,d1	| *8
-	lea		screen_data+NB_BYTES_PER_ROW*8,a1  | temp 8 pixel y shift
-	add.w	d1,a1
-	lsr.w	#6,d0
-	neg.w	d0
-	add.w	#32,d0	| mirror
-	add.w	d0,a1
+	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*8
+
 	
 	moveq	#NB_PLANES-1,d3
 	move.w	d2,d4
@@ -496,15 +517,7 @@ update_fg_tile:
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
 	bmi		.u4
-	mulu.w	#NB_BYTES_PER_ROW,d1		| TODO: use mul table
-	lsl.w	#3,d1	| *8
-	lea		screen_data+SCREEN_PLANE_SIZE,a1
-	add.w	d1,a1
-	lsr.w	#6,d0
-	neg.w	d0
-	add.w	#32,d0	| mirror
-	add.w	d0,a1
-	
+	GET_XY_ADDRESS	screen_data+SCREEN_PLANE_SIZE
 	moveq	#NB_PLANES-1,d3
 	move.w	d2,d4
 .u0:
@@ -555,18 +568,44 @@ osd_update_scroll_hw:
 
 * a5=obj_tbl
 osd_update_sprite_shadow:
-		moveq			#64-1,d7
-1:	jsr				update_sprite_shadow
-		adda.w		#_OBJSIZE,a5
-		dbf				d7,1b
-		rts
+	lea       sprite_shadow_msb,a2
+	moveq			#64-1,d7
+1:		
+	bsr.b	update_sprite_shadow
+	*lea		(_OBJSIZE,a5),a5
+	dbf				d7,1b
+	rts
 
-update_sprite_shadow: | $0332
+update_sprite_shadow:
+	move.b	(a5)+,d0		| state
+	move.b	(a5)+,d1
+	lsl.w	#8,d1
+	move.b	(a5)+,d1
+	lsr.w	#6,d1
+	move.b	d1,(a2)+	| d1: X[8:1]
+	add.w	d1,d1		| shift back
+	move.b	(a5)+,d2
+	lsl.w	#8,d2
+	move.b	(a5)+,d2
+	lsr.w	#5,d2		| d2: Y[7:0]
+	move.b	d2,(a2)+
+	move.b	(a5)+,d3	| attributes
+	move.b	(a5)+,d4	| tile code
+	move.b	(a5)+,d5	| tile colour
 9:	rts
 				
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
-		rts
+	* testing blitter functions
+	lea	_sprite+320*2,a0
+	move.w	#40,d0
+	move.w	#40,d1
+	bsr	blit_16x16_bob
+	lea	_sprite+320*8,a0
+	move.w	#140,d0
+	move.w	#140,d1
+	bsr	blit_16x16_bob
+	rts
 		
 * d0=DSWA, d1=DSWB
 osd_read_dipswitches:
@@ -618,6 +657,9 @@ osd_read_p2_inputs:
 		bra				osd_read_p1_inputs
 		rts
 
+osd_debug_hook:
+	rts
+	
 osd_read_coin:
 	move.l	d1,-(a7)
 	move.b	#0,d0
@@ -643,6 +685,142 @@ osd_no_yel:
 	tst.b	d0
 9:	rts
 		
+* what: blits 16x16 data on fg planes, cookie cut
+* args:
+* < A0: data (16x16X(4+1)) (320 bytes)
+* < D0: X
+* < D1: Y
+* trashes: D0-D1
+
+blit_16x16_bob:
+	movem.l	d2-d4/a0-a2,-(a7)
+	lea		screen_data,a1
+	moveq	#NB_PLANES-1,d3
+	lea		(64*4,a0),a3		| mask
+	moveq	#-1,d2
+1:
+	move.l	a1,a2
+	bsr.b	blit_plane_cookie_cut
+	lea		(SCREEN_PLANE_SIZE*2,a1),a1
+	lea		(64,a0),a0  | next plane
+	dbf		d3,1b
+	movem.l	(a7)+,d2-d4/a0-a2
+	rts
+	
+* what: blits 16x16 data on one plane, cookie cut
+* args:
+* < A0: data (16x16)
+* < A1: plane  (40 rows)
+* < A2: background (40 rows) to mix with cookie cut
+* < A3: source mask for cookie cut (16x16)
+* < D0: X
+* < D1: Y
+* < D2: blit mask
+* trashes: D0-D1
+
+blit_plane_cookie_cut:
+    movem.l d2-d7/a1-a5,-(a7)
+    lea _custom,A5
+	move.l d2,d3		|masking of first/last word    
+    move.w  #4,d2       | 16 pixels + 2 shift bytes
+    move.w  #16,d4      | 16 pixels height   
+    bsr blit_plane_any_internal_cookie_cut
+    movem.l (a7)+,d2-d7/a1-a5
+    rts
+    
+* < A5: custom
+* < D0.W,D1.W: x,y
+* < A0: source
+* < A1: destination
+* < A2: background to mix with cookie cut
+* < A3: source mask for cookie cut
+* < D2: width in bytes (inc. 2 extra for shifting)
+* < D3: blit mask
+* < D4: height
+* blit mask set
+* returns: start of destination in A1 (computed from old A1+X,Y)
+* trashes: a1
+
+blit_plane_any_internal_cookie_cut:
+    movem.l d0-d6/a2/a4,-(a7)
+    * pre-compute the maximum of shit here
+    lea		mulNB_BYTES_PER_ROW_table,a4
+    swap    d1
+    clr.w   d1
+    swap    d1
+    add.w   d1,d1
+    beq   .d1_zero    | optim
+    move.w  (a4,d1.w),d1	| y times 40
+	add.w	d1,a2			| Y plane position for background
+.d1_zero:
+    move.l  #0x0fca0000,d5    | B+C-A->D cookie cut   
+
+    move    d0,d6
+    beq   .d0_zero
+    asr.w   #3,d0
+	bclr	#0,d0
+    and.w   #0xF,d6
+	beq	.no_shifting
+
+    lsl.l   #8,d6
+    lsl.l   #4,d6
+    or.w    d6,d5            | add shift to mask (bplcon1)
+    swap    d6
+    clr.w   d6
+    or.l    d6,d5            | add shift
+.no_shifting:   
+    move.w  d0,d6
+    add.w   d0,d1
+    
+.d0_zero:
+    * make offset even. Blitter will ignore odd address
+    * but a 68000 CPU doesn't and since we RETURN A1...
+    bclr    #0,d1
+    add.l   d1,a1       | plane position (long: allow unsigned D1)
+
+    add.w   d6,a2       | X offset for background
+
+	move.w	#NB_BYTES_PER_ROW,d0
+
+    sub.w   d2,d0       | blit width
+
+    lsl.w   #6,d4
+    lsr.w   #1,d2
+    add.w   d2,d4       | blit height
+
+    * always the same settings (ATM)
+
+    * now just wait for blitter ready to write all registers
+	bsr	wait_blit
+    
+    * blitter registers set
+
+    move.l  d3,bltafwm(a5)
+	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
+	clr.w bltbmod(a5)		|A modulo=bytes to skip between lines
+	move.l d5,bltcon0(a5)	| sets con0 and con1
+
+    move.w  d0,bltcmod(a5)	|C modulo
+    move.w  d0,bltdmod(a5)	|D modulo
+							
+	move.l a3,bltapt(a5)	|source graphic top left corner (mask)
+	move.l a0,bltbpt(a5)	|source graphic top left corner
+	move.l a2,bltcpt(a5)	|pristine background
+	move.l a1,bltdpt(a5)	|destination top left corner
+	move.w  d4,bltsize(a5)	|rectangle size, starts blit
+    
+    movem.l (a7)+,d0-d6/a2/a4
+    rts
+
+wait_blit:
+	TST.B	0xBFE001
+1:
+	BTST	#6,dmaconr+_custom
+	BNE.S	1b
+	rts
+	
+	MUL_TABLE	NB_BYTES_PER_ROW
+	
 vbl_counter:
 		dc.w	0
 _resload:
@@ -738,8 +916,8 @@ score_sprite_red:
     dc.w    sprpt+30,0
 end_color_copper:
    * proper sprite priority: above bitplanes
-   *dc.w  $0102,$0000            ;  BPLCON1 := 0x0000
-   *dc.w  $0104,$0024            ;  BPLCON2 := 
+   *dc.w  0x0102,0x0000            ;  BPLCON1 := 0x0000
+   *dc.w  0x0104,0x0024            ;  BPLCON2 := 
    dc.w  0xFFDF,0xFFFE           
    dc.w  0x2201,0xFFFE           
    dc.w	 intreq,0x8010          
