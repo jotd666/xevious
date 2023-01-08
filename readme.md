@@ -14,7 +14,7 @@ PROGRESS:
 
 The core transcode is complete, except for a few minor bugs. There is also currently no provision for sound in the core (TBD).
 
-The Neo Geo target is essentially playable on an emulator. It runs but requires some optimisations in the Neo Geo OSD layer before it will run at 100% on real hardware.
+The Neo Geo target is essentially playable on an emulator and also on real hardware (tested on an AES with NeoSD cartridge).
 
 The Amiga target is early WIP.
 
@@ -46,6 +46,9 @@ Prerequesites:
 Build process:
 
 - install NeoDev and set path accordingly
+- clone repository
+- unzip original puzzledp roms in 'roms/puzzledp' subdirectory
+- set PLATFORM=neogeo in makefile
 - make
 
 AMIGA:
