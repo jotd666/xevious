@@ -383,14 +383,13 @@ platform_init:
 *   - vertical position, sticky, size           
     move.w    #(SCB3+FGSS),-2(a0)               | VRAM_ADDR=SCB3
     move.w    #(SPRITEY_0-2)<<7,d0              | YPOS=0
-    moveq     #4-1,d7
-    *** FIXME!!!
-    *** WTF? why does removing this break it?
     ori.w     #33,d0                            | SIZE=33
-3:  move.w    d0,(a0)                           | 1st 4 sprites size=0
+    moveq     #FGNS-4-1,d7
+3:  move.w    d0,(a0)                           | visible
     dbf       d7,3b   
-    ori.w     #33,d0                            | SIZE=33
-    moveq     #FGNS-4-1,d7                      | more sprites
+    andi.w    #~33,d0                           | SIZE=0
+    * deactivate top 4 sprites to min sprites/line
+    moveq     #4-1,d7                           | top 4 sprites not visible
 4:  move.w    d0,(a0)                           | SCB3 data
     dbf       d7,4b
     
@@ -412,7 +411,7 @@ platform_init:
 
 * - tiles and palettes
     move.w    #(SCB1+DMSS)*64,-2(a0)            | VRAM_ADDR=SCB1
-    moveq     #2,d6
+    moveq     #DMNS-1,d6                        | 2 sprites
 1:  moveq     #32-1,d7
     move.w    #BG_TILE_BASE,d0                  | tile code from BG
 2:  move.w    d0,(a0)                           | TILE
@@ -425,7 +424,7 @@ platform_init:
 *   - shrinking coefficients
     move.w    #(SCB2+DMSS),-2(a0)               | VRAM_ADDR=SCB2
     moveq     #0,d7
-    moveq     #2-1,d7                           | 2 sprites
+    moveq     #DMNS-1,d7                        | 2 sprites
 2:  move.w    #0x077F,(a0)                      | 50% H&V (8x8)
     dbf       d7,2b
 
@@ -433,7 +432,7 @@ platform_init:
     move.w    #(SCB3+DMSS),-2(a0)               | VRAM_ADDR=SCB3
     move.w    #SPRITEY_0<<7,d0                  | YPOS=0
     ori.w     #33,d0                            | SIZE
-    moveq     #2-1,d7                           | 2 sprites
+    moveq     #DMNS-1,d7                         | 2 sprites
 3:  move.w    d0,(a0)                           | SCB3 data
     dbf       d7,3b
 
@@ -451,7 +450,7 @@ platform_init:
     moveq     #0,d7
 4:  move.w    d7,d3
     and.w     #0x3f,d3                          | row (sprite number indirectly)
-    move.w    #35+4,d2                          | forst 4 rows not visible
+    move.w    #35+4,d2                          | first 4 rows not visible
     sub.w     d3,d2                             | sprite #
     lsl.w     #6,d2                             | d2=sprite offset in SCB1
     move.w    d7,d3
