@@ -35,6 +35,7 @@ with open("xevious_gfx.c") as f:
         # for fg, remove the upper 256 tiles as they're used only in cocktail mode
         del block_dict["fg_tile"]["data"][256:]
 
+
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
 
 palette = bitplanelib.palette_round(palette,0xF0)
@@ -48,7 +49,8 @@ for table,data in block_dict.items():
         side = int(data["size"]**0.5)
         pics = data["data"]
         dump_width = side * 64
-        img = Image.new("RGB",(dump_width,side*(len(pics)//(dump_width//side))))
+        dump_height = side * (len(pics)//64)
+        img = Image.new("RGB",(dump_width,dump_height))
         cur_x = 0
         cur_y = 0
         for pic in pics:
@@ -77,9 +79,7 @@ for table,data in block_dict.items():
 outfile = os.path.join(src_dir,"graphics.68k")
 #print("writing {}".format(os.path.abspath(outfile)))
 with open(outfile,"w") as f:
-    for t in ["fg_tile","bg_tile","sprite"]:
-        if t == "sprite":
-            f.write("\t.datachip\n")
+    for t in ["fg_tile","bg_tile"]:
         f.write("\t.global\t_{0}\n_{0}:".format(t))
         c = 0
         for block in raw_blocks[t]:
@@ -93,3 +93,23 @@ with open(outfile,"w") as f:
                 if c == 8:
                     c = 0
         f.write("\n")
+    t = "sprite"
+    f.write("\t.datachip\n")
+    f.write("\t.global\t_{0}\n_{0}:\n".format(t))
+    sprite_blocks = raw_blocks[t]
+    for i in range(len(sprite_blocks)):
+        f.write("\t.long\tsprite_{:03}\n".format(i))
+    c = 0
+
+    for i,block in enumerate(sprite_blocks):
+        f.write("\nsprite_{:03}:".format(i))
+        for d in block:
+            if c==0:
+                f.write("\n\t.byte\t")
+            else:
+                f.write(",")
+            f.write("0x{:02x}".format(d))
+            c += 1
+            if c == 8:
+                c = 0
+    f.write("\n")

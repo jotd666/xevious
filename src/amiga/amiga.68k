@@ -8,6 +8,9 @@
 .include "exec_lvos.i"
 .include "graphics_lvos.i"
 
+STATE_ACTIVE = 2
+STATE_DO_NOT_UPDATE_SHADOW = 1
+STATE_INACTIVE = 0
 
 _custom = 0xDFF000
 
@@ -25,6 +28,15 @@ SCREEN_SIZE = NB_PLANES*SCREEN_PLANE_SIZE
 ;.endm
 
 	bra	_user
+
+| write current PC value to some address
+.macro LOGPC	address
+     bsr    .next_\@
+.next_\@:
+      addq.l    #6,(a7) | skip this & next instruction
+      move.l    (a7)+,0x\address
+.endm
+
 	
 .macro MUL_TABLE value
 mul\value\()_table:
@@ -569,42 +581,91 @@ osd_update_scroll_hw:
 * a5=obj_tbl
 osd_update_sprite_shadow:
 	lea       sprite_shadow_msb,a2
+	lea		current_sprite_state(pc),a4
 	moveq			#64-1,d7
-1:		
-	bsr.b	update_sprite_shadow
-	*lea		(_OBJSIZE,a5),a5
-	dbf				d7,1b
-	rts
-
-update_sprite_shadow:
-	move.b	(a5)+,d0		| state
-	move.b	(a5)+,d1
-	lsl.w	#8,d1
-	move.b	(a5)+,d1
+1:
+	move.b	(_STATE,a5),d0
+	cmp.b	#STATE_DO_NOT_UPDATE_SHADOW,d0
+	beq.b	3f
+	move.b	d0,(a4)+
+	move.b	(_ATTR,a5),(a4)+
+	move.b	(_CODE,a5),(a4)+
+	move.b	(_COLOUR,a5),(a4)+
+	move.w	(_X,a5),d1
 	lsr.w	#6,d1
 	move.b	d1,(a2)+	| d1: X[8:1]
 	add.w	d1,d1		| shift back
-	move.b	(a5)+,d2
-	lsl.w	#8,d2
-	move.b	(a5)+,d2
+	move.w	d1,(a4)+
+	move.w	(_Y,a5),d2
 	lsr.w	#5,d2		| d2: Y[7:0]
 	move.b	d2,(a2)+
-	move.b	(a5)+,d3	| attributes
-	move.b	(a5)+,d4	| tile code
-	move.b	(a5)+,d5	| tile colour
-9:	rts
+	* mirror
+	neg.w	d2
+	add.w	#32*8,d2
+	move.w	d2,(a4)+
+2:
+	lea		(_OBJSIZE,a5),a5
+	dbf				d7,1b
+	rts
+3:
+	addq.w	#8,a4
+	addq.w	#2,a2
+	bra.b	2b
 				
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
-	* testing blitter functions
-	lea	_sprite+320*2,a0
-	move.w	#40,d0
-	move.w	#40,d1
+	lea		current_sprite_state(pc),a4
+	lea		previous_sprite_state(pc),a5
+	move.w	d0,d1
+	beq.b	1f
+	lsl.w	#3,d1
+	add.w	d1,a4		| add second half offset
+	add.w	d1,a5		| add second half offset
+1:
+	* first restore all background tiles behind the previous
+	* positions of the previously active objects
+	move.l	a5,-(a7)
+	move.l	(a7)+,a5
+* TODO
+	* then update the active sprites
+	move.l	a4,-(a7)
+	lea		_sprite,a3		| base
+	move.w	#31,d4			| 32 sprites
+4:
+	cmp.b	#STATE_INACTIVE,(a4)
+	beq.b	2f
+	move.w	(4,a4),d1
+	sub.w	#4*8,d1
+	bmi.b	2f		| not visible
+
+	clr.w	d0
+	move.b	(2,a4),d0	| tile code
+	move.b		(1,a4),d2  | tile attributes
+	bpl.b	5f
+	* second bank
+	bset	#8,d0
+5:
+	* multiply by 8 to get proper tile pointer in table
+	
+	lsl.w	#3,d0
+	btst	#2,d2	| xflip (or 3 xflip??)
+	beq.b	6f
+	add.w	#4,d0	| mirrored
+6:
+	move.l	(a3,d0.w),a0	| sprite data
+	move.w	(6,a4),d0
+	sub.w	#8,d0		| offset
 	bsr	blit_16x16_bob
-	lea	_sprite+320*8,a0
-	move.w	#140,d0
-	move.w	#140,d1
-	bsr	blit_16x16_bob
+
+2:
+	lea		(8,a4),a4		| next sprite
+	dbf		d4,4b
+	* then back up current object state (X,Y,STATE) for next update
+	move.w	#7,d0
+	move.l	(a7)+,a4
+3:
+	move.l	(a4)+,(a5)+
+	dbf		d0,3b
 	rts
 		
 * d0=DSWA, d1=DSWB
@@ -685,7 +746,7 @@ osd_no_yel:
 	tst.b	d0
 9:	rts
 		
-* what: blits 16x16 data on fg planes, cookie cut
+* what: blits 16x16 data on bg planes, cookie cut
 * args:
 * < A0: data (16x16X(4+1)) (320 bytes)
 * < D0: X
@@ -694,7 +755,7 @@ osd_no_yel:
 
 blit_16x16_bob:
 	movem.l	d2-d4/a0-a2,-(a7)
-	lea		screen_data,a1
+	lea		screen_data+SCREEN_PLANE_SIZE,a1
 	moveq	#NB_PLANES-1,d3
 	lea		(64*4,a0),a3		| mask
 	moveq	#-1,d2
@@ -820,6 +881,11 @@ wait_blit:
 	rts
 	
 	MUL_TABLE	NB_BYTES_PER_ROW
+	
+current_sprite_state:
+	ds.b	8*64
+previous_sprite_state:
+	ds.b	8*64
 	
 vbl_counter:
 		dc.w	0
