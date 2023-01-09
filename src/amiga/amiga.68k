@@ -14,13 +14,13 @@ STATE_INACTIVE = 0
 
 _custom = 0xDFF000
 
-NB_PLANES = 4
+NB_PLANES = 7
 COPPERLIST_SIZE = 200
 GRID_SIZE = 1<<11   | 6+5 bits to encode position
 NB_BYTES_PER_ROW = 40
 NB_LINES = 288
 SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_LINES
-SCREEN_SIZE = NB_PLANES*SCREEN_PLANE_SIZE
+SCREEN_SIZE = (NB_PLANES+1)*SCREEN_PLANE_SIZE
 
 
 ;.macro pixw nm, x, y
@@ -185,7 +185,6 @@ TRAP:
 	rte
 	    
 _user:
-	move.l	#_fg_color_data,0x100
     * if D0 contains "WHDL"
     * A0 contains resload
         
@@ -349,9 +348,7 @@ platform_init:
     move.w #0x30C1,diwstop(a5)
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
-    *move.w #0x7210,bplcon0(a5)  | 8 bitplanes
-	move.w #0x7610,bplcon0(a5) | 8 bitplanes, dual playfield	
-	*move.w #0X4000,bplcon3(a5) | 16-color offset
+    move.w #0x0210,bplcon0(a5)  | 8 bitplanes
 	
     clr.w bplcon1(a5) 
     clr.w bplcon2(a5)                     
@@ -366,11 +363,8 @@ platform_init:
 	move.l	#copperlist,cop1lc(a5)
 	* load palette
 	lea		palette(pc),a0
-	lea		_custom+color,a1
-	move.w	#31,d0
-.copy:
-	move.w	(a0)+,(a1)+
-	dbf		d0,.copy
+	move.w	#256,d0
+	bsr		set_color_registers	
 	
     * init sprite, bitplane, whatever dma
     move.w #0x83E0,dmacon(a5)
@@ -379,6 +373,35 @@ platform_init:
 	pea		_vblank(pc)
 	move.l	(a7)+,0x6C.W
 	
+    rts
+
+* < a0: source palette
+* < d0: number of colors to set
+set_color_registers:
+    moveq	#0,d7
+    move.w  d0,d1
+    lsr.w   #5,d1   | divide by 32
+    and.w   #0x1F,d0
+    beq.b   1f
+    add.w   #1,d1
+1:
+    * set AGA color bank
+    move.w  d7,d0
+    lsl.w   #8,d0
+    lsl.w   #5,d0
+    move.w  d0,bplcon3(a5)
+    lea color(a5),a1
+    * now set the colors for that bank
+    move.w  #31,d0 
+2:
+    move.w  (a0)+,(a1)+
+    dbf d0,2b
+    addq.w  #1,d7
+    cmp.w   d1,d7
+    bne.b   1b
+    
+    * reset bank so copperlist can work on base ECS bank
+    move.w  #0,bplcon3(a5)
     rts
 
 * 60Hz VBLANK interrupt
@@ -461,118 +484,102 @@ osd_w_bg_videoram:
 * d2: attribute
 * a0: tile map start (fg/bg)
 update_bg_tile:
-	and.w	#0xFF,d1
+	and.l	#0xFF,d1
 	btst	#0,d2
-	beq.b	.u_first_half
+	beq.b	1f
 	bset	#8,d1	| upper part of background tile code
-.u_first_half:
-	lsl.w	#6,d1			| *64 (each tile+mirror tile has 8 bytes ATM)
+1:
+*	lea		mulNB_PLANES_table,a1
+*	add.w	d1,d1
+*	move.w	(a1,d1.w),d1
+*	lsl.l	#4,d1			| times 112: 8*7*2
+	mulu	#112,d1
+	
 	btst	#6,d2			| X-flip?
-	beq.b	.bg_no_xflip
-	add.w	#32,d1			| mirror version
-.bg_no_xflip:
-	add.w	d1,a0
+	beq.b	2f
+	add.l	#NB_PLANES*8,d1			| mirror version
+2:
+	add.l	d1,a0
 	move.w	d0,d1
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
-	bmi		.bg_u4
+	bmi		6f
 	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*8
 
-	
-	moveq	#NB_PLANES-1,d3
+	moveq	#NB_PLANES-1,d3	| 7 planes (AGA)
 	move.w	d2,d4
-.bg_u0:
+3:
 	* draw
 	btst	#7,d4
-	bne.b	.bg_yflip
-	move.b	(a0),(a1)
-	move.b	(1,a0),(NB_BYTES_PER_ROW,a1)
-	move.b	(2,a0),(NB_BYTES_PER_ROW*2,a1)
-	move.b	(3,a0),(NB_BYTES_PER_ROW*3,a1)
-	move.b	(4,a0),(NB_BYTES_PER_ROW*4,a1)
-	move.b	(5,a0),(NB_BYTES_PER_ROW*5,a1)
-	move.b	(6,a0),(NB_BYTES_PER_ROW*6,a1)
-	move.b	(7,a0),(NB_BYTES_PER_ROW*7,a1)
-	bra.b	.bg_u3
-.bg_yflip:
-	move.b	(7,a0),(a1)
-	move.b	(6,a0),(NB_BYTES_PER_ROW,a1)
-	move.b	(5,a0),(NB_BYTES_PER_ROW*2,a1)
-	move.b	(4,a0),(NB_BYTES_PER_ROW*3,a1)
-	move.b	(3,a0),(NB_BYTES_PER_ROW*4,a1)
-	move.b	(2,a0),(NB_BYTES_PER_ROW*5,a1)
-	move.b	(1,a0),(NB_BYTES_PER_ROW*6,a1)
-	move.b	(a0),(NB_BYTES_PER_ROW*7,a1)
-
-.bg_u3:
-	lea		(8,a0),a0
-    lea   (SCREEN_PLANE_SIZE*2,a1),a1
-    dbf d3,.bg_u0
-.bg_u4:
+	bne.b	5f
+4:
+	move.b	(a0)+,(a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*2,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*3,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*4,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*5,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*6,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*7,a1)
+    lea   (SCREEN_PLANE_SIZE,a1),a1
+    dbf d3,4b
 	rts
 	
-process_fg_tile:
+5:   | y-flip
+	move.b	(a0)+,(NB_BYTES_PER_ROW*7,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*6,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*5,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*4,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*3,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*2,a1)
+ 	move.b	(a0)+,(NB_BYTES_PER_ROW,a1)
+	move.b	(a0)+,(a1)
+   lea		(SCREEN_PLANE_SIZE,a1),a1
+    dbf		d3,5b
+6:
+	rts
 	
-	move.b	d1,(a2,d0.w)	| update logical grid
-	move.b	(a1,d0.w),d2	| color & X/Y flip data
 * d1: tile code
 * d2: attribute
 * a0: tile map start (fg/bg)
 update_fg_tile:
 	and.w	#0xFF,d1
-	lsl.w	#6,d1			| *64 (each tile+mirror tile has 8 bytes ATM)
+	lsl.w	#4,d1			| *16 (each tile+mirror tile has 8+8 bytes)
 	btst	#6,d2			| X-flip?
-	beq.b	.no_xflip
-	add.w	#32,d1			| mirror version
-.no_xflip:
+	beq.b	1f
+	add.w	#8,d1			| mirror version
+1:
 	add.w	d1,a0
 	move.w	d0,d1
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
-	bmi		.u4
-	GET_XY_ADDRESS	screen_data+SCREEN_PLANE_SIZE
-	moveq	#NB_PLANES-1,d3
+	bmi.w		3f
+	GET_XY_ADDRESS	screen_data+SCREEN_PLANE_SIZE*7
+	
 	move.w	d2,d4
-.u0:
-	btst	#0,d2
-	beq.b	.u1
+
 	* draw
 	btst	#7,d4
-	bne.b	.yflip
-	move.b	(a0),(a1)
-	move.b	(1,a0),(NB_BYTES_PER_ROW,a1)
-	move.b	(2,a0),(NB_BYTES_PER_ROW*2,a1)
-	move.b	(3,a0),(NB_BYTES_PER_ROW*3,a1)
-	move.b	(4,a0),(NB_BYTES_PER_ROW*4,a1)
-	move.b	(5,a0),(NB_BYTES_PER_ROW*5,a1)
-	move.b	(6,a0),(NB_BYTES_PER_ROW*6,a1)
-	move.b	(7,a0),(NB_BYTES_PER_ROW*7,a1)
-	bra.b	.u3
-.yflip:
-	move.b	(7,a0),(a1)
-	move.b	(6,a0),(NB_BYTES_PER_ROW,a1)
-	move.b	(5,a0),(NB_BYTES_PER_ROW*2,a1)
-	move.b	(4,a0),(NB_BYTES_PER_ROW*3,a1)
-	move.b	(3,a0),(NB_BYTES_PER_ROW*4,a1)
-	move.b	(2,a0),(NB_BYTES_PER_ROW*5,a1)
-	move.b	(1,a0),(NB_BYTES_PER_ROW*6,a1)
-	move.b	(a0),(NB_BYTES_PER_ROW*7,a1)
-	bra.b	.u3
-.u1:
-	* clear
-	clr.b	(a1)
-	clr.b	(NB_BYTES_PER_ROW,a1)
-	clr.b	(NB_BYTES_PER_ROW*2,a1)
-	clr.b	(NB_BYTES_PER_ROW*3,a1)
-	clr.b	(NB_BYTES_PER_ROW*4,a1)
-	clr.b	(NB_BYTES_PER_ROW*5,a1)
-	clr.b	(NB_BYTES_PER_ROW*6,a1)
-	clr.b	(NB_BYTES_PER_ROW*7,a1)
-.u3:
-    lsr.w   #1,d2
-    lea   (SCREEN_PLANE_SIZE*2,a1),a1
-    dbf d3,.u0
-.u4:
+	bne.b	2f
+	move.b	(a0)+,(a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*2,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*3,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*4,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*5,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*6,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*7,a1)
+	rts
+2:
+	move.b	(a0)+,(NB_BYTES_PER_ROW*7,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*6,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*5,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*4,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*3,a1)
+	move.b	(a0)+,(NB_BYTES_PER_ROW*2,a1)
+ 	move.b	(a0)+,(NB_BYTES_PER_ROW,a1)
+	move.b	(a0)+,(a1)
+3:
 	rts
 	
 * d6 = bg_scroll_x_shadow
@@ -684,7 +691,7 @@ osd_read_p1_inputs:
 
 set_bitplanes:
     move.l	#screen_data,d0
-    moveq #NB_PLANES*2-1,d1
+    moveq #NB_PLANES,d1  | +1 for foreground
     lea	bitplanes+2,a0
 .mkcl:
     swap d0
@@ -749,21 +756,21 @@ osd_no_yel:
 		
 * what: blits 16x16 data on bg planes, cookie cut
 * args:
-* < A0: data (16x16X(4+1)) (320 bytes)
+* < A0: data (16x16X(7+1))
 * < D0: X
 * < D1: Y
 * trashes: D0-D1
 
 blit_16x16_bob:
 	movem.l	d2-d4/a0-a2,-(a7)
-	lea		screen_data+SCREEN_PLANE_SIZE,a1
+	lea		screen_data,a1
 	moveq	#NB_PLANES-1,d3
-	lea		(64*4,a0),a3		| mask
+	lea		(64*NB_PLANES,a0),a3		| mask
 	moveq	#-1,d2
 1:
 	move.l	a1,a2
 	bsr.b	blit_plane_cookie_cut
-	lea		(SCREEN_PLANE_SIZE*2,a1),a1
+	lea		(SCREEN_PLANE_SIZE,a1),a1
 	lea		(64,a0),a0  | next plane
 	dbf		d3,1b
 	movem.l	(a7)+,d2-d4/a0-a2
@@ -882,6 +889,7 @@ wait_blit:
 	rts
 	
 	MUL_TABLE	NB_BYTES_PER_ROW
+	MUL_TABLE	NB_PLANES
 	
 current_sprite_state:
 	ds.b	8*64
@@ -931,7 +939,7 @@ _bg_char_data:
 	ds.b	GRID_SIZE
 		.bsschip
 screen_data:
-	ds.b	SCREEN_SIZE*2
+	ds.b	SCREEN_SIZE
 	ds.b	100	| small margin (I suspect that gas is buggy with ds directive)
 	.datachip
 copperlist:

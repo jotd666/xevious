@@ -76,30 +76,15 @@ with open("xevious_gfx.c") as f:
 
 
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
+palette = bitplanelib.palette_round(palette)
 
 
-# we can't have 128 (119 unique) colors on each playfield. AGA only allows 16!! per playfield
-# so we're going to quantize bg tiles+sprite, and fg, separately into 16 dominant colors
-# foreground colors can't be reduced here, as game controls the used colors, so we're going to record them
-# while running the game and try to find the most used, and create an indirection colorindex (0-127) => colorindex (0-15)
-# and there's only one plane of data so maybe not that complex
 
-# background colors+sprites
-# lets merge CLUTS
-
-bg_tile_clut = [tuple(x) for x in block_dict["bg_tile_clut"]["data"]+block_dict["sprite_clut"]["data"]]
-# print(len(set(bg_tile_clut))) # there are 86 possible configurations for indexes WTF! for 192 configurations
-# get the proper RGB values instead now
-
-bg_palette_dict = quantize_palette(bg_tile_clut,palette)
-
-
-# now create a dictionary old palette -> new palette
-
-dump_graphics = False
+dump_graphics = True
 
 if dump_graphics:
-    bitplanelib.palette_dump(palette,os.path.join(src_dir,"palette.68k"),bitplanelib.PALETTE_FORMAT_ASMGNU)
+# temp add all white for foreground
+    bitplanelib.palette_dump(palette+[(240,240,240)]*128,os.path.join(src_dir,"palette.68k"),bitplanelib.PALETTE_FORMAT_ASMGNU)
 
 
     raw_blocks = collections.defaultdict(list)
@@ -107,6 +92,11 @@ if dump_graphics:
     for table,data in block_dict.items():
         if data["size"] in [64,256]:
             is_sprite = table == "sprite"
+            is_fg = "fg" in table
+            nb_planes = 1 if is_fg else 7
+            nb_colors = 1<<nb_planes
+            current_palette = [(0,0,0),(96, 96, 96)] if is_fg else palette
+
             side = int(data["size"]**0.5)
             pics = data["data"]
             dump_width = side * 64
@@ -117,10 +107,11 @@ if dump_graphics:
             for pic in pics:
                 input_image = Image.new("RGB",(side,side))
                 for i,p in enumerate(pic):
-                    col = palette[p]
+                    col = current_palette[p]
                     y,x = divmod(i,side)
                     img.putpixel((cur_x+x,cur_y+y),col)  # for dump
                     input_image.putpixel((x,y),col)
+
 
                 cur_x += side
                 if cur_x == dump_width:
@@ -128,7 +119,8 @@ if dump_graphics:
                     cur_y += side
                 for the_tile in [input_image,ImageOps.mirror(input_image)]:
                     raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
-                    palette=palette[0:16],forced_nb_planes=4,
+                    palette=current_palette,
+                    forced_nb_planes=nb_planes,
                     palette_precision_mask=0xF0,
                     generate_mask=is_sprite,
                     blit_pad=is_sprite)
