@@ -349,8 +349,9 @@ platform_init:
     move.w #0x30C1,diwstop(a5)
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
-    move.w #0x4200,bplcon0(a5)
-	*move.w #0x7610,bplcon0(a5) | 8 bitplanes, dual playfield	
+    *move.w #0x7210,bplcon0(a5)  | 8 bitplanes
+	move.w #0x7610,bplcon0(a5) | 8 bitplanes, dual playfield	
+	*move.w #0X4000,bplcon3(a5) | 16-color offset
 	
     clr.w bplcon1(a5) 
     clr.w bplcon2(a5)                     
