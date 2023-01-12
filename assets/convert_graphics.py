@@ -6,6 +6,26 @@ import collections
 
 block_dict = {}
 
+def get_used_bg_cluts():
+    infile = r"C:\Users\Public\Documents\Amiga Files\WinUAE\bg_tile_log"
+    rval = collections.defaultdict(list)
+    with open(infile,"rb") as f:
+        contents = f.read()
+
+    row_index = 0
+    for tile_index in range(512):
+        for idx in range(64):
+            if contents[row_index+idx] == 0xdd:
+                clut_index = 0
+                if tile_index & 0x80:
+                    clut_index = 1<<4
+                clut_index |= (idx>>2) & 0xF
+                clut_index |= (idx&0x3) << 5
+                rval[tile_index].append(clut_index)
+        row_index += 64
+
+    return rval
+
 def quantize_palette(tile_clut,global_palette):
     rgb_configs = set(global_palette[i & 0x7F] for clut in tile_clut for i in clut)  # 75 unique colors now
     # remove 0, we don't want it quantized
@@ -80,12 +100,39 @@ palette = bitplanelib.palette_round(palette)
 
 
 
+bg_tile_clut = block_dict["bg_tile_clut"]["data"]
+
+# compute the RGB configuration used for each used tile. Generate a lookup table with
+bg_tile_clut_dict = get_used_bg_cluts()
+for tile,cluts in bg_tile_clut_dict.items():
+    used_cluts = [[palette[i] for i in bg_tile_clut[c]] for c in cluts]
+    used_clut_indexes = [bg_tile_clut[c] for c in cluts]
+    print(tile,used_cluts,used_clut_indexes)
+
 dump_graphics = True
+
+def generate_tile(pic,side,current_palette,nb_planes,is_sprite):
+    input_image = Image.new("RGB",(side,side))
+    for i,p in enumerate(pic):
+        col = current_palette[p]
+        y,x = divmod(i,side)
+        input_image.putpixel((x,y),col)
+
+    rval = []
+    for the_tile in [input_image,ImageOps.mirror(input_image)]:
+        raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
+        palette=current_palette,
+        forced_nb_planes=nb_planes,
+        palette_precision_mask=0xF0,
+        generate_mask=is_sprite,
+        blit_pad=is_sprite)
+        rval.append(raw)
+
+    return rval
 
 if dump_graphics:
 # temp add all white for foreground
     bitplanelib.palette_dump(palette+[(240,240,240)]*128,os.path.join(src_dir,"palette.68k"),bitplanelib.PALETTE_FORMAT_ASMGNU)
-
 
     raw_blocks = collections.defaultdict(list)
 
@@ -99,53 +146,60 @@ if dump_graphics:
 
             side = int(data["size"]**0.5)
             pics = data["data"]
-            dump_width = side * 64
-            dump_height = side * (len(pics)//64)
-            img = Image.new("RGB",(dump_width,dump_height))
-            cur_x = 0
-            cur_y = 0
             for pic in pics:
-                input_image = Image.new("RGB",(side,side))
-                for i,p in enumerate(pic):
-                    col = current_palette[p]
-                    y,x = divmod(i,side)
-                    img.putpixel((cur_x+x,cur_y+y),col)  # for dump
-                    input_image.putpixel((x,y),col)
+                couple = generate_tile(pic,side,current_palette,nb_planes,is_sprite)
+                raw_blocks[table].extend(couple)
 
-
-                cur_x += side
-                if cur_x == dump_width:
-                    cur_x = 0
-                    cur_y += side
-                for the_tile in [input_image,ImageOps.mirror(input_image)]:
-                    raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
-                    palette=current_palette,
-                    forced_nb_planes=nb_planes,
-                    palette_precision_mask=0xF0,
-                    generate_mask=is_sprite,
-                    blit_pad=is_sprite)
-                    raw_blocks[table].append(raw)
-
-            img.save(table+".png")
-            maxcol = max(max(pic) for pic in pics)
+##            dump_width = side * 64
+##            dump_height = side * (len(pics)//64)
+##            img = Image.new("RGB",(dump_width,dump_height))
+##            cur_x = 0
+##            cur_y = 0
+##                img.putpixel((cur_x+x,cur_y+y),col)  # for dump
+##                cur_x += side
+##                if cur_x == dump_width:
+##                    cur_x = 0
+##                    cur_y += side
+#            img.save(table+".png")
 
     outfile = os.path.join(src_dir,"graphics.68k")
     #print("writing {}".format(os.path.abspath(outfile)))
     with open(outfile,"w") as f:
-        for t in ["fg_tile","bg_tile"]:
-            f.write("\t.global\t_{0}\n_{0}:".format(t))
-            c = 0
-            for block in raw_blocks[t]:
-                for d in block:
-                    if c==0:
-                        f.write("\n\t.byte\t")
-                    else:
-                        f.write(",")
-                    f.write("0x{:02x}".format(d))
-                    c += 1
-                    if c == 8:
-                        c = 0
-            f.write("\n")
+        f.write("NULLPTR = 0\n")
+        t = "fg_tile"
+        # foreground tiles: just write the 1-bitplane tiles and their mirrored counterpart
+        f.write("\t.global\t_{0}\n_{0}:".format(t))
+        c = 0
+        for block in raw_blocks[t]:
+            for d in block:
+                if c==0:
+                    f.write("\n\t.byte\t")
+                else:
+                    f.write(",")
+                f.write("0x{:02x}".format(d))
+                c += 1
+                if c == 8:
+                    c = 0
+        f.write("\n")
+        # background tiles: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
+        t = "bg_tile"
+        f.write("\t.global\t_{0}\n_{0}:".format(t))
+
+        # TEMP TEMP TEMP
+        c = 0
+        for block in raw_blocks[t]:
+            for d in block:
+                if c==0:
+                    f.write("\n\t.byte\t")
+                else:
+                    f.write(",")
+                f.write("0x{:02x}".format(d))
+                c += 1
+                if c == 8:
+                    c = 0
+        f.write("\n")
+        # TEMP TEMP TEMP
+
         t = "sprite"
         f.write("\t.datachip\n")
         f.write("\t.global\t_{0}\n_{0}:\n".format(t))

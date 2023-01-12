@@ -11,6 +11,8 @@
 STATE_ACTIVE = 2
 STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
+	
+OPT_ENABLE_LOGGING = 1
 
 _custom = 0xDFF000
 
@@ -38,10 +40,10 @@ SCREEN_SIZE = (NB_PLANES+1)*SCREEN_PLANE_SIZE
 .endm
 
 	
-.macro MUL_TABLE value
+.macro MUL_TABLE value,len
 mul\value\()_table:
 	.set    mulv,0
-	.rept	256
+	.rept	\len
 	dc.w	mulv
 	.set	mulv,mulv+\value
 	.endr
@@ -50,8 +52,12 @@ mul\value\()_table:
 .macro GET_XY_ADDRESS  base_address
 	* multiply D1 by 240
 	lea		mulNB_BYTES_PER_ROW_table(pc),a1
+	.ifdef	NO68020
 	add.w	d1,d1
 	move.w	(a1,d1.w),d1
+	.else
+	move.w	(a1,d1.w*2),d1
+	.endif
 	lea		\base_address,a1
 	lsl.w	#3,d1
 	* add y offset to screen data
@@ -480,8 +486,8 @@ osd_w_bg_videoram:
 	rts
 	
 * d0: offset
-* d1: tile code
-* d2: attribute
+* d1: tile code (0-256 but extends to 512 with bit 0 of attribute)
+* d2: attribute (0-255, color is in bits 0-5)
 * a0: tile map start (fg/bg)
 update_bg_tile:
 	and.l	#0xFF,d1
@@ -489,11 +495,27 @@ update_bg_tile:
 	beq.b	1f
 	bset	#8,d1	| upper part of background tile code
 1:
-*	lea		mulNB_PLANES_table,a1
-*	add.w	d1,d1
-*	move.w	(a1,d1.w),d1
-*	lsl.l	#4,d1			| times 112: 8*7*2
-	mulu	#112,d1
+	.ifne  OPT_ENABLE_LOGGING
+	* log the tile, use start address in 0x100 then
+	* S bg_tile_log address !64*!512
+	lea		bg_tile_log,a1
+	move.l	a1,0x100
+	movem.l	d1/d2,-(a7)
+	lsl.w	#6,d1		| times 64
+	add.w	d1,a1
+	and.w	#0x3F,d2	| significant color bits
+	move.b	#0xDD,(a1,d2.w)
+	movem.l	(a7)+,d1/d2
+	.endif
+1:
+	lea		mulNB_PLANES_table,a1
+	.ifdef	NO68020
+	add.w	d1,d1
+	move.w	(a1,d1.w),d1	
+	.else
+	move.w	(a1,d1.w*2),d1
+	.endif
+	lsl.l	#4,d1			| times 112: 8*7*2
 	
 	btst	#6,d2			| X-flip?
 	beq.b	2f
@@ -817,9 +839,13 @@ blit_plane_any_internal_cookie_cut:
     swap    d1
     clr.w   d1
     swap    d1
-    add.w   d1,d1
     beq   .d1_zero    | optim
+	.ifdef	NO68020
+	add.w	d1,d1
     move.w  (a4,d1.w),d1	| y times 40
+	.else
+    move.w  (a4,d1.w*2),d1	| y times 40
+	.endif
 	add.w	d1,a2			| Y plane position for background
 .d1_zero:
     move.l  #0x0fca0000,d5    | B+C-A->D cookie cut   
@@ -888,8 +914,8 @@ wait_blit:
 	BNE.S	1b
 	rts
 	
-	MUL_TABLE	NB_BYTES_PER_ROW
-	MUL_TABLE	NB_PLANES
+	MUL_TABLE	NB_BYTES_PER_ROW,288
+	MUL_TABLE	NB_PLANES,512
 	
 current_sprite_state:
 	ds.b	8*64
@@ -918,7 +944,10 @@ palette:
 		.bss
 
 		.align 4
-
+	.ifne	OPT_ENABLE_LOGGING
+bg_tile_log:
+	ds.b	0x200*64
+	.endif
 * using 2 tiles/sprite only
 *scb1_shadow:									ds.w 	128*4*2
 scb3_shadow:									ds.w 	128*2
