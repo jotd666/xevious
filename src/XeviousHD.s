@@ -4,6 +4,7 @@
 	INCLUDE	whdmacros.i
 
 ;;CHIP_ONLY
+EXPSIZE = $100000
 
 _base	SLAVE_HEADER					; ws_security + ws_id
 	dc.w	17					; ws_version (was 10)
@@ -11,7 +12,7 @@ _base	SLAVE_HEADER					; ws_security + ws_id
     IFD CHIP_ONLY
 	dc.l	$200000					; ws_basememsize
     ELSE
-	dc.l	$100000					; ws_expmem
+	dc.l	EXPSIZE					; ws_expmem
     ENDC
 	dc.l	0					; ws_execinstall
 	dc.w	start-_base		; ws_gameloader
@@ -25,7 +26,7 @@ _expmem
     IFD CHIP_ONLY
     dc.l    0
     ELSE
-	dc.l	$100000					; ws_expmem
+	dc.l	EXPSIZE					; ws_expmem
     ENDC
 	dc.w	_name-_base				; ws_name
 	dc.w	_copy-_base				; ws_copy
@@ -79,13 +80,13 @@ start:
     
     IFD CHIP_ONLY
     lea  _expmem(pc),a0
-    move.l  #$80000,(a0)
+    move.l  #$100000,(a0)
     ENDC
     lea progstart(pc),a0
     move.l  _expmem(pc),(a0)
 
 	move.l	_expmem(pc),d0
-	add.l	#$80000,D0
+	add.l	#EXPSIZE,D0
 	move.l	d0,a7
 	
 	lea	exe(pc),a0

@@ -433,7 +433,6 @@ osd_w_fg_colorram:
 	move.b	d1,d2
 	move.b	(a1,d0.w),d1	| fetch tile from character grid
 	* now update tile to reflect the color change
-	lea		_fg_tile,a0
 	bsr	update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a1
    .endif | OPT_DISABLE_FG_LAYER
@@ -448,7 +447,6 @@ osd_w_bg_colorram:
 	lea		_bg_char_data,a1
 	move.b	d1,d2
 	move.b	(a1,d0.w),d1	| fetch tile from character grid
-	lea		_bg_tile,a0
 	bsr	update_bg_tile
 	movem.l	(a7)+,d0-d5/a0-a1
    .endif | OPT_DISABLE_BG_LAYER
@@ -465,7 +463,6 @@ osd_w_fg_videoram:
 	lea		_fg_char_data,a2
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
-	lea		_fg_tile,a0
 	bsr		update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a2
     .endif | OPT_DISABLE_FG_LAYER
@@ -479,7 +476,6 @@ osd_w_bg_videoram:
 	lea		_bg_char_data,a2
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
-	lea		_bg_tile,a0
 	bsr		update_bg_tile
 	movem.l	(a7)+,d0-d5/a0-a2
     .endif | OPT_DISABLE_BG_LAYER
@@ -488,8 +484,8 @@ osd_w_bg_videoram:
 * d0: offset
 * d1: tile code (0-256 but extends to 512 with bit 0 of attribute)
 * d2: attribute (0-255, color is in bits 0-5)
-* a0: tile map start (fg/bg)
 update_bg_tile:
+	lea		_bg_tile,a0
 	and.l	#0xFF,d1
 	btst	#0,d2
 	beq.b	1f
@@ -507,21 +503,39 @@ update_bg_tile:
 	move.b	#0xDD,(a1,d2.w)
 	movem.l	(a7)+,d1/d2
 	.endif
-1:
-	lea		mulNB_PLANES_table,a1
-	.ifdef	NO68020
-	add.w	d1,d1
-	move.w	(a1,d1.w),d1	
-	.else
-	move.w	(a1,d1.w*2),d1
-	.endif
-	lsl.l	#4,d1			| times 112: 8*7*2
+
+	* compute clut index in d3
+	* by descrambling the bizarre encoding
+	move.b	d2,d3
+	and.w	#0x3F,d3	| keep only 5:0 bits
+	lsr.b	#2,d3
+	move.b	d2,d4
+	and.b	#3,d4
+	lsl.b	#5,d4	| high color bits
+	or.b	d4,d3	| add them back
+	btst	#7,d1
+	beq.b	2f
+	bset	#4,d3	| add bit 4 if tile id > 0x80
+2:
+	* now d3 is the index, mul by 8 to get row pointer offset
+	lsl.w	#3,d3
+	* d1 times 1024 (<<10) is the row start pointer
+	lsl.l	#8,d1
+	add.l	d1,d1
+	add.l	d1,d1
 	
 	btst	#6,d2			| X-flip?
-	beq.b	2f
-	add.l	#NB_PLANES*8,d1			| mirror version
-2:
-	add.l	d1,a0
+	beq.b	3f
+	add.w	#4,d3			| mirror version
+3:
+	add.l	d1,a0		| row offset
+	add.w	d3,a0		| col offset
+	move.l	(a0),d1
+	bne.b	7f
+	* tile is not known with that CLUT configuration
+	blitz
+7:
+	move.l	d1,a0
 	move.w	d0,d1
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
@@ -530,7 +544,10 @@ update_bg_tile:
 
 	moveq	#NB_PLANES-1,d3	| 7 planes (AGA)
 	move.w	d2,d4
-3:
+
+	cmp.w	#1,a0
+	beq.b	8f		| clear
+
 	* draw
 	btst	#7,d4
 	bne.b	5f
@@ -560,11 +577,23 @@ update_bg_tile:
     dbf		d3,5b
 6:
 	rts
+8:
+	clr.b	(a1)
+	clr.b	(NB_BYTES_PER_ROW,a1)
+	clr.b	(NB_BYTES_PER_ROW*2,a1)
+	clr.b	(NB_BYTES_PER_ROW*3,a1)
+	clr.b	(NB_BYTES_PER_ROW*4,a1)
+	clr.b	(NB_BYTES_PER_ROW*5,a1)
+	clr.b	(NB_BYTES_PER_ROW*6,a1)
+	clr.b	(NB_BYTES_PER_ROW*7,a1)
+    lea   (SCREEN_PLANE_SIZE,a1),a1
+    dbf d3,8b
+	rts
 	
 * d1: tile code
 * d2: attribute
-* a0: tile map start (fg/bg)
 update_fg_tile:
+	lea		_fg_tile,a0
 	and.w	#0xFF,d1
 	lsl.w	#4,d1			| *16 (each tile+mirror tile has 8+8 bytes)
 	btst	#6,d2			| X-flip?
@@ -644,6 +673,8 @@ osd_update_sprite_shadow:
 				
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
+	rts
+	
 	lea		current_sprite_state(pc),a4
 	lea		previous_sprite_state(pc),a5
 	move.w	d0,d1

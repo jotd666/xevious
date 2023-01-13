@@ -102,16 +102,11 @@ palette = bitplanelib.palette_round(palette)
 
 bg_tile_clut = block_dict["bg_tile_clut"]["data"]
 
-# compute the RGB configuration used for each used tile. Generate a lookup table with
-bg_tile_clut_dict = get_used_bg_cluts()
-for tile,cluts in bg_tile_clut_dict.items():
-    used_cluts = [[palette[i] for i in bg_tile_clut[c]] for c in cluts]
-    used_clut_indexes = [bg_tile_clut[c] for c in cluts]
-    print(tile,used_cluts,used_clut_indexes)
 
 dump_graphics = True
+dump_pngs = True
 
-def generate_tile(pic,side,current_palette,nb_planes,is_sprite):
+def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
     input_image = Image.new("RGB",(side,side))
     for i,p in enumerate(pic):
         col = current_palette[p]
@@ -121,56 +116,96 @@ def generate_tile(pic,side,current_palette,nb_planes,is_sprite):
     rval = []
     for the_tile in [input_image,ImageOps.mirror(input_image)]:
         raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
-        palette=current_palette,
+        palette=global_palette,
         forced_nb_planes=nb_planes,
         palette_precision_mask=0xF0,
         generate_mask=is_sprite,
         blit_pad=is_sprite)
         rval.append(raw)
 
-    return rval
+    return {"png":input_image,"standard":rval[0],"mirror":rval[1]}
+
+def dump_asm_bytes(block,f):
+    c = 0
+    for d in block:
+        if c==0:
+            f.write("\n\t.byte\t")
+        else:
+            f.write(",")
+        f.write("0x{:02x}".format(d))
+        c += 1
+        if c == 8:
+            c = 0
+    f.write("\n")
 
 if dump_graphics:
 # temp add all white for foreground
     bitplanelib.palette_dump(palette+[(240,240,240)]*128,os.path.join(src_dir,"palette.68k"),bitplanelib.PALETTE_FORMAT_ASMGNU)
 
-    raw_blocks = collections.defaultdict(list)
+    raw_blocks = {}
 
-    for table,data in block_dict.items():
-        if data["size"] in [64,256]:
-            is_sprite = table == "sprite"
-            is_fg = "fg" in table
-            nb_planes = 1 if is_fg else 7
-            nb_colors = 1<<nb_planes
-            current_palette = [(0,0,0),(96, 96, 96)] if is_fg else palette
+    # foreground data, simplest of all 3
+    table = "fg_tile"
+    fg_data = block_dict[table]
+    current_palette = [(0,0,0),(96, 96, 96)]
 
-            side = int(data["size"]**0.5)
-            pics = data["data"]
-            for pic in pics:
-                couple = generate_tile(pic,side,current_palette,nb_planes,is_sprite)
-                raw_blocks[table].extend(couple)
+    side = 8
+    pics = fg_data["data"]
+    raw_blocks[table] = []
+    for i,pic in enumerate(pics):
+        d = generate_tile(pic,side,current_palette,current_palette,nb_planes=1,is_sprite=False)
+        raw_blocks[table].append(d["standard"])
+        raw_blocks[table].append(d["mirror"])
+        if dump_pngs:
+            ImageOps.scale(d["png"],5,0).save("dumps/fg_img_{:02}.png".format(i))
 
-##            dump_width = side * 64
-##            dump_height = side * (len(pics)//64)
-##            img = Image.new("RGB",(dump_width,dump_height))
-##            cur_x = 0
-##            cur_y = 0
-##                img.putpixel((cur_x+x,cur_y+y),col)  # for dump
-##                cur_x += side
-##                if cur_x == dump_width:
-##                    cur_x = 0
-##                    cur_y += side
-#            img.save(table+".png")
+    # background data: requires to generate as many copies of each tile that there are used CLUTs on that tile
+    # the only way to know which CLUTs are used is to run the game and log them... We can't generate all pics, that
+    # would take too much memory (512*64 pics of 16 color 8x8 tiles!!)
+
+    table = "bg_tile"
+    bg_data = block_dict[table]
+
+    matrix = raw_blocks[table] = [[None]*256 for _ in range(512)]
+    # compute the RGB configuration used for each used tile. Generate a lookup table with
+    bg_tile_clut_dict = get_used_bg_cluts()
+
+    side = 8
+    pics = bg_data["data"]
+
+    img_index = 0
+    for tile_index,cluts in bg_tile_clut_dict.items():
+        # select the used tile
+        pic = pics[tile_index]
+        # select the proper row (for all tile color configurations - aka bitplane configurations)
+        row = matrix[tile_index]
+        # generate the proper palette
+        for clut_index in cluts:
+            current_palette = [palette[i] for i in bg_tile_clut[clut_index]]
+            if all(x==(0,0,0) for x in current_palette):
+                row[clut_index*2] = 0
+                row[clut_index*2+1] = 0
+            else:
+                d = generate_tile(pic,side,current_palette,palette,nb_planes=7,is_sprite=False)
+                row[clut_index*2] = d["standard"]
+                row[clut_index*2+1] = d["mirror"]
+                if dump_pngs:
+                    ImageOps.scale(d["png"],5,0).save("dumps/bg_img_{:02}_{}.png".format(tile_index,clut_index))
+
 
     outfile = os.path.join(src_dir,"graphics.68k")
     #print("writing {}".format(os.path.abspath(outfile)))
     with open(outfile,"w") as f:
-        f.write("NULLPTR = 0\n")
+        nullptr = "NULLPTR"
+        blankptr = "BLANKPTR"
+        f.write("{} = 0\n".format(nullptr))
+        f.write("{} = 1\n".format(blankptr))
         t = "fg_tile"
         # foreground tiles: just write the 1-bitplane tiles and their mirrored counterpart
         f.write("\t.global\t_{0}\n_{0}:".format(t))
         c = 0
         for block in raw_blocks[t]:
+            print(block)
             for d in block:
                 if c==0:
                     f.write("\n\t.byte\t")
@@ -185,20 +220,32 @@ if dump_graphics:
         t = "bg_tile"
         f.write("\t.global\t_{0}\n_{0}:".format(t))
 
-        # TEMP TEMP TEMP
         c = 0
-        for block in raw_blocks[t]:
-            for d in block:
+        pic_list = []
+
+        for i,row in enumerate(matrix):
+            f.write("\n* row {}".format(i))
+            for item in row:
                 if c==0:
-                    f.write("\n\t.byte\t")
+                    f.write("\n\t.long\t")
                 else:
                     f.write(",")
-                f.write("0x{:02x}".format(d))
+                if item is None:
+                    f.write(nullptr)
+                elif item == 0:
+                    f.write(blankptr)
+                else:
+                    f.write("pic_{:03d}".format(len(pic_list)))
+                    pic_list.append(item)
                 c += 1
                 if c == 8:
                     c = 0
-        f.write("\n")
-        # TEMP TEMP TEMP
+            f.write("\n")
+
+        # now write all defined pics
+        for i,item in enumerate(pic_list):
+            f.write("pic_{:03d}:".format(i))
+            dump_asm_bytes(item,f)
 
         t = "sprite"
         f.write("\t.datachip\n")
@@ -210,13 +257,6 @@ if dump_graphics:
 
         for i,block in enumerate(sprite_blocks):
             f.write("\nsprite_{:03}:".format(i))
-            for d in block:
-                if c==0:
-                    f.write("\n\t.byte\t")
-                else:
-                    f.write(",")
-                f.write("0x{:02x}".format(d))
-                c += 1
-                if c == 8:
-                    c = 0
+            dump_asm_bytes(block,f)
+
         f.write("\n")
