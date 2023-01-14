@@ -1,0 +1,7 @@
+find proper color to change fg color
+blit ascending for flipped sprites
+sprites
+scrolling
+rip sounds
+issue in low screen fg color copper table
+bg tile table should be relative (saves a ton of memory)

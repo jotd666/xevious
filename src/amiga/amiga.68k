@@ -497,7 +497,7 @@ update_bg_tile:
 1:
 	.ifne  OPT_ENABLE_LOGGING
 	* log the tile, use start address in 0x100 then
-	* S bg_tile_log address !64*!512
+	* S bg_tile_log <address> !64*!512
 	lea		bg_tile_log,a1
 	move.l	a1,0x100
 	movem.l	d1/d2,-(a7)
@@ -544,6 +544,9 @@ update_bg_tile:
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
 	bmi		6f
+	cmp.w	#36,d1
+	bcc.w	6f
+	
 	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*8
 
 	moveq	#NB_PLANES-1,d3	| 7 planes (AGA)
@@ -608,11 +611,28 @@ update_fg_tile:
 	move.w	d0,d1
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
-	bmi.w		3f
-	GET_XY_ADDRESS	screen_data+SCREEN_PLANE_SIZE*7
+	bmi.w	3f
+
+	cmp.w	#36,d1
+	bcc.w	3f
 	
 	move.w	d2,d4
+	and.w	#0x1F,d2
+	* update color for that row
+	lea	_fg_color_table,a1
+	.ifdef	NO68020
+	move.w	d1,d3
+	add.w	d3,d3
+	add.w	d3,d3
+	move.l	(a1,d3.w),a1
+	.else
+	move.l	(a1,d1.w*4),a1	
+	.endif
+	move.w	d2,(a1)		| color palette index
 
+	GET_XY_ADDRESS	screen_data+SCREEN_PLANE_SIZE*7
+	
+	
 	* draw
 	btst	#7,d4
 	bne.b	2f
@@ -993,6 +1013,21 @@ scb4_shadow:									ds.w 	128*2
 irq_cnt:											ds.w		1
 		.data
 
+* 36 rows = 288 pixels
+* table of the colors for fg tiles in the copperlist
+_fg_color_table:
+	.set	fgrow_offset,2
+	.rept	29
+	.long	color_row_0+4+fgrow_offset
+	.set	fgrow_offset,fgrow_offset+8
+	.endr
+	.long	color_row_30+6
+	.set	fgrow_offset,2
+	.rept	6
+	.long	color_row_30_plus+4+fgrow_offset
+	.set	fgrow_offset,fgrow_offset+8
+	.endr
+	
 _fg_color_data:
 	ds.b	GRID_SIZE
 _bg_color_data:
@@ -1057,6 +1092,35 @@ end_color_copper:
    * proper sprite priority: above bitplanes
    *dc.w  0x0102,0x0000            ;  BPLCON1 := 0x0000
    *dc.w  0x0104,0x0024            ;  BPLCON2 := 
+   * dynamic colors for color 128 each 8 lines
+	.set    beampos,0x1C01
+	.set    testcol,0x0
+	dc.w	bplcon3,0  | temp
+color_row_0:
+	.rept	29
+	dc.w	beampos,0xFFFE
+	dc.w	color,(testcol & 0x0FFF)
+	.set	beampos,beampos+0x800
+	.set	testcol,testcol+0x011
+	.endr
+	* pal limit
+    dc.w  0xFFDF,0xFFFE           
+color_row_30:
+    dc.w  0x0401,0xFFFE
+	dc.w	color,0xFFF
+    dc.w  0x0C01,0xFFFE           
+          
+	.set    testcol,0xF0
+color_row_30_plus:
+	.set    beampos,0x1401
+	.rept	48/8
+	dc.w	color,(testcol & 0x0FFF)
+	dc.w	beampos,0xFFFE
+	.set	beampos,beampos+0x800
+	.set	testcol,testcol+0x022
+	.endr
+   
+   
    dc.w  0xFFDF,0xFFFE           
    dc.w  0x2201,0xFFFE           
    dc.w	 intreq,0x8010          
