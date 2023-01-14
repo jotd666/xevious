@@ -218,7 +218,7 @@ if dump_graphics:
         f.write("\n")
         # background tiles: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
         t = "bg_tile"
-        f.write("\t.global\t_{0}\n_{0}:".format(t))
+        f.write("\t.global\tbg_picbase\n\t.global\t_{0}\n_{0}:".format(t))
 
         c = 0
         pic_list = []
@@ -227,7 +227,7 @@ if dump_graphics:
             f.write("\n* row {}".format(i))
             for item in row:
                 if c==0:
-                    f.write("\n\t.long\t")
+                    f.write("\n\t.word\t")
                 else:
                     f.write(",")
                 if item is None:
@@ -235,16 +235,17 @@ if dump_graphics:
                 elif item == 0:
                     f.write(blankptr)
                 else:
-                    f.write("pic_{:03d}".format(len(pic_list)))
+                    f.write("bg_pic_{:03d}-bg_picbase".format(len(pic_list)))
                     pic_list.append(item)
                 c += 1
                 if c == 8:
                     c = 0
             f.write("\n")
 
+        f.write("bg_picbase:\n")
         # now write all defined pics
         for i,item in enumerate(pic_list):
-            f.write("pic_{:03d}:".format(i))
+            f.write("bg_pic_{:03d}:".format(i))
             dump_asm_bytes(item,f)
 
         t = "sprite"

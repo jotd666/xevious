@@ -521,25 +521,24 @@ update_bg_tile:
 	beq.b	2f
 	bset	#4,d3	| add bit 4 if tile id > 0x80
 2:
-	* now d3 is the index, mul by 8 to get row pointer offset
-	lsl.w	#3,d3
-	* d1 times 1024 (<<10) is the row start pointer
+	* now d3 is the index, mul by 4 to get row pointer offset
+	lsl.w	#2,d3
+	* d1 times 512 (<<9) is the row start pointer
 	lsl.l	#8,d1
-	add.l	d1,d1
 	add.l	d1,d1
 	
 	btst	#6,d2			| X-flip?
 	beq.b	3f
-	add.w	#4,d3			| mirror version
+	add.w	#2,d3			| mirror version
 3:
 	add.l	d1,a0		| row offset
 	add.w	d3,a0		| col offset
-	move.l	(a0),d1
+	move.w	(a0),d1
 	bne.b	7f
 	* tile is not known with that CLUT configuration
 	blitz
 7:
-	move.l	d1,a0
+	move.w	d1,a0
 	move.w	d0,d1
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
@@ -555,6 +554,8 @@ update_bg_tile:
 	cmp.w	#1,a0
 	beq.b	8f		| clear
 
+	add.l	#bg_picbase,a0
+	
 	* draw
 	btst	#7,d4
 	bne.b	5f
@@ -600,6 +601,7 @@ update_bg_tile:
 * d1: tile code
 * d2: attribute
 update_fg_tile:
+
 	lea		_fg_tile,a0
 	and.w	#0xFF,d1
 	lsl.w	#4,d1			| *16 (each tile+mirror tile has 8+8 bytes)
@@ -617,9 +619,23 @@ update_fg_tile:
 	bcc.w	3f
 	
 	move.w	d2,d4
-	and.w	#0x1F,d2
+	* decode color
+	and.w	#0x3F,d2	| drop flip x/y bits
+	move.w	d2,d3
+	lsr.w	#2,d2		| 5:2 => 3:0
+	and.w	#0x3,d3		| keep 5:4
+	lsl.w	#4,d3		| at proper position
+	or.w	d3,d2		| combine
+	lea		palette(pc),a1
+	.ifdef	NO68020
+	add.w	d2,d2
+	move.w	(a1,d2.w),d2
+	.else
+	move.w	(a1,d2.w*2),d2
+	.endif
 	* update color for that row
 	lea	_fg_color_table,a1
+	
 	.ifdef	NO68020
 	move.w	d1,d3
 	add.w	d3,d3
@@ -1024,7 +1040,7 @@ _fg_color_table:
 	.long	color_row_30+6
 	.set	fgrow_offset,2
 	.rept	6
-	.long	color_row_30_plus+4+fgrow_offset
+	.long	color_row_30_plus+fgrow_offset
 	.set	fgrow_offset,fgrow_offset+8
 	.endr
 	
@@ -1041,6 +1057,8 @@ screen_data:
 	ds.b	SCREEN_SIZE
 	ds.b	100	| small margin (I suspect that gas is buggy with ds directive)
 	.datachip
+	
+
 copperlist:
 bitplanes:
    dc.l  0x00e00000
@@ -1095,7 +1113,7 @@ end_color_copper:
    * dynamic colors for color 128 each 8 lines
 	.set    beampos,0x1C01
 	.set    testcol,0x0
-	dc.w	bplcon3,0  | temp
+	dc.w	bplcon3,4<<13	| color 128
 color_row_0:
 	.rept	29
 	dc.w	beampos,0xFFFE
@@ -1111,8 +1129,8 @@ color_row_30:
     dc.w  0x0C01,0xFFFE           
           
 	.set    testcol,0xF0
-color_row_30_plus:
 	.set    beampos,0x1401
+color_row_30_plus:
 	.rept	48/8
 	dc.w	color,(testcol & 0x0FFF)
 	dc.w	beampos,0xFFFE
@@ -1120,10 +1138,8 @@ color_row_30_plus:
 	.set	testcol,testcol+0x022
 	.endr
    
-   
-   dc.w  0xFFDF,0xFFFE           
-   dc.w  0x2201,0xFFFE           
-   dc.w	 intreq,0x8010          
+    dc.w	 intreq,0x8010
+	dc.w	bplcon3,0  | reset ECS	
     dc.l    -2					
 	
 

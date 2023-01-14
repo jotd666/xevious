@@ -4,4 +4,3 @@ sprites
 scrolling
 rip sounds
 issue in low screen fg color copper table
-bg tile table should be relative (saves a ton of memory)
