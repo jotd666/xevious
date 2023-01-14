@@ -6,8 +6,10 @@ import collections
 
 block_dict = {}
 
+winuae_dir = r"C:\Users\Public\Documents\Amiga Files\WinUAE"
+
 def get_used_bg_cluts():
-    infile = r"C:\Users\Public\Documents\Amiga Files\WinUAE\bg_tile_log"
+    infile = os.path.join(winuae_dir,"bg_tile_log")
     rval = collections.defaultdict(list)
     with open(infile,"rb") as f:
         contents = f.read()
@@ -23,6 +25,22 @@ def get_used_bg_cluts():
                 clut_index |= (idx&0x3) << 5
                 rval[tile_index].append(clut_index)
         row_index += 64
+
+    return rval
+
+def get_used_sprite_cluts():
+    infile = os.path.join(winuae_dir,"sprite_tile_log")
+    rval = collections.defaultdict(list)
+    with open(infile,"rb") as f:
+        contents = f.read()
+
+    row_index = 0
+    for tile_index in range(320):
+        for idx in range(128):
+            if contents[row_index+idx] == 0xee:
+                clut_index = idx
+                rval[tile_index].append(clut_index)
+        row_index += 128
 
     return rval
 
@@ -96,12 +114,12 @@ with open("xevious_gfx.c") as f:
 
 
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
-#palette = bitplanelib.palette_round(palette)
-
 
 
 bg_tile_clut = block_dict["bg_tile_clut"]["data"]
+sprite_tile_clut = block_dict["sprite_clut"]["data"]
 
+#sprite_tile_clut += sprite_tile_clut   # TEMP TEMP TEMP
 
 dump_graphics = True
 dump_pngs = True
@@ -118,7 +136,6 @@ def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
         raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
         palette=global_palette,
         forced_nb_planes=nb_planes,
-        #palette_precision_mask=0xF0,
         generate_mask=is_sprite,
         blit_pad=is_sprite)
         rval.append(raw)
@@ -167,19 +184,18 @@ if dump_graphics:
     table = "bg_tile"
     bg_data = block_dict[table]
 
-    matrix = raw_blocks[table] = [[None]*256 for _ in range(512)]
+    bg_matrix = raw_blocks[table] = [[None]*256 for _ in range(512)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
     bg_tile_clut_dict = get_used_bg_cluts()
 
     side = 8
     pics = bg_data["data"]
 
-    img_index = 0
     for tile_index,cluts in bg_tile_clut_dict.items():
         # select the used tile
         pic = pics[tile_index]
         # select the proper row (for all tile color configurations - aka bitplane configurations)
-        row = matrix[tile_index]
+        row = bg_matrix[tile_index]
         # generate the proper palette
         for clut_index in cluts:
             current_palette = [palette[i] for i in bg_tile_clut[clut_index]]
@@ -193,6 +209,38 @@ if dump_graphics:
                 if dump_pngs:
                     ImageOps.scale(d["png"],5,0).save("dumps/bg_img_{:02}_{}.png".format(tile_index,clut_index))
 
+
+    table = "sprite"
+    raw_pic_data = block_dict[table]
+    print(raw_pic_data["size"],len(raw_pic_data["data"]))
+    sprite_matrix = raw_blocks[table] = [[None]*256 for _ in range(320)]
+    # compute the RGB configuration used for each used tile. Generate a lookup table with
+    sprite_tile_clut_dict = get_used_sprite_cluts()
+
+    side = 16
+    pics = raw_pic_data["data"]
+
+    for tile_index,cluts in sprite_tile_clut_dict.items():
+        # select the used tile
+        pic = pics[tile_index]
+        # select the proper row (for all tile color configurations - aka bitplane configurations)
+        row = sprite_matrix[tile_index]
+        # generate the proper palette
+        for clut_index in cluts:
+            current_palette = [palette[i & 0x7F] for i in sprite_tile_clut[clut_index]]
+            if all(x==(0,0,0) for x in current_palette):
+                row[clut_index*2] = 0
+                row[clut_index*2+1] = 0
+            else:
+                print(tile_index,pic)
+                d = generate_tile(pic,side,current_palette,palette,nb_planes=7,is_sprite=False)
+                row[clut_index*2] = d["standard"]
+                row[clut_index*2+1] = d["mirror"]
+                if dump_pngs:
+                    ImageOps.scale(d["png"],5,0).save("dumps/sprite_img_{:02}_{}.png".format(tile_index,clut_index))
+
+
+    dfdfg
 
     outfile = os.path.join(src_dir,"graphics.68k")
     #print("writing {}".format(os.path.abspath(outfile)))
@@ -223,7 +271,7 @@ if dump_graphics:
         c = 0
         pic_list = []
 
-        for i,row in enumerate(matrix):
+        for i,row in enumerate(bg_matrix):
             f.write("\n* row {}".format(i))
             for item in row:
                 if c==0:

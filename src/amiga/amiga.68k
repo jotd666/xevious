@@ -69,6 +69,36 @@ mul\value\()_table:
 	add.w	d0,a1
 .endm
 
+* damn, there's a 2-pixel shift between foreground layer
+* and background layer, forcing us to write tile data on 2 bytes!!
+* fortunately, there's only 1 plane to process that way
+.macro	SET_FG_BYTE
+	move.b	(offset+1,a1),d1
+	move.b	(a0)+,d0
+	bclr	#6,d1
+	btst	#0,d0
+	beq.b	1f
+	bset	#6,d1
+1:
+	bclr	#7,d1
+	btst	#1,d0
+	beq.b	1f
+	bset	#7,d1
+1:
+	move.b	d1,(offset+1,a1)
+	move.b	(offset,a1),d1
+	and.b	#0xC0,d1
+	lsr.b	#2,d0
+	or.b	d0,d1
+	move.b	d1,(offset,a1)
+	.endm
+	
+* the non shifted version is just so simple...
+.macro	SET_FG_BYTE_SHIFT
+	move.b	(a0)+,(offset,a1)
+	.endm
+	
+
 .macro blitz
 	move.w	d0,-(a7)
 	clr.w	d0
@@ -602,7 +632,6 @@ update_bg_tile:
 * d1: tile code
 * d2: attribute
 update_fg_tile:
-
 	lea		_fg_tile,a0
 	and.w	#0xFF,d1
 	lsl.w	#4,d1			| *16 (each tile+mirror tile has 8+8 bytes)
@@ -636,7 +665,6 @@ update_fg_tile:
 	.endif
 	* update color for that row
 	lea	_fg_color_table,a1
-	move.l	a1,0x104
 	.ifdef	NO68020
 	move.w	d1,d3
 	add.w	d3,d3
@@ -653,25 +681,19 @@ update_fg_tile:
 	
 	* draw
 	btst	#7,d4
-	bne.b	2f
-	move.b	(a0)+,(a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*2,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*3,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*4,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*5,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*6,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*7,a1)
+	bne	2f
+	.set	offset,0
+	.rept		8
+	SET_FG_BYTE
+	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
 	rts
 2:
-	move.b	(a0)+,(NB_BYTES_PER_ROW*7,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*6,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*5,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*4,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*3,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*2,a1)
- 	move.b	(a0)+,(NB_BYTES_PER_ROW,a1)
-	move.b	(a0)+,(a1)
+	.set	offset,NB_BYTES_PER_ROW*7
+	.rept		8
+	SET_FG_BYTE
+	.set	offset,offset-NB_BYTES_PER_ROW
+	.endr
 3:
 	rts
 	
@@ -715,8 +737,6 @@ osd_update_sprite_shadow:
 				
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
-	rts
-	
 	lea		current_sprite_state(pc),a4
 	lea		previous_sprite_state(pc),a5
 	move.w	d0,d1
@@ -742,12 +762,32 @@ osd_update_32_sprite_hw:
 	bmi.b	2f		| not visible
 
 	clr.w	d0
-	move.b	(2,a4),d0	| tile code
-	move.b		(1,a4),d2  | tile attributes
+	move.b	(2,a4),d0	    | tile code
+	move.b	(3,a4),d1	    | tile color
+	move.b		(1,a4),d2   | tile attributes	
 	bpl.b	5f
 	* second bank
 	bset	#8,d0
 5:
+	
+	.ifne  OPT_ENABLE_LOGGING
+	* log the tile, use start address in 0x104 then
+	* S sprite_tile_log <address> !128*!320
+	lea		sprite_tile_log,a1
+	move.l	a1,0x104
+	movem.l	d0/d1,-(a7)
+	and.w	#0xFFFF,d0
+	lsl.w	#7,d0		| times 128
+	add.l	d0,a1
+	and.w	#0x7F,d1	| significant color bits
+	move.b	#0xEE,(a1,d1.w)
+	movem.l	(a7)+,d0/d1
+	.endif
+	* TEMP stop here
+	move.l	(a7)+,a4
+	rts
+	
+	
 	* multiply by 8 to get proper tile pointer in table
 	
 	lsl.w	#3,d0
@@ -1019,7 +1059,9 @@ palette:
 		.align 4
 	.ifne	OPT_ENABLE_LOGGING
 bg_tile_log:
-	ds.b	0x200*64
+	ds.b	0x200*64    | there are 128 CLUTs but 1 bit is decided by tile code
+sprite_tile_log:
+	ds.b	320*128    | there are 128 CLUTs
 	.endif
 * using 2 tiles/sprite only
 *scb1_shadow:									ds.w 	128*4*2
@@ -1057,7 +1099,9 @@ _bg_char_data:
 		.bsschip
 screen_data:
 	ds.b	SCREEN_SIZE
-	ds.b	100	| small margin (I suspect that gas is buggy with ds directive)
+	* small margin (I suspect that gas is buggy with ds directive)
+	* plus fg plane shifting can write one byte too far
+	ds.b	100
 	.datachip
 	
 

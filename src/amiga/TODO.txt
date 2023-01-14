@@ -1,6 +1,6 @@
-find proper color to change fg color
 blit ascending for flipped sprites
 sprites
 scrolling
 rip sounds
-issue in low screen fg color copper table
+hack for orange highscore
+
