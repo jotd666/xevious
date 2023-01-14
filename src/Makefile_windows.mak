@@ -25,7 +25,7 @@ map_rom.o: map_rom.68k xevious.inc
 	$(ASM) map_rom.68k -o map_rom.o
 xevious_sub.o: xevious_sub.68k xevious.inc
 	$(ASM) xevious_sub.68k -o xevious_sub.o
-amiga.o: amiga/amiga.68k xevious.inc amiga/ReadJoyPad.inc
+amiga.o: amiga/amiga.68k xevious.inc amiga/ReadJoyPad.inc amiga/palette.68k
 	$(ASM) -Iamiga amiga/amiga.68k -o amiga.o
 ptplayer.o: amiga/ptplayer.68k
 	$(ASM) -Iamiga amiga/ptplayer.68k -o ptplayer.o

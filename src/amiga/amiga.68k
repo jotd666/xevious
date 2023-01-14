@@ -73,6 +73,7 @@ mul\value\()_table:
 	move.w	d0,-(a7)
 	clr.w	d0
 loop\@:
+	move.w	#0,_custom+bplcon3	| really color 0
 	move.w	d0,_custom+color
 	btst	#6,0xbfe001
 	beq.b	out\@
@@ -635,7 +636,7 @@ update_fg_tile:
 	.endif
 	* update color for that row
 	lea	_fg_color_table,a1
-	
+	move.l	a1,0x104
 	.ifdef	NO68020
 	move.w	d1,d3
 	add.w	d3,d3
@@ -644,7 +645,8 @@ update_fg_tile:
 	.else
 	move.l	(a1,d1.w*4),a1	
 	.endif
-	move.w	d2,(a1)		| color palette index
+	move.w	d2,(a1)			| color palette index
+	move.w	d2,(8,a1)		| color palette index
 
 	GET_XY_ADDRESS	screen_data+SCREEN_PLANE_SIZE*7
 	
@@ -1034,14 +1036,14 @@ irq_cnt:											ds.w		1
 _fg_color_table:
 	.set	fgrow_offset,2
 	.rept	29
-	.long	color_row_0+4+fgrow_offset
-	.set	fgrow_offset,fgrow_offset+8
+	.long	color_row_0+8+fgrow_offset
+	.set	fgrow_offset,fgrow_offset+20
 	.endr
 	.long	color_row_30+6
 	.set	fgrow_offset,2
 	.rept	6
-	.long	color_row_30_plus+fgrow_offset
-	.set	fgrow_offset,fgrow_offset+8
+	.long	color_row_30_plus+4+fgrow_offset
+	.set	fgrow_offset,fgrow_offset+20
 	.endr
 	
 _fg_color_data:
@@ -1113,26 +1115,35 @@ end_color_copper:
    * dynamic colors for color 128 each 8 lines
 	.set    beampos,0x1C01
 	.set    testcol,0x0
-	dc.w	bplcon3,4<<13	| color 128
+	.set	color_28,color+28*2
 color_row_0:
 	.rept	29
+	dc.w	bplcon3,4<<13	| color 128
 	dc.w	beampos,0xFFFE
 	dc.w	color,(testcol & 0x0FFF)
+	dc.w	bplcon3,5<<13	| color 188
+	dc.w	color_28,0xFFF
 	.set	beampos,beampos+0x800
 	.set	testcol,testcol+0x011
 	.endr
 	* pal limit
     dc.w  0xFFDF,0xFFFE           
-color_row_30:
     dc.w  0x0401,0xFFFE
+color_row_30:
+	dc.w	bplcon3,4<<13	| color 128
 	dc.w	color,0xFFF
+	dc.w	bplcon3,5<<13	| color 188
+	dc.w	color_28,0xFFF
     dc.w  0x0C01,0xFFFE           
           
 	.set    testcol,0xF0
 	.set    beampos,0x1401
 color_row_30_plus:
 	.rept	48/8
+	dc.w	bplcon3,4<<13	| color 128
 	dc.w	color,(testcol & 0x0FFF)
+	dc.w	bplcon3,5<<13	| color 188
+	dc.w	color_28,0xFFF
 	dc.w	beampos,0xFFFE
 	.set	beampos,beampos+0x800
 	.set	testcol,testcol+0x022
