@@ -369,8 +369,10 @@ platform_init:
 	move.l	#copperlist,cop1lc(a5)
 	* load palette
 	lea		palette(pc),a0
-	move.w	#256,d0
-	bsr		set_color_registers	
+	clr.w	d0
+	bsr		set_aga_color_registers	
+	move.w	#0x200,d0	| LOCT: 1
+	bsr		set_aga_color_registers	
 	
     * init sprite, bitplane, whatever dma
     move.w #0x83E0,dmacon(a5)
@@ -382,10 +384,11 @@ platform_init:
     rts
 
 * < a0: source palette
-* < d0: number of colors to set
-set_color_registers:
+* < d0: LOCT mask 0 or $200
+set_aga_color_registers:
+	move.w	d0,d2
     moveq	#0,d7
-    move.w  d0,d1
+    move.w  #256,d1    | number of colors
     lsr.w   #5,d1   | divide by 32
     and.w   #0x1F,d0
     beq.b   1f
@@ -395,6 +398,7 @@ set_color_registers:
     move.w  d7,d0
     lsl.w   #8,d0
     lsl.w   #5,d0
+	or.w	d2,d0
     move.w  d0,bplcon3(a5)
     lea color(a5),a1
     * now set the colors for that bank

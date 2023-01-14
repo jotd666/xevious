@@ -96,7 +96,7 @@ with open("xevious_gfx.c") as f:
 
 
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
-palette = bitplanelib.palette_round(palette)
+#palette = bitplanelib.palette_round(palette)
 
 
 
@@ -118,7 +118,7 @@ def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
         raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
         palette=global_palette,
         forced_nb_planes=nb_planes,
-        palette_precision_mask=0xF0,
+        #palette_precision_mask=0xF0,
         generate_mask=is_sprite,
         blit_pad=is_sprite)
         rval.append(raw)
@@ -140,7 +140,8 @@ def dump_asm_bytes(block,f):
 
 if dump_graphics:
 # temp add all white for foreground
-    bitplanelib.palette_dump(palette+[(240,240,240)]*128,os.path.join(src_dir,"palette.68k"),bitplanelib.PALETTE_FORMAT_ASMGNU)
+    bitplanelib.palette_dump(palette+[(255,)*3]*128,os.path.join(src_dir,"palette.68k"),
+                            bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
 
     raw_blocks = {}
 
@@ -205,7 +206,6 @@ if dump_graphics:
         f.write("\t.global\t_{0}\n_{0}:".format(t))
         c = 0
         for block in raw_blocks[t]:
-            print(block)
             for d in block:
                 if c==0:
                     f.write("\n\t.byte\t")
