@@ -112,19 +112,19 @@ sub_fn_0__update_32_sprite_hw: | $01F6
     jsr       osd_disable_vblank_interrupt
     move.w    #32,d0                            | start at sprite 32
     jsr       osd_update_32_sprite_hw
-    jsr       osd_enable_vblank_interrupt
-    rts
+    jmp       osd_enable_vblank_interrupt
+
         
 sub_fn_1__update_scroll_hw: | $0218
     move.w    (bg_scroll_x_shadow),d6
-    bra       osd_update_scroll_hw
+    jmp       osd_update_scroll_hw
 
 * handling of reading coins and start buttons
 * is done by the NAMCO chips
 * - do it completely differently here
 sub_fn_4__handle_credits_and_start: | $0227
     jsr       osd_read_coin
-    beq       1f
+    beq.b       1f
     * add a credit
     moveq     #1,d0
     move.b    (num_credits),d1
@@ -133,17 +133,17 @@ sub_fn_4__handle_credits_and_start: | $0227
     * process 1P, 2P
 1:  moveq     #0,d2
     jsr       osd_read_start
-    beq       9f
+    beq.b     9f
     btst.b    #0,d0                             | P1START?
-    beq       2f                                | no, skip
+    beq.b     2f                                | no, skip
     cmp.b     #1,(num_credits)                  | enough for 1P?
-    bcs       9f                                | no, exit
+    bcs.b     9f                                | no, exit
     moveq     #1,d2                             | 1 credit/player
     bra       8f
 2:  btst.b    #1,d0                             | P2START?
-    beq       9f                                | no, return
+    beq.b     9f                                | no, return
     cmp.b     #2,(num_credits)                  | enough for 2P?
-    bcs       9f                                | no, exit
+    bcs.b     9f                                | no, exit
     moveq     #2,d2                             | 2 credits/players
     * can start a game here
 8:  andi      #0x0f,ccr                         | clear X
@@ -157,7 +157,7 @@ sub_fn_4__handle_credits_and_start: | $0227
 
 sub_fn_5__handle_pulsing_colours: | $0264
     tst.b     (scroll_disabled)
-    bne       9f
+    bne.b     9f
     move.b    (countup_timer_1),d0
     lsr.b     #1,d0
     and.b     #3,d0
@@ -183,8 +183,8 @@ colour_lut_8043:
     
 sub_fn_30__handle_scroll: | $02A6
     tst.b     (scroll_disabled)
-    bne       9f
-    jsr       get_map_row
+    bne.b     9f
+    bsr.b     get_map_row
     move.w    #0x40,d0
     move.w    (scroll_cntr),d1
     lsl.w     #1,d0
@@ -205,7 +205,7 @@ get_map_row: | $02D4
     lsr.w     #8,d2
     cmp.b     d2,d1                             | same as before?
     beq       9f                                | yes, return
-    bmi       1f
+    bmi.b     1f
     add.b     #0x40,d1
 1:  add.b     #0xf2,d1                          | adjustment (map row)
     move.b    (area_offset_in_map),d2
@@ -233,8 +233,7 @@ get_map_row: | $02D4
 
 sub_fn_31__update_sprite_shadow: | $031E
     lea       obj_tbl,a5
-    jsr       osd_update_sprite_shadow
-    rts
+    jmp       osd_update_sprite_shadow
 
 * byte3 is a signed offset into flying_enemy_offset_tbl
 * which in turn sets number of flying enemies and
@@ -247,7 +246,7 @@ sub_2_fn_2__set_flying_enemies: | $03BD
     adda      #1,a0
 loc_3BF:
     lea       flying_enemy_type_offset_tbl,a1
-    lsl.w     #1,d0
+    add.w	  d0,d0
     move.b    (a1,d0.w),(num_flying_enemies)
     move.b    (1,a1,d0.w),(flying_enemy_type_tbl_offset)
     move.l    a0,(area_obj_ptr)
@@ -266,7 +265,7 @@ sub_2_fn_3__inc_enemy_AI_and_flying_enemies: | $03D1
     move.b    (a1,d1.w),d0
     add.b     (enemy_AI_level),d0
     cmp.b     #0x80,d0
-    bcs       1f
+    bcs.b     1f
     sub.b     #0x40,d0
 1:  move.b    d0,(enemy_AI_level)
     bra       loc_3BF
@@ -287,9 +286,9 @@ sub_2_fn_23__adjust_AI_level: | $040C
     move.l    a0,(area_obj_ptr)
     move.w    (curr_player_score_msb),d1        
     move.b    (solvalou_number),d0
-    jsr       avg_score_per_solvalou
+    bsr       avg_score_per_solvalou
     cmp.w     #16,d1
-    ble       1f
+    ble.b     1f
     move.w    #16,d1
 1:  add.b     d1,(enemy_AI_level)    
     rts
@@ -305,9 +304,9 @@ avg_score_per_solvalou: | $0E23
     moveq     #16-1,d7
 1:  lsl.w     #1,d1
     roxl.b    #1,d0
-    bcs       2f
+    bcs.b     2f
     cmp.b     d2,d0
-    bcs       3f
+    bcs.b     3f
 2:  sub.b     d2,d0
     addq.w    #1,d1
 3:  dbf       d7,1b
@@ -315,57 +314,48 @@ avg_score_per_solvalou: | $0E23
             
 * a0 = ptr byte 3
 sub_2_fn_8__fire_freq_mask_derota: | $043E
-    move.b    (a0),(ffreq_mask_derota)    
-    adda.w    #1,a0
+    move.b    (a0)+,(ffreq_mask_derota)    
     move.l    a0,(area_obj_ptr)
     rts
     
 * a0 = ptr byte 3
 sub_2_fn_9__fire_freq_mask_logram: | $0448
-    move.b    (a0),(ffreq_mask_logram)    
-    adda.w    #1,a0
+    move.b    (a0)+,(ffreq_mask_logram)    
     move.l    a0,(area_obj_ptr)
     rts
 
 sub_2_fn_11__fire_freq_mask_zoshi: | $0452
-    move.b    (a0),(ffreq_mask_zoshi)   
-    adda.w    #1,a0
+    move.b    (a0)+,(ffreq_mask_zoshi)   
     move.l    a0,(area_obj_ptr)
     rts
 
 sub_2_fn_12__fire_freq_mask_terrazi: | $045C
-    move.b    (a0),(ffreq_mask_terrazi)   
-    adda.w    #1,a0
+    move.b    (a0)+,(ffreq_mask_terrazi)   
     move.l    a0,(area_obj_ptr)
     rts
 
 sub_2_fn_13__fire_freq_mask_kapi: | $0466
-    move.b    (a0),(ffreq_mask_kapi)    
-    adda.w    #1,a0
+    move.b    (a0)+,(ffreq_mask_kapi)    
     move.l    a0,(area_obj_ptr)
     rts
 
 sub_2_fn_16__fire_freq_mask_boza_logram: | $0470
-    move.b    (a0),(ffreq_mask_boza_logram)   
-    adda.w    #1,a0
+    move.b    (a0)+,(ffreq_mask_boza_logram)   
     move.l    a0,(area_obj_ptr)
     rts
 
 sub_2_fn_17__fire_freq_mask_domogram: | $047A
-    move.b    (a0),(ffreq_mask_domogram)    
-    adda.w    #1,a0
+    move.b    (a0)+,(ffreq_mask_domogram)    
     move.l    a0,(area_obj_ptr)
     rts
 
 sub_2_fn_22__fire_freq_mask_andor_genesis: | $0484
-    move.b    (a0),(ffreq_mask_andor_genesis)   
-    adda.w    #1,a0
+    move.b    (a0)+,(ffreq_mask_andor_genesis)   
     move.l    a0,(area_obj_ptr)
     rts
 
 sub_2_fn_10__gnd_stop_firing_row: | $048E
-    move.b    (a0),(gnd_stop_firing_row)    
-    adda.w    #1,a0
+    move.b    (a0)+,(gnd_stop_firing_row)    
     move.l    a0,(area_obj_ptr)
     rts
 
@@ -421,7 +411,7 @@ sub_2_fn_15__domogram: | $05E1
     adda.w    d0,a0
     move.l    a0,(area_obj_ptr)
     move.w    (next_domogram),d0
-    mulu      #64,d0                            | offset in table
+	lsl.w     #6,d0                             | *64 offset in table
     lea       domogram_tbl,a2
     lea       (a2,d0.w),a2                      | address in table
     move.l    a2,(_EXTRA,a5)                    | store ptr
@@ -431,7 +421,7 @@ sub_2_fn_15__domogram: | $05E1
     move.w    (next_domogram),d0
     addq.b    #1,d0
     cmp.b     #12,d0                            | wrap?
-    bcs       2f
+    bcs.b     2f
     clr.w     d0
 2:  move.w    d0,(next_domogram)
     rts
@@ -490,10 +480,10 @@ sub_fn_2__handle_objects: | $068F
     ** On the Neo Geo, @$0000=$00, which does match
     **   and ultimately jumps to an invalid address
     cmpa.l    #0,a0
-    beq       9f
+    beq.b       9f
     move.b    (scroll_cntr),d0                  | MSB
     cmp.b     (a0),d0                           | current row?
-    bne       9f
+    bne.b       9f
     moveq     #0,d0
     move.b    (1,a0),d0                         | byte #2 (type)
     adda.w    #2,a0                             | ptr byte #3
@@ -574,8 +564,7 @@ sub_2_fn_1__ground_object: | $073F
     rts
 
 sub_2_fn_6__set_8422: | $075D
-    move.b    (a0),(bacura_inc_cnt)
-    adda.w    #1,a0
+    move.b    (a0)+,(bacura_inc_cnt)
     move.l    a0,(area_obj_ptr)
     rts
     
@@ -597,7 +586,8 @@ sub_fn_3__handle_next_area: | $078B
     lea       area_offset_in_map_tbl,a0
     move.b    (a0,d0.w),(area_offset_in_map)    | update offset
     lea       area_object_tbl_tbl,a0
-    lsl.w     #2,d0                             | offset in table
+    add.w	  d0,d0                            | offset in table
+    add.w	  d0,d0                            | offset in table
     move.l    (a0,d0.w),(area_obj_ptr)          | new area ptr
     *** show area on screen for debugging
     .ifne OPT_DISPLAY_AREA
@@ -645,7 +635,7 @@ display_1up_2up:
 flash_1up_2up:
     movem.l   d0/d1/d6,-(a7)
     and.b     (is_real_game),d3                 | timer for flashing
-    beq       1f
+    beq.b     1f
     move.b    #2,d6                             | 3rd string in table ("   ")
 1:  jsr       display_1up_2up   
     movem.l   (a7)+,d0/d1/d6
