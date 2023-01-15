@@ -468,6 +468,7 @@ osd_w_fg_colorram:
 	move.b	d1,d2
 	move.b	(a1,d0.w),d1	| fetch tile from character grid
 	* now update tile to reflect the color change
+	moveq	#0,d3
 	bsr	update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a1
    .endif | OPT_DISABLE_FG_LAYER
@@ -498,6 +499,7 @@ osd_w_fg_videoram:
 	lea		_fg_char_data,a2
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
+	moveq	#1,d3
 	bsr		update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a2
     .endif | OPT_DISABLE_FG_LAYER
@@ -566,8 +568,10 @@ update_bg_tile:
 	add.w	d3,a0		| col offset
 	move.w	(a0),d1
 	bne.b	7f
-	* tile is not known with that CLUT configuration
-	blitz
+	* tile is not known with that CLUT configuration: flash
+	move.w	#0xF00,color+_custom
+	move.w	#0,bplcon3+_custom
+	bra.w	9f
 7:
 	move.w	d1,a0
 	move.w	d0,d1
@@ -627,10 +631,12 @@ update_bg_tile:
 	clr.b	(NB_BYTES_PER_ROW*7,a1)
     lea   (SCREEN_PLANE_SIZE,a1),a1
     dbf d3,8b
+9:
 	rts
 	
 * d1: tile code
 * d2: attribute
+* d3: needs to redraw tile
 update_fg_tile:
 	lea		_fg_tile,a0
 	and.w	#0xFF,d1
@@ -651,11 +657,11 @@ update_fg_tile:
 	move.w	d2,d4
 	* decode color
 	and.w	#0x3F,d2	| drop flip x/y bits
-	move.w	d2,d3
+	move.w	d2,d5
 	lsr.w	#2,d2		| 5:2 => 3:0
-	and.w	#0x3,d3		| keep 5:4
-	lsl.w	#4,d3		| at proper position
-	or.w	d3,d2		| combine
+	and.w	#0x3,d5		| keep 5:4
+	lsl.w	#4,d5		| at proper position
+	or.w	d5,d2		| combine
 	lea		palette(pc),a1
 	.ifdef	NO68020
 	add.w	d2,d2
@@ -666,16 +672,22 @@ update_fg_tile:
 	* update color for that row
 	lea	_fg_color_table,a1
 	.ifdef	NO68020
-	move.w	d1,d3
-	add.w	d3,d3
-	add.w	d3,d3
-	move.l	(a1,d3.w),a1
+	move.w	d1,d5
+	add.w	d5,d5
+	add.w	d5,d5
+	move.l	(a1,d5.w),a1
 	.else
 	move.l	(a1,d1.w*4),a1	
 	.endif
 	move.w	d2,(a1)			| color palette index
 	move.w	d2,(8,a1)		| color palette index
 
+	tst	d3
+	bne.b	4f
+	* no need to draw tile, called from color change
+	* (saves cycles)
+	rts
+4:
 	GET_XY_ADDRESS	screen_data+SCREEN_PLANE_SIZE*7
 	
 	
@@ -741,26 +753,70 @@ osd_update_32_sprite_hw:
 	lea		previous_sprite_state(pc),a5
 	move.w	d0,d1
 	beq.b	1f
-	lsl.w	#3,d1
+	lsl.w	#3,d1		| times 8 (size of the "previous" struct)
 	add.w	d1,a4		| add second half offset
 	add.w	d1,a5		| add second half offset
 1:
 	* first restore all background tiles behind the previous
 	* positions of the previously active objects
-	move.l	a5,-(a7)
-	move.l	(a7)+,a5
-* TODO
-	* then update the active sprites
-	move.l	a4,-(a7)
-	lea		_sprite,a3		| base
+	movem.l	d0-d5/a0-a2/a5,-(a7)
 	move.w	#31,d4			| 32 sprites
+	lea		_bg_color_data,a1
+	lea		_bg_char_data,a2
+2:
+	cmp.b	#STATE_INACTIVE,(a5)
+	beq.b	3f
+	move.w	(6,a5),d0
+	sub.w	#8,d0		| offset
+	move.w	(4,a5),d1
+	lsr.w	#3,d1
+	lsr.w	#3,d0
+	neg.w	d0
+	add.w	#32,d0	| mirror
+	* update background tile below sprite
+	* translate sprite x,y in tile offset
+	lsl.w	#6,d0
+	add.w	d1,d0	| should do it
+	move.b	(a1,d0.w),d2
+	move.b	(a2,d0.w),d1
+	movem.l	d4/a1,-(a7)
+	bsr	update_bg_tile
+	movem.l	(a7)+,d4/a1
+*	move.b	(1,a1,d0.w),d2
+*	move.b	(1,a2,d0.w),d1
+*	movem.l	d4/a1,-(a7)
+*	bsr	update_bg_tile
+*	movem.l	(a7)+,d4/a1
+*	move.b	(-32,a1,d0.w),d2
+*	move.b	(-32,a2,d0.w),d1
+*	movem.l	d4/a1,-(a7)
+*	bsr	update_bg_tile
+*	movem.l	(a7)+,d4/a1
+*	move.b	(-32+1,a1,d0.w),d2
+*	move.b	(-32+1,a2,d0.w),d1
+*	movem.l	d4/a1,-(a7)
+*	bsr	update_bg_tile
+*	movem.l	(a7)+,d4/a1
+3:
+	lea		(8,a5),a5
+	dbf		d4,2b
+	movem.l	(a7)+,d0-d5/a0-a2/a5
+
+	* then update the active sprites
+	lea		sprite_picbase,a3
+	move.l	a4,-(a7)
+	move.w	#31,d4			| 32 sprites
+	| sprite loop
 4:
 	cmp.b	#STATE_INACTIVE,(a4)
-	beq.b	2f
+	beq.w	2f
 	move.w	(4,a4),d1
 	sub.w	#4*8,d1
-	bmi.b	2f		| not visible
+	bmi		2f		| not visible
+	cmp.w	#36*8,d1
+	bcc.w	2f		| too low
 
+	move.w	d1,d3			| save y
 	clr.w	d0
 	move.b	(2,a4),d0	    | tile code
 	move.b	(3,a4),d1	    | tile color
@@ -769,6 +825,10 @@ osd_update_32_sprite_hw:
 	* second bank
 	bset	#8,d0
 5:
+	* mask higher nibble
+	swap	d0
+	clr.w	d0
+	swap	d0
 	
 	.ifne  OPT_ENABLE_LOGGING
 	* log the tile, use start address in 0x104 then
@@ -776,41 +836,59 @@ osd_update_32_sprite_hw:
 	lea		sprite_tile_log,a1
 	move.l	a1,0x104
 	movem.l	d0/d1,-(a7)
-	and.w	#0xFFFF,d0
 	lsl.w	#7,d0		| times 128
 	add.l	d0,a1
 	and.w	#0x7F,d1	| significant color bits
 	move.b	#0xEE,(a1,d1.w)
 	movem.l	(a7)+,d0/d1
 	.endif
-	* TEMP stop here
-	move.l	(a7)+,a4
-	rts
+
+	* compute clut index in d1
+	and.w	#0x7F,d1	| significant color bits TEMP
 	
-	
-	* multiply by 8 to get proper tile pointer in table
-	
-	lsl.w	#3,d0
-	btst	#2,d2	| xflip (or 3 xflip??)
-	beq.b	6f
-	add.w	#4,d0	| mirrored
-6:
-	move.l	(a3,d0.w),a0	| sprite data
+	* now d1 is the index, mul by 4 to get row pointer offset
+	* (there are 2 versions of the sprite normal,mirror for each
+	* color configuration)
+	lsl.w	#2,d1
+	* d1 times 512 (<<9) is the row start pointer
+	lsl.l	#8,d0
+	add.l	d0,d0
+	* TODO x/y flip
+*	btst	#6,d2			| X-flip?
+*	beq.b	3f
+*	add.w	#2,d1			| mirror version comes right after
+*3:
+	lea		_sprite_tile,a0
+	add.l	d0,a0		| row offset
+	add.w	d1,a0		| col offset
+	move.w	(a0),d1
+	bne.b	7f
+	* sprite is not known with that CLUT configuration: red flash
+	move.w	#0xF,color+_custom
+	move.w	#0,bplcon3+_custom
+	bra.b	2f
+7:
+	lea		(a3,d1.w),a0	| sprite data
 	move.w	(6,a4),d0
 	sub.w	#8,d0		| offset
+	move.w	d3,d1		| restore y
 	bsr	blit_16x16_bob
 
 2:
 	lea		(8,a4),a4		| next sprite
 	dbf		d4,4b
 	* then back up current object state (X,Y,STATE) for next update
-	move.w	#7,d0
 	move.l	(a7)+,a4
+	move.w	#31,d0	| 32*8 bytes
 3:
+	* copy one sprite backup structure (8 bytes) 32 times
+	move.l	(a4)+,(a5)+
 	move.l	(a4)+,(a5)+
 	dbf		d0,3b
 	rts
-		
+zzz:
+			blitz
+			rts
 * d0=DSWA, d1=DSWB
 osd_read_dipswitches:
 		rts
@@ -1123,8 +1201,9 @@ bitplanes:
    dc.l  0x00fa0000
    dc.l  0x00fc0000
    dc.l  0x00fe0000
-colors:
-   dc.w color,0
+   * reset color 0
+   dc.w	bplcon3,0
+	dc.w color,0
 sprites:
 score_sprite_white:
     ; #0

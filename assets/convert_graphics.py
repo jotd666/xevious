@@ -124,6 +124,41 @@ sprite_tile_clut = block_dict["sprite_clut"]["data"]
 dump_graphics = True
 dump_pngs = True
 
+def write_tiles(t,matrix,f,datachip):
+    # background tiles/sprites: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
+
+    f.write("\t.global\t{0}_picbase\n\t.global\t_{0}_tile\n_{0}_tile:".format(t))
+
+    c = 0
+    pic_list = []
+
+    for i,row in enumerate(matrix):
+        f.write("\n* row {}".format(i))
+        for item in row:
+            if c==0:
+                f.write("\n\t.word\t")
+            else:
+                f.write(",")
+            if item is None:
+                f.write(nullptr)
+            elif item == 0:
+                f.write(blankptr)
+            else:
+                f.write("{1}_pic_{0:03d}-{1}_picbase".format(len(pic_list),t))
+                pic_list.append(item)
+            c += 1
+            if c == 8:
+                c = 0
+        f.write("\n")
+
+    if datachip:
+        f.write("\t.datachip\n")
+    f.write("{}_picbase:\n".format(t))
+    # now write all defined pics
+    for i,item in enumerate(pic_list):
+        f.write("{}_pic_{:03d}:".format(t,i))
+        dump_asm_bytes(item,f)
+
 def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
     input_image = Image.new("RGB",(side,side))
     for i,p in enumerate(pic):
@@ -212,7 +247,7 @@ if dump_graphics:
 
     table = "sprite"
     raw_pic_data = block_dict[table]
-    print(raw_pic_data["size"],len(raw_pic_data["data"]))
+
     sprite_matrix = raw_blocks[table] = [[None]*256 for _ in range(320)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
     sprite_tile_clut_dict = get_used_sprite_cluts()
@@ -232,15 +267,13 @@ if dump_graphics:
                 row[clut_index*2] = 0
                 row[clut_index*2+1] = 0
             else:
-                print(tile_index,pic)
-                d = generate_tile(pic,side,current_palette,palette,nb_planes=7,is_sprite=False)
+                d = generate_tile(pic,side,current_palette,palette,nb_planes=7,is_sprite=True)
                 row[clut_index*2] = d["standard"]
                 row[clut_index*2+1] = d["mirror"]
                 if dump_pngs:
                     ImageOps.scale(d["png"],5,0).save("dumps/sprite_img_{:02}_{}.png".format(tile_index,clut_index))
 
 
-    dfdfg
 
     outfile = os.path.join(src_dir,"graphics.68k")
     #print("writing {}".format(os.path.abspath(outfile)))
@@ -264,48 +297,10 @@ if dump_graphics:
                 if c == 8:
                     c = 0
         f.write("\n")
-        # background tiles: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
-        t = "bg_tile"
-        f.write("\t.global\tbg_picbase\n\t.global\t_{0}\n_{0}:".format(t))
 
-        c = 0
-        pic_list = []
 
-        for i,row in enumerate(bg_matrix):
-            f.write("\n* row {}".format(i))
-            for item in row:
-                if c==0:
-                    f.write("\n\t.word\t")
-                else:
-                    f.write(",")
-                if item is None:
-                    f.write(nullptr)
-                elif item == 0:
-                    f.write(blankptr)
-                else:
-                    f.write("bg_pic_{:03d}-bg_picbase".format(len(pic_list)))
-                    pic_list.append(item)
-                c += 1
-                if c == 8:
-                    c = 0
-            f.write("\n")
+        write_tiles("bg",bg_matrix,f,False)
 
-        f.write("bg_picbase:\n")
-        # now write all defined pics
-        for i,item in enumerate(pic_list):
-            f.write("bg_pic_{:03d}:".format(i))
-            dump_asm_bytes(item,f)
+        # sprites are blitted, so require chipmem
 
-        t = "sprite"
-        f.write("\t.datachip\n")
-        f.write("\t.global\t_{0}\n_{0}:\n".format(t))
-        sprite_blocks = raw_blocks[t]
-        for i in range(len(sprite_blocks)):
-            f.write("\t.long\tsprite_{:03}\n".format(i))
-        c = 0
-
-        for i,block in enumerate(sprite_blocks):
-            f.write("\nsprite_{:03}:".format(i))
-            dump_asm_bytes(block,f)
-
-        f.write("\n")
+        write_tiles("sprite",sprite_matrix,f,True)
