@@ -21,8 +21,9 @@ COPPERLIST_SIZE = 200
 GRID_SIZE = 1<<11   | 6+5 bits to encode position
 NB_BYTES_PER_ROW = 40
 NB_LINES = 288
-SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_LINES
-SCREEN_SIZE = (NB_PLANES+1)*SCREEN_PLANE_SIZE
+SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_LINES*2
+* 7 scrollable planes + 1 non-scrollable so shorter
+SCREEN_SIZE = NB_PLANES*SCREEN_PLANE_SIZE+(SCREEN_PLANE_SIZE/2)
 
 
 ;.macro pixw nm, x, y
@@ -569,8 +570,8 @@ update_bg_tile:
 	move.w	(a0),d1
 	bne.b	7f
 	* tile is not known with that CLUT configuration: flash
-	move.w	#0xF00,color+_custom
 	move.w	#0,bplcon3+_custom
+	move.w	#0xF00,color+_custom
 	bra.w	9f
 7:
 	move.w	d1,a0
@@ -578,10 +579,10 @@ update_bg_tile:
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
 	bmi		6f
-	cmp.w	#36,d1
+	cmp.w	#64,d1
 	bcc.w	6f
 	
-	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*8
+	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*12
 
 	moveq	#NB_PLANES-1,d3	| 7 planes (AGA)
 	move.w	d2,d4
@@ -634,12 +635,20 @@ update_bg_tile:
 9:
 	rts
 	
+* d0: offset
 * d1: tile code
 * d2: attribute
 * d3: needs to redraw tile
 update_fg_tile:
+	moveq	#0,d4
 	lea		_fg_tile,a0
 	and.w	#0xFF,d1
+	* handle special case of orange color hiscore
+	cmp.w	#17,d1		| "H" tile
+	bne.b	0f
+	cmp.w	#0x504,d0	| HISCORE pos
+	seq		d4
+0:
 	lsl.w	#4,d1			| *16 (each tile+mirror tile has 8+8 bytes)
 	btst	#6,d2			| X-flip?
 	beq.b	1f
@@ -711,7 +720,10 @@ update_fg_tile:
 	
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
-		rts
+	move.w	d6,scroll_offset
+	* add to planes offset & change copperlist
+	bra		set_bitplanes
+
 
 * a5=obj_tbl
 osd_update_sprite_shadow:
@@ -746,7 +758,16 @@ osd_update_sprite_shadow:
 	addq.w	#8,a4
 	addq.w	#2,a2
 	bra.b	2b
-				
+	
+.macro   UPDATE_BG_TILE_OFFSET	xoff,yoff
+	movem.l	d0/d4/a1,-(a7)
+	add.w	#\yoff-(\xoff<<6),d0
+	move.b	(a1,d0.w),d2
+	move.b	(a2,d0.w),d1
+	bsr	update_bg_tile
+	movem.l	(a7)+,d0/d4/a1
+	.endm
+	
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
 	lea		current_sprite_state(pc),a4
@@ -765,9 +786,10 @@ osd_update_32_sprite_hw:
 	lea		_bg_char_data,a2
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
-	beq.b	3f
+	beq	3f
+	* first convert sprite coords to background tile coords
 	move.w	(6,a5),d0
-	sub.w	#8,d0		| offset
+	sub.w	#4,d0		| sprite Y offset (32-X on amiga screen)
 	move.w	(4,a5),d1
 	lsr.w	#3,d1
 	lsr.w	#3,d0
@@ -775,28 +797,22 @@ osd_update_32_sprite_hw:
 	add.w	#32,d0	| mirror
 	* update background tile below sprite
 	* translate sprite x,y in tile offset
+	* offset = (32-x)<<6 + y
 	lsl.w	#6,d0
 	add.w	d1,d0	| should do it
 	move.b	(a1,d0.w),d2
-	move.b	(a2,d0.w),d1
-	movem.l	d4/a1,-(a7)
+	move.b	(a2,d0.w),d1	| char
+	movem.l	d0/d4/a1,-(a7)
 	bsr	update_bg_tile
-	movem.l	(a7)+,d4/a1
-*	move.b	(1,a1,d0.w),d2
-*	move.b	(1,a2,d0.w),d1
-*	movem.l	d4/a1,-(a7)
-*	bsr	update_bg_tile
-*	movem.l	(a7)+,d4/a1
-*	move.b	(-32,a1,d0.w),d2
-*	move.b	(-32,a2,d0.w),d1
-*	movem.l	d4/a1,-(a7)
-*	bsr	update_bg_tile
-*	movem.l	(a7)+,d4/a1
-*	move.b	(-32+1,a1,d0.w),d2
-*	move.b	(-32+1,a2,d0.w),d1
-*	movem.l	d4/a1,-(a7)
-*	bsr	update_bg_tile
-*	movem.l	(a7)+,d4/a1
+	movem.l	(a7)+,d0/d4/a1
+	UPDATE_BG_TILE_OFFSET	1,0
+	UPDATE_BG_TILE_OFFSET	1,1
+	UPDATE_BG_TILE_OFFSET	1,-1
+	UPDATE_BG_TILE_OFFSET	-1,-1
+	UPDATE_BG_TILE_OFFSET	-1,0
+	UPDATE_BG_TILE_OFFSET	-1,1
+	UPDATE_BG_TILE_OFFSET	0,-1
+
 3:
 	lea		(8,a5),a5
 	dbf		d4,2b
@@ -864,14 +880,15 @@ osd_update_32_sprite_hw:
 	move.w	(a0),d1
 	bne.b	7f
 	* sprite is not known with that CLUT configuration: red flash
-	move.w	#0xF,color+_custom
 	move.w	#0,bplcon3+_custom
+	move.w	#0xF,color+_custom
 	bra.b	2f
 7:
 	lea		(a3,d1.w),a0	| sprite data
 	move.w	(6,a4),d0
-	sub.w	#8,d0		| offset
+	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
+	addq.w	#4,d1		| sprite Y offset
 	bsr	blit_16x16_bob
 
 2:
@@ -903,8 +920,17 @@ osd_read_p1_inputs:
 * what: sets bitplanes in copperlist
 
 set_bitplanes:
-    move.l	#screen_data,d0
-    moveq #NB_PLANES,d1  | +1 for foreground
+    lea		screen_data,a0
+    moveq #NB_PLANES-1,d1
+	move.w	scroll_offset(pc),d2
+	lea	mulNB_BYTES_PER_ROW_table(pc),a1
+	.ifdef	NO68020
+	add.w	d2,d2
+	add.w	(a1,d2.w),a0
+	.else
+	add.w	(a1,d2.w*2),a0
+	.endif
+	move.l	a0,d0
     lea	bitplanes+2,a0
 .mkcl:
     swap d0
@@ -914,6 +940,12 @@ set_bitplanes:
     addq.w  #8,a0
     add.l #SCREEN_PLANE_SIZE,d0
     dbf d1,.mkcl
+	* foreground bitplane doesn't scroll
+    move.l	#screen_data+7*SCREEN_PLANE_SIZE,d0
+    swap d0
+    move.w d0,(a0)
+    swap d0
+    move.w d0,(4,a0)    
     rts
 	
 input_map_tbl:
@@ -1105,7 +1137,7 @@ wait_blit:
 	BNE.S	1b
 	rts
 	
-	MUL_TABLE	NB_BYTES_PER_ROW,288
+	MUL_TABLE	NB_BYTES_PER_ROW,512
 	MUL_TABLE	NB_PLANES,512
 	
 current_sprite_state:
@@ -1113,6 +1145,8 @@ current_sprite_state:
 previous_sprite_state:
 	ds.b	8*64
 	
+scroll_offset:
+	dc.w	0
 vbl_counter:
 		dc.w	0
 _resload:
@@ -1155,8 +1189,9 @@ irq_cnt:											ds.w		1
 * table of the colors for fg tiles in the copperlist
 _fg_color_table:
 	.set	fgrow_offset,2
-	.rept	29
 	.long	color_row_0+8+fgrow_offset
+	.rept	28
+	.long	color_row_1+8+fgrow_offset
 	.set	fgrow_offset,fgrow_offset+20
 	.endr
 	.long	color_row_30+6
@@ -1177,6 +1212,7 @@ _bg_char_data:
 		.bsschip
 screen_data:
 	ds.b	SCREEN_SIZE
+	
 	* small margin (I suspect that gas is buggy with ds directive)
 	* plus fg plane shifting can write one byte too far
 	ds.b	100
@@ -1240,7 +1276,21 @@ end_color_copper:
 	.set    testcol,0x0
 	.set	color_28,color+28*2
 color_row_0:
-	.rept	29
+	dc.w	bplcon3,4<<13	| color 128
+	dc.w	beampos,0xFFFE
+	dc.w	color,(testcol & 0x0FFF)
+	dc.w	bplcon3,5<<13	| color 188
+	dc.w	color_28,0xFFF
+	* special copper change
+color_row_0_col_4:
+	*dc.w	bplcon3,0  |4<<13	| color 128
+	*dc.w	beampos+90,0xFF00+(90<<1)
+	*dc.w	color,0xF00
+	
+	.set	beampos,beampos+0x800
+	.set	testcol,testcol+0x011
+color_row_1:
+	.rept	28
 	dc.w	bplcon3,4<<13	| color 128
 	dc.w	beampos,0xFFFE
 	dc.w	color,(testcol & 0x0FFF)

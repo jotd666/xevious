@@ -1,6 +1,7 @@
-blit ascending for flipped sprites
-sprites
-scrolling
+blit ascending for flipped sprites to code
+scrolling not okay!
 rip sounds
 hack for orange highscore
+missing enemy sprites
+missing bg tiles
 
