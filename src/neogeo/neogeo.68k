@@ -682,8 +682,7 @@ osd_update_scroll_hw:
     
     * only need to reposition existing btm_sprite
     * and sprite BGSS if it's visible
-
-    * bottom sprite    
+    * - btm_sprite    
     lea       (SCB4+BGSS),a1
     move.w    (btm_sprite),d0
     lea       (a1,d0.w),a1
@@ -691,8 +690,7 @@ osd_update_scroll_hw:
     add.w     #(SPRITEX_0+BGOFF),d1             | add screen offset
     lsl.w     #7,d1                             | shift for Neo Geo
     move.w    d1,(a0)                           | set register
-
-    * sprite 0 if required
+    * - sprite BGSS if required
     move.w    #64,d2
     sub.w     d0,d2                             
     and.w     #0x3f,d2                          | row offset of sprite BGSS
@@ -728,23 +726,19 @@ row_scroll:
     move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
     move.w    #(SPRITEX_0+BGOFF+7)<<7,d1
     move.w    d1,(a0)
-    
     * update sprite BGSS if visible    
     move.w    #64,d1
     sub.w     d0,d1                             
     and.w     #0x3f,d1                          | row offset of sprite BGSS
     cmp.w     #37,d1                            | visible?
     bgt       1f                                | no, skip
-osd_debug1:    
     lea       (SCB4+BGSS),a1
     move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
     ror.w     #6,d1                             | lsl 3, lsl 7
     add.w     #(SPRITEX_0+BGOFF+7)<<7,d1        | add to base
     move.w    d1,(a0)    
-
-1:
     * activate top sprite (chained unless sprite BGSS)
-    add.w     #37,d0                            | calc top sprite
+1:  add.w     #37,d0                            | calc top sprite
     and.w     #0x3f,d0                          | handle wrap
     lea       (SCB3+BGSS),a1
     lea       (a1,d0.w),a1
@@ -759,54 +753,66 @@ osd_debug1:
     
 arbitrary_scroll:
     move.w    d6,(bg_scroll_x_r)
-    move.w    d6,d1                             | tmp hack
-    
+    * deactivate all active sprites
+    lea       VRAM_RW.l,a0
+    move.w    #1,(2,a0)                         | VRAM_MOD=1
+    lea       SCB3+BGSS,a1
+    move.w    (btm_sprite),d0
+    lea       (a1,d0.w),a2
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB3
+    move.w    #38-1,d7
+3:  move.w    #0,(a0)
+    addq.w    #1,d0                             | next sprite
+    cmp.w     #0x3f,d0
+    ble       4f
+    moveq     #0,d0
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB3
+4:  dbf       d7,3b
+    * calculate new bottom sprite
+    move.w    d6,d1                             | copy
     lsr.w     #3,d1                             | byte offset
     move.w    #24,d0
-    sub.w     d1,d0                             | d0=sprite of bottom row
+    sub.w     d1,d0                             | new btm_sprite
     and.w     #0x3f,d0                          | fix wrap
-    move.w    d0,d2                             | copy
-    
     move.w    d0,(btm_sprite)
-    
-    lea       VRAM_RW.l,a0
-    move.w    #1,2(a0)                          | VRAM_MOD=1
-    lea       SCB3+BGSS,a1
-    move.w    a1,-2(a0)                         | VRAM_ADDR=SCB3
-    * deactivate all sprites
-    moveq     #64-1,d7
-1:  move.w    #0,(a0)                           | deactivate sprite
-    dbf       d7,1b
+    move.w    d0,d2                             | copy
     * activate visible sprites
-    lea       SCB3+BGSS,a1
+    lea       (a1,d0.w),a2
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB3
     moveq     #38-1,d7
     move.w    #(SPRITEY_0<<7),d1
     ori.w     #33,d1                            | bottom sprite not sticky
-2:  lea       (d0.w,a1),a2
-    move.w    a2,-2(a0)                         | VRAM_ADDR=SCB3
-    move.w    d1,(a0)                           | ypos,sticky,size
-    addq.w    #1,d0
-    and.w     #0x3f,d0                          | next sprite
-    cmp.w     #0,d0                             | sprite 0?
-    bne       3f                                | no, skip
-    and.w     #~SCB3_STICKY,d1                  | sprite 0 is never sticky
-    bra       4f
-3:  ori.w     #SCB3_STICKY,d1
-4:  dbf       d7,2b
-    * position all sprites (only non-sticky will work)
+5:  move.w    d1,(a0)                           | ypos,sticky,size
+    ori.w     #SCB3_STICKY,d1                   | default sticky
+    addq.w    #1,d0                             | next sprite
+    cmp.w     #0x3f,d0
+    ble       6f
+    moveq     #0,d0                             | handle wrap
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB3
+    and.w     #~SCB3_STICKY,d1                  | never sticky
+6:  dbf       d7,5b
+    * position btm sprite and sprite BGSS
+    * - btm_sprite
     lea       SCB4+BGSS,a1
-    move.w    #(SPRITEX_0-4)<<7,d0
+    lea       (a1,d2.w),a2                      | addr for btm_sprite
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB3
+    move.w    #(SPRITEX_0+BGOFF),d1
     and.w     #7,d6
-    lsl.w     #7,d6
-    add.w     d6,d0
-    moveq     #38-1,d7
-5:  lea       (d2.w,a1),a2
-    move.w    a2,-2(a0)                         | VRAM_ADDR=SCB4
-    move.w    d0,(a0)                           | X POSITION
-    addq.w    #1,d2
-    and.w     #0x3f,d2                          | next sprite
-    add.w     #(8<<7),d0                        | next position
-    dbf       d7,5b
+    add.w     d6,d1
+    lsl.w     #7,d1
+    move.w    d1,(a0)                           | X POSITION
+    * - sprite BGSS (if visible)
+    move.w    #64,d1
+    sub.w     d2,d1                             
+    and.w     #0x3f,d1                          | row offset of sprite BGSS
+    cmp.w     #37,d1                            | visible?
+    bgt       9f                                | no, skip
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB3
+    lsl.w     #3,d1                             | x8
+    add.w     #(SPRITEX_0+BGOFF),d1             | add to base
+    add.w     d6,d1                             | pixel offset
+    move.w    d1,(a0)    
+
 9:  movem.l   (a7)+,d0-d2/a0-a2
     .endif | OPT_DISABLE_BG_LAYER
     rts
