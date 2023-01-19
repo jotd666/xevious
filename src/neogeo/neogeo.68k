@@ -533,6 +533,10 @@ platform_init:
     move.b    #1,(REG_ENVIDEO)                  | enable video
 .endif
 
+    * some working variables
+    move.w    #0,(btm_sprite)
+    move.w    #0,(bg_scroll_x_r)
+    
 5:  KICK_WDOG
     rts
 
@@ -655,17 +659,116 @@ w_bg_ram:
 9:  movem.l   (a7)+,d0-d3/a0/a1
     .endif | OPT_DISABLE_BG_LAYER
     rts
-            
+
+    .equ      BGOFF, -4
+    
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
     .ifeq OPT_DISABLE_BG_LAYER
     movem.l   d0-d2/a0-a2,-(a7)
+    lea       VRAM_RW.l,a0
+    move.w    #1,(2,a0)                         | VRAM_MOD=1
     move.w    d6,d1                             | copy of scroll register
+    addq.w    #1,d1                             | scroll+1
+    and.w     #0x01ff,d1                        | handle wrap
+    cmp.w     (bg_scroll_x_r),d1                | same as last?
+    bne       arbitrary_scroll                  | no, recalculate entire screen
+    * has scrolled down by 1 pixel row
+    move.w    d6,(bg_scroll_x_r)
+    move.w    d6,d1
+    and.w     #7,d1                             | bit offset
+    cmp.b     #7,d1                             | time for a new row?
+    beq       row_scroll                        | yes, go
+    
+    * only need to reposition existing btm_sprite
+    * and sprite BGSS if it's visible
+
+    * bottom sprite    
+    lea       (SCB4+BGSS),a1
+    move.w    (btm_sprite),d0
+    lea       (a1,d0.w),a1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
+    add.w     #(SPRITEX_0+BGOFF),d1             | add screen offset
+    lsl.w     #7,d1                             | shift for Neo Geo
+    move.w    d1,(a0)                           | set register
+
+    * sprite 0 if required
+    move.w    #64,d2
+    sub.w     d0,d2                             
+    and.w     #0x3f,d2                          | row offset of sprite BGSS
+    cmp.w     #37,d2                            | visible?
+    bgt       9f                                | no, done
+    lea       (SCB4+BGSS),a1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
+    ror.w     #6,d2                             | lsl 3, lsl 7
+    add.w     d2,d1                             | add to base
+    move.w    d1,(a0)    
+    
+    bra 9f
+    
+row_scroll:
+    
+    * inactivate btm_sprite, update btm_sprite
+    lea       (SCB3+BGSS),a1
+    move.w    (btm_sprite),d0
+    lea       (a1,d0.w),a1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB3
+    move.w    #0,(a0)                           | inactivate
+    addq.w    #1,d0                             | calc btm_sprite
+    and.w     #0x3f,d0                          | handle wrap
+    move.w    d0,(btm_sprite)
+    * unsticky, set btm_sprite position
+    lea       (SCB3+BGSS),a1
+    lea       (a1,d0.w),a1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB3
+    move.w    #(SPRITEY_0<<7)+33,d1             | unsticky
+    move.w    d1,(a0)
+    lea       (SCB4+BGSS),a1
+    lea       (a1,d0.w),a1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
+    move.w    #(SPRITEX_0+BGOFF+7)<<7,d1
+    move.w    d1,(a0)
+    
+    * update sprite BGSS if visible    
+    move.w    #64,d1
+    sub.w     d0,d1                             
+    and.w     #0x3f,d1                          | row offset of sprite BGSS
+    cmp.w     #37,d1                            | visible?
+    bgt       1f                                | no, skip
+osd_debug1:    
+    lea       (SCB4+BGSS),a1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
+    ror.w     #6,d1                             | lsl 3, lsl 7
+    add.w     #(SPRITEX_0+BGOFF+7)<<7,d1        | add to base
+    move.w    d1,(a0)    
+
+1:
+    * activate top sprite (chained unless sprite BGSS)
+    add.w     #37,d0                            | calc top sprite
+    and.w     #0x3f,d0                          | handle wrap
+    lea       (SCB3+BGSS),a1
+    lea       (a1,d0.w),a1
+    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
+    move.w    #(SPRITEY_0+33),d1                | always set ypos,size
+    tst.w     d0
+    beq       2f                                | no sticky for sprite BGSS
+    add.w     #SCB3_STICKY,d1
+2:  move.w    d1,(a0)
+    
+    bra       9f
+    
+arbitrary_scroll:
+    move.w    d6,(bg_scroll_x_r)
+    move.w    d6,d1                             | tmp hack
+    
     lsr.w     #3,d1                             | byte offset
     move.w    #24,d0
     sub.w     d1,d0                             | d0=sprite of bottom row
     and.w     #0x3f,d0                          | fix wrap
     move.w    d0,d2                             | copy
+    
+    move.w    d0,(btm_sprite)
+    
     lea       VRAM_RW.l,a0
     move.w    #1,2(a0)                          | VRAM_MOD=1
     lea       SCB3+BGSS,a1
@@ -704,7 +807,7 @@ osd_update_scroll_hw:
     and.w     #0x3f,d2                          | next sprite
     add.w     #(8<<7),d0                        | next position
     dbf       d7,5b
-    movem.l   (a7)+,d0-d2/a0-a2
+9:  movem.l   (a7)+,d0-d2/a0-a2
     .endif | OPT_DISABLE_BG_LAYER
     rts
 
@@ -720,21 +823,20 @@ osd_update_sprite_shadow:
     dbf       d7,1b
     rts
 
-osd_debug1:
 update_sprite_shadow: | $0332
     move.b    (_STATE,a5),d0                    | state
-    subq.b    #1,d0                             | =1?
+    subq.b    #1,d0                             | =1 (inactive)?
     bne       0f                                | no, skip
     adda.w    #2*4*2,a1
     adda.w    #2,a2
     adda.w    #2*2,a3
     adda.w    #2*2,a4
     rts
-0:  addq.b    #1,d0
-    bne       1f                                | NZ? yes, skip
+0:  addq.b    #1,d0                             | restore state
+    bne       1f                                | NZ (not going inactive)? yes, skip
     clr.w     (_X,a5)                           | spriteX=0
     clr.w     (_Y,a5)                           | spriteY=0
-    move.b    #1,(_STATE,a5)                    | state=1
+    move.b    #1,(_STATE,a5)                    | state=1 (inactive)
     ** SCB1
 1:  moveq     #0,d0
     move.b    (_ATTR,a5),d0                     | bank,xflip,yflip,size
@@ -791,8 +893,8 @@ update_sprite_shadow: | $0332
     and.w     #0xff00,d0                        | max=256
 3:  add.w     #0x110,d0
     lsl.w     #7,d0
-    cmp.b     #2,(_STATE,a5)                    | state=0/1? (fix me)
-    bcs       4f                                | yes, skip
+    cmp.b     #1,(_STATE,a5)                    | state=1 (inactive?)
+    beq       4f                                | yes, skip (size=0)
     ori.w     #1,d0                             | size=1 (default)
     btst.b    #1,(_ATTR,a5)                     | double height?
     beq       4f                                | no, skip
@@ -1014,8 +1116,8 @@ fg_colorram_lookup_tbl:       ds.w  256
 bg_colorram_lookup_tbl:       ds.w  512
 
 .align 2
-bg_1st_row_sprite:            ds.w    1
-irq_cnt:                      ds.w    1
+btm_sprite:                   ds.w    1
+bg_scroll_x_r:                ds.w    1
 
 p1_input_r:                   ds.b    1
 p2_input_r:                   ds.b    1
