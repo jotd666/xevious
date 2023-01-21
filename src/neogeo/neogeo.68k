@@ -661,7 +661,8 @@ w_bg_ram:
     rts
 
     .equ      BGOFF, -4
-    
+
+* we require 38 visible (active) sprites
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
     .ifeq OPT_DISABLE_BG_LAYER
@@ -689,50 +690,47 @@ osd_update_scroll_hw:
     * - btm_sprite    
     lea       (SCB4+BGSS),a1
     move.w    (btm_sprite),d0
-    lea       (a1,d0.w),a1
-    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
+    lea       (a1,d0.w),a2
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB4
     add.w     #(SPRITEX_0+BGOFF),d1             | add screen offset
     lsl.w     #7,d1                             | shift for Neo Geo
     move.w    d1,(a0)                           | set register
     * - sprite BGSS if required
-    cmp.w     #63-37,d0                         | visible?
-    ble       9f                                | no, done
-    lea       (SCB4+BGSS),a1
+    tst.w     d0                                | btm_sprite==0?
+    beq       9f                                | yes, go
+    cmp.w     #64-37,d0                         | visible?
+    blt       9f                                | no, done
     move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
     move.w    #64,d2
     sub.w     d0,d2
     ror.w     #6,d2                             | lsl 3, lsl 7
     add.w     d2,d1                             | add to base
     move.w    d1,(a0)    
-    
     bra 9f
     
 row_scroll:
-    
     * inactivate btm_sprite, update btm_sprite
     lea       (SCB3+BGSS),a1
     move.w    (btm_sprite),d0
-    lea       (a1,d0.w),a1
-    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB3
+    lea       (a1,d0.w),a2
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB3
     move.w    #0,(a0)                           | inactivate
     addq.w    #1,d0                             | calc btm_sprite
     and.w     #0x3f,d0                          | handle wrap
     move.w    d0,(btm_sprite)
     * unsticky, set btm_sprite position
-    lea       (SCB3+BGSS),a1
-    lea       (a1,d0.w),a1
-    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB3
+    lea       (a1,d0.w),a2
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB3
     move.w    #(SPRITEY_0<<7)+33,d1             | unsticky
     move.w    d1,(a0)
     lea       (SCB4+BGSS),a1
-    lea       (a1,d0.w),a1
-    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
+    lea       (a1,d0.w),a2
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB4
     move.w    #(SPRITEX_0+BGOFF+7)<<7,d1
     move.w    d1,(a0)
     * update sprite BGSS if visible    
-    cmp.w     #63-37,d0                         | visible?
-    ble       1f                                | no, skip
-    lea       (SCB4+BGSS),a1
+    cmp.w     #64-37,d0                         | visible?
+    blt       1f                                | no, skip
     move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
     move.w    #64,d2
     sub.w     d0,d2
@@ -743,14 +741,13 @@ row_scroll:
 1:  add.w     #37,d0                            | calc top sprite
     and.w     #0x3f,d0                          | handle wrap
     lea       (SCB3+BGSS),a1
-    lea       (a1,d0.w),a1
-    move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB4
-    move.w    #(SPRITEY_0+33),d1                | always set ypos,size
+    lea       (a1,d0.w),a2
+    move.w    a2,(-2,a0)                        | VRAM_ADDR=SCB4
+    move.w    #(SPRITEY_0<<7)+33,d1             | always set ypos,size
     tst.w     d0
     beq.b     2f                                | no sticky for sprite BGSS
-    add.w     #SCB3_STICKY,d1
+    ori.w     #SCB3_STICKY,d1
 2:  move.w    d1,(a0)
-    
     bra       9f
     
 arbitrary_scroll:
@@ -805,11 +802,8 @@ osd_debug1:
     lsl.w     #7,d1
     move.w    d1,(a0)                           | X POSITION
     * - sprite BGSS (if visible)
-    move.w    #64,d1
-    sub.w     d2,d1                             
-    and.w     #0x3f,d1                          | row offset of sprite BGSS
-    cmp.w     #37,d1                            | visible?
-    bgt.b     9f                                | no, skip
+    cmp.w     #64-37,d0                         | visible?
+    blt.b     9f                                | no, skip
     move.w    a1,(-2,a0)                        | VRAM_ADDR=SCB3
     lsl.w     #3,d1                             | x8
     add.w     #(SPRITEX_0+BGOFF),d1             | add to base
