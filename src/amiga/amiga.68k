@@ -596,7 +596,8 @@ update_bg_tile:
 	cmp.w	#1,a0
 	beq.b	8f		| blank (optim)
 
-	add.l	#bg_picbase,a0
+	add.l	#bg_picbase,a0   | pointer on tile data
+	move.l	(a0),a0			 | tile data
 	
 	* draw
 	btst	#7,d4
@@ -885,16 +886,17 @@ osd_update_32_sprite_hw:
 *	add.w	#2,d1			| mirror version comes right after
 *3:
 	lea		_sprite_tile,a0
+
 	add.l	d0,a0		| row offset
 	add.w	d1,a0		| col offset
 	move.w	(a0),d1
-	bne.b	7f
-	* sprite is not known with that CLUT configuration: red flash
+	* sprite is not known with that CLUT configuration: blue flash
 	move.w	#0,bplcon3+_custom
 	move.w	#0xF,color+_custom
 	bra.b	2f
 7:
-	lea		(a3,d1.w),a0	| sprite data
+	move.l	(a3,d1.w),a0	| get pointer on data
+	move.l	(a0),a0	| sprite data
 	move.w	(6,a4),d0
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
@@ -933,6 +935,7 @@ set_bitplanes:
     lea		screen_data,a0
     moveq #NB_PLANES-1,d1
 	move.w	scroll_offset(pc),d2
+	move.l	d2,0x108
 	lea	mulNB_BYTES_PER_ROW_table(pc),a1
 	.ifdef	NO68020
 	add.w	d2,d2

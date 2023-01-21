@@ -1,4 +1,4 @@
-import os,re,bitplanelib,ast
+import os,re,bitplanelib,ast,json
 from PIL import Image,ImageOps
 
 import collections
@@ -17,41 +17,83 @@ block_dict = {}
 
 winuae_dir = r"C:\Users\Public\Documents\Amiga Files\WinUAE"
 
+def load_binary_tile_file(infile):
+    contents = b""
+    if os.path.exists(infile):
+        with open(infile,"rb") as f:
+            contents = f.read()
+    else:
+        # normal when rebuilding with a complete .json file
+        print("{} file not dumped")
+
+    return contents
+
+def load_json_tile_file(filename):
+    rval = collections.defaultdict(set)
+    try:
+        with open(filename) as f:
+            d = json.load(f)
+
+        rval.update({int(k):set(v) for k,v in d.items()})
+    except OSError:
+        pass
+    return rval
+
+def save_json_tile_file(filename,rval,old_rval):
+    if rval != old_rval:
+        print("Updating {}".format(filename))
+        with open(filename,"w") as f:
+            json.dump({k:sorted(v) for k,v in rval.items()},f,indent=2)
+    else:
+        print("{} already contains all tile/clut info".format(filename))
+
 def get_used_bg_cluts():
     infile = os.path.join(winuae_dir,"bg_tile_log")
-    rval = collections.defaultdict(list)
-    with open(infile,"rb") as f:
-        contents = f.read()
+    bg_json_base = "bg_tile_clut.json"
+    # load previously recorded configurations
+    rval = load_json_tile_file(bg_json_base)
+    copy_rval = rval.copy()
 
-    row_index = 0
-    for tile_index in range(512):
-        for idx in range(64):   # table still needs tile index to get bit 4 of clut index
-            v = contents[row_index+idx]
-            if v == 0xdd:
-                clut_index = 0
-                if tile_index & 0x80:
-                    clut_index = 1<<4
-                clut_index |= (idx>>2) & 0xF
-                clut_index |= (idx&0x3) << 5
-                rval[tile_index].append(clut_index)
-                print("found: tile_index: {}, clut_index: {}".format(tile_index,clut_index))
-        row_index += 64
+    # update with what was ripped in WinUAE directory
+    contents = load_binary_tile_file(infile)
+
+    if contents:
+        row_index = 0
+        for tile_index in range(512):
+            for idx in range(64):   # table still needs tile index to get bit 4 of clut index
+                v = contents[row_index+idx]
+                if v == 0xdd:
+                    clut_index = 0
+                    if tile_index & 0x80:
+                        clut_index = 1<<4
+                    clut_index |= (idx>>2) & 0xF
+                    clut_index |= (idx&0x3) << 5
+                    rval[tile_index].add(clut_index)
+                    print("found: tile_index: {}, clut_index: {}".format(tile_index,clut_index))
+            row_index += 64
+
+        save_json_tile_file(bg_json_base,rval,copy_rval)
 
     return rval
 
 def get_used_sprite_cluts():
     infile = os.path.join(winuae_dir,"sprite_tile_log")
-    rval = collections.defaultdict(list)
-    with open(infile,"rb") as f:
-        contents = f.read()
+    sprite_json_base = "sprite_tile_clut.json"
 
-    row_index = 0
-    for tile_index in range(320):
-        for idx in range(128):
-            if contents[row_index+idx] == 0xee:
-                clut_index = idx
-                rval[tile_index].append(clut_index)
-        row_index += 128
+    rval = load_json_tile_file(sprite_json_base)
+    copy_rval = rval.copy()
+
+    contents = load_binary_tile_file(infile)
+    if contents:
+        row_index = 0
+        for tile_index in range(320):
+            for idx in range(128):
+                if contents[row_index+idx] == 0xee:
+                    clut_index = idx
+                    rval[tile_index].add(clut_index)
+            row_index += 128
+
+        save_json_tile_file(sprite_json_base,rval,copy_rval)
 
     return rval
 
@@ -161,13 +203,21 @@ def write_tiles(t,matrix,f,datachip):
                 c = 0
         f.write("\n")
 
-    if datachip:
-        f.write("\t.datachip\n")
     # add 2 bytes so relative addresses aren't 0
     f.write("{}_picbase:\n\tdc.w\t0\n".format(t))
-    # now write all defined pics
+    # now write all defined pointers to pics (no relative shit
+    # as data can be pretty big and overshoot 0x7FFF limit, which
+    # explains the double indirection in the tables
+    # 1) one table with word offsets to save memory, pointing on pointers
+    # 2) one table of pointers that point on actual data
+    #
     for i,item in enumerate(pic_list):
-        f.write("{}_pic_{:03d}:".format(t,i))
+        picname = "{}_pic_{:03d}".format(t,i)
+        f.write("{0}:\n\tdc.l\t{0}_bytes\n".format(picname))
+    if datachip:
+        f.write("\t.datachip\n")
+    for i,item in enumerate(pic_list):
+        f.write("{}_pic_{:03d}_bytes:".format(t,i))
         dump_asm_bytes(item,f)
 
 def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
