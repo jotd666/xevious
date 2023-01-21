@@ -6,6 +6,15 @@ import collections
 
 block_dict = {}
 
+# where tile & sprite CLUT used configuration logs are fetch from
+# we cannot possibly generate all tile & sprite CLUT configurations
+# as that would generate gigabytes of graphics when only one or
+# a few CLUTs are used for each background tile/sprite
+#
+# tile logs are dumped in debug mode when running the game, experiencing
+# dashed tiles / flashing colors to indicate that such or such tile CLUT
+# configuration is missing
+
 winuae_dir = r"C:\Users\Public\Documents\Amiga Files\WinUAE"
 
 def get_used_bg_cluts():
@@ -16,14 +25,16 @@ def get_used_bg_cluts():
 
     row_index = 0
     for tile_index in range(512):
-        for idx in range(64):
-            if contents[row_index+idx] == 0xdd:
+        for idx in range(64):   # table still needs tile index to get bit 4 of clut index
+            v = contents[row_index+idx]
+            if v == 0xdd:
                 clut_index = 0
                 if tile_index & 0x80:
                     clut_index = 1<<4
                 clut_index |= (idx>>2) & 0xF
                 clut_index |= (idx&0x3) << 5
                 rval[tile_index].append(clut_index)
+                print("found: tile_index: {}, clut_index: {}".format(tile_index,clut_index))
         row_index += 64
 
     return rval
@@ -119,7 +130,6 @@ palette = [tuple(x) for x in block_dict["palette"]["data"]]
 bg_tile_clut = block_dict["bg_tile_clut"]["data"]
 sprite_tile_clut = block_dict["sprite_clut"]["data"]
 
-#sprite_tile_clut += sprite_tile_clut   # TEMP TEMP TEMP
 
 dump_graphics = True
 dump_pngs = True
@@ -153,7 +163,8 @@ def write_tiles(t,matrix,f,datachip):
 
     if datachip:
         f.write("\t.datachip\n")
-    f.write("{}_picbase:\n".format(t))
+    # add 2 bytes so relative addresses aren't 0
+    f.write("{}_picbase:\n\tdc.w\t0\n".format(t))
     # now write all defined pics
     for i,item in enumerate(pic_list):
         f.write("{}_pic_{:03d}:".format(t,i))
