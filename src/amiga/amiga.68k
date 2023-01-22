@@ -521,14 +521,25 @@ osd_w_bg_videoram:
 	
 * d0: offset
 * d1: tile code (0-256 but extends to 512 with bit 0 of attribute)
-* d2: attribute (0-255, color is in bits 0-5)
+* d2: attribute (0-255, color is in bits 0-5, X/Y flip in 6:7)
 update_bg_tile:
+	* discard everything not in column range
+	move.w	d0,d3
+	lsr.w	#6,d3
+	neg.w	d3
+	add.w	#32-3,d3	| mirror
+	bmi.b		0f
+	cmp.w	#29,d3
+	bcs.b	1f
+0:
+	rts
+1:
 	lea		_bg_tile,a0
 	and.l	#0xFF,d1
 	btst	#0,d2
-	beq.b	1f
+	beq.b	2f
 	bset	#8,d1	| upper part of background tile code
-1:
+2:
 	.ifne  OPT_ENABLE_LOGGING
 	* log the tile, use start address in 0x100 then
 	* S bg_tile_log <address> !128*!512
@@ -564,7 +575,7 @@ update_bg_tile:
 	
 	btst	#6,d2			| X-flip?
 	beq.b	3f
-	add.w	#2,d3			| mirror version
+	addq.w	#2,d3			| mirror version
 3:
 	add.l	d1,a0		| row offset
 	add.w	d3,a0		| col offset
@@ -591,7 +602,6 @@ update_bg_tile:
 	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*12
 
 	moveq	#NB_PLANES-1,d3	| 7 planes (AGA)
-	move.w	d2,d4
 
 	cmp.w	#1,a0
 	beq.b	8f		| blank (optim)
@@ -600,44 +610,35 @@ update_bg_tile:
 	move.l	(a0),a0			 | tile data
 	
 	* draw
-	btst	#7,d4
+	btst	#7,d2    | Y-flip
 	bne.b	5f
 4:
-	move.b	(a0)+,(a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*2,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*3,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*4,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*5,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*6,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*7,a1)
+	.set	offset,0
+	.rept	8
+	move.b	(a0)+,(offset,a1)
+	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
     lea   (SCREEN_PLANE_SIZE,a1),a1
     dbf d3,4b
 	rts
 	
 5:   | y-flip
-	move.b	(a0)+,(NB_BYTES_PER_ROW*7,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*6,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*5,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*4,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*3,a1)
-	move.b	(a0)+,(NB_BYTES_PER_ROW*2,a1)
- 	move.b	(a0)+,(NB_BYTES_PER_ROW,a1)
-	move.b	(a0)+,(a1)
-   lea		(SCREEN_PLANE_SIZE,a1),a1
+	.set	offset,NB_BYTES_PER_ROW*7
+	.rept	8
+	move.b	(a0)+,(offset,a1)
+	.set	offset,offset-NB_BYTES_PER_ROW
+	.endr
+	lea		(SCREEN_PLANE_SIZE,a1),a1
     dbf		d3,5b
 6:
 	rts
 8:
-	clr.b	(a1)
-	clr.b	(NB_BYTES_PER_ROW,a1)
-	clr.b	(NB_BYTES_PER_ROW*2,a1)
-	clr.b	(NB_BYTES_PER_ROW*3,a1)
-	clr.b	(NB_BYTES_PER_ROW*4,a1)
-	clr.b	(NB_BYTES_PER_ROW*5,a1)
-	clr.b	(NB_BYTES_PER_ROW*6,a1)
-	clr.b	(NB_BYTES_PER_ROW*7,a1)
-    lea   (SCREEN_PLANE_SIZE,a1),a1
+	.set	offset,0
+	.rept	8
+	clr.b	(offset,a1)
+ 	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
+   lea   (SCREEN_PLANE_SIZE,a1),a1
     dbf d3,8b
 9:
 	rts
@@ -652,6 +653,7 @@ update_fg_tile:
 	lea		_fg_tile,a0
 	and.w	#0xFF,d1
 	* handle special case of orange color hiscore
+	* (probably not going to handle that after all...)
 	cmp.w	#17,d1		| "H" tile
 	bne.b	0f
 	cmp.w	#0x504,d0	| HISCORE pos
@@ -818,6 +820,8 @@ osd_update_32_sprite_hw:
 	* suboptimal but works ATM
 	UPDATE_BG_TILE_OFFSET	1,0
 	UPDATE_BG_TILE_OFFSET	1,1
+	UPDATE_BG_TILE_OFFSET	2,0
+	UPDATE_BG_TILE_OFFSET	2,1
 	UPDATE_BG_TILE_OFFSET	1,-1
 	UPDATE_BG_TILE_OFFSET	-1,-1
 	UPDATE_BG_TILE_OFFSET	-1,0
@@ -890,13 +894,13 @@ osd_update_32_sprite_hw:
 	add.l	d0,a0		| row offset
 	add.w	d1,a0		| col offset
 	move.w	(a0),d1
+	bne.b	7f
 	* sprite is not known with that CLUT configuration: blue flash
 	move.w	#0,bplcon3+_custom
 	move.w	#0xF,color+_custom
 	bra.b	2f
 7:
 	move.l	(a3,d1.w),a0	| get pointer on data
-	move.l	(a0),a0	| sprite data
 	move.w	(6,a4),d0
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
@@ -1020,7 +1024,7 @@ osd_no_yel:
 * trashes: D0-D1
 
 blit_16x16_bob:
-	movem.l	d2-d4/a0-a2,-(a7)
+	movem.l	d2-d4/a0-a3,-(a7)
 	lea		screen_data,a1
 	moveq	#NB_PLANES-1,d3
 	lea		(64*NB_PLANES,a0),a3		| mask
@@ -1031,7 +1035,7 @@ blit_16x16_bob:
 	lea		(SCREEN_PLANE_SIZE,a1),a1
 	lea		(64,a0),a0  | next plane
 	dbf		d3,1b
-	movem.l	(a7)+,d2-d4/a0-a2
+	movem.l	(a7)+,d2-d4/a0-a3
 	rts
 	
 * what: blits 16x16 data on one plane, cookie cut

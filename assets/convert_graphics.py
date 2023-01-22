@@ -17,6 +17,25 @@ block_dict = {}
 
 winuae_dir = r"C:\Users\Public\Documents\Amiga Files\WinUAE"
 
+def load_names(json_file):
+    rval = {}
+    try:
+        with open(json_file) as f:
+            d = json.load(f)
+
+        for k,v in d.items():
+            if k.isdigit():
+                rng = [int(k)]
+            else:
+                start,end = map(int,k.split("-"))
+                rng = range(start,end+1)
+            for k in rng:
+                rval[k] = v
+
+    except OSError:
+        pass
+    return rval
+
 def load_binary_tile_file(infile):
     contents = b""
     if os.path.exists(infile):
@@ -168,6 +187,7 @@ with open("xevious_gfx.c") as f:
 
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
 
+sprite_names = load_names("sprite_names.json")
 
 bg_tile_clut = block_dict["bg_tile_clut"]["data"]
 sprite_tile_clut = block_dict["sprite_clut"]["data"]
@@ -211,7 +231,7 @@ def write_tiles(t,matrix,f,datachip):
     # 1) one table with word offsets to save memory, pointing on pointers
     # 2) one table of pointers that point on actual data
     #
-    for i,item in enumerate(pic_list):
+    for i,_ in enumerate(pic_list):
         picname = "{}_pic_{:03d}".format(t,i)
         f.write("{0}:\n\tdc.l\t{0}_bytes\n".format(picname))
     if datachip:
@@ -332,7 +352,7 @@ if dump_graphics:
                 row[clut_index*2] = d["standard"]
                 row[clut_index*2+1] = d["mirror"]
                 if dump_pngs:
-                    ImageOps.scale(d["png"],5,0).save("dumps/sprite_img_{:02}_{}.png".format(tile_index,clut_index))
+                    ImageOps.scale(d["png"],5,0).save("dumps/sprite_{}_{:02}_{}.png".format(sprite_names.get(tile_index,"img"),tile_index,clut_index))
 
 
 

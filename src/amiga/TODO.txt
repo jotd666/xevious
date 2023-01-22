@@ -1,7 +1,7 @@
-blit ascending for flipped sprites to code
 scrolling
 rip sounds
-missing enemy sprites
-buggy bg tiles
-completely broke sprite engine!
+buggy bg tiles: mirror/flip works, but scrolling tilemap seems broken
+sprite shadow management
+ascending blit for vertically flipped sprites to code
+sprite attributes to code
 
