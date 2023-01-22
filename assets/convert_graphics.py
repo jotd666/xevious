@@ -196,6 +196,16 @@ sprite_tile_clut = block_dict["sprite_clut"]["data"]
 dump_graphics = True
 dump_pngs = True
 
+def mkdir(d):
+    if not os.path.exists(d):
+        os.mkdir(d)
+
+if dump_pngs:
+    dump_root = "dumps"
+    mkdir(dump_root)
+    for d in ["bg","fg","sprite"]:
+        mkdir(os.path.join(dump_root,d))
+
 def write_tiles(t,matrix,f,datachip):
     # background tiles/sprites: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
 
@@ -291,7 +301,7 @@ if dump_graphics:
         raw_blocks[table].append(d["standard"])
         raw_blocks[table].append(d["mirror"])
         if dump_pngs:
-            ImageOps.scale(d["png"],5,0).save("dumps/fg_img_{:02}.png".format(i))
+            ImageOps.scale(d["png"],5,0).save("dumps/fg/img_{:02}.png".format(i))
 
     # background data: requires to generate as many copies of each tile that there are used CLUTs on that tile
     # the only way to know which CLUTs are used is to run the game and log them... We can't generate all pics, that
@@ -323,7 +333,7 @@ if dump_graphics:
                 row[clut_index*2] = d["standard"]
                 row[clut_index*2+1] = d["mirror"]
                 if dump_pngs:
-                    ImageOps.scale(d["png"],5,0).save("dumps/bg_img_{:02}_{}.png".format(tile_index,clut_index))
+                    ImageOps.scale(d["png"],5,0).save("dumps/bg/img_{:02}_{}.png".format(tile_index,clut_index))
 
 
     table = "sprite"
@@ -352,7 +362,7 @@ if dump_graphics:
                 row[clut_index*2] = d["standard"]
                 row[clut_index*2+1] = d["mirror"]
                 if dump_pngs:
-                    ImageOps.scale(d["png"],5,0).save("dumps/sprite_{}_{:02}_{}.png".format(sprite_names.get(tile_index,"img"),tile_index,clut_index))
+                    ImageOps.scale(d["png"],5,0).save("dumps/sprite/{}_{:02}_{}.png".format(sprite_names.get(tile_index,"img"),tile_index,clut_index))
 
 
 
