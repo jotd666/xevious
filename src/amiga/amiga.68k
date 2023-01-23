@@ -512,7 +512,7 @@ osd_w_bg_videoram:
 	movem.l	d0-d5/a0-a2,-(a7)
 	lea		_bg_color_data,a1
 	lea		_bg_char_data,a2
-	* dump both tables (color+char): S <address@0x110> $1000
+	* dump both tables (color+char): S bg_data <address@0x110> $1000
 	move.l	a1,0x110		| temp
 	
 	move.b	d1,(a2,d0.w)	| update logical grid

@@ -294,6 +294,7 @@ if dump_graphics:
     current_palette = [(0,0,0),(96, 96, 96)]
 
     side = 8
+    scale = 4
     pics = fg_data["data"]
     raw_blocks[table] = []
     for i,pic in enumerate(pics):
@@ -301,7 +302,7 @@ if dump_graphics:
         raw_blocks[table].append(d["standard"])
         raw_blocks[table].append(d["mirror"])
         if dump_pngs:
-            ImageOps.scale(d["png"],5,0).save("dumps/fg/img_{:02}.png".format(i))
+            ImageOps.scale(d["png"],scale,0).save("dumps/fg/img_{:02}.png".format(i))
 
     # background data: requires to generate as many copies of each tile that there are used CLUTs on that tile
     # the only way to know which CLUTs are used is to run the game and log them... We can't generate all pics, that
@@ -333,7 +334,7 @@ if dump_graphics:
                 row[clut_index*2] = d["standard"]
                 row[clut_index*2+1] = d["mirror"]
                 if dump_pngs:
-                    ImageOps.scale(d["png"],5,0).save("dumps/bg/img_{:02}_{}.png".format(tile_index,clut_index))
+                    ImageOps.scale(d["png"],scale,0).save("dumps/bg/img_{:02}_{}.png".format(tile_index,clut_index))
 
 
     table = "sprite"

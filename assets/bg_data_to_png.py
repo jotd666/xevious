@@ -18,34 +18,45 @@ block_dict = {}
 winuae_dir = r"C:\Users\Public\Documents\Amiga Files\WinUAE"
 
 dump_dir = "dumps/bg"
-bg_data = os.path.join(winuae_dir,"bg_data")
 
-with open(bg_data,"rb") as f:
-    color_data = f.read(0x800)
-    tile_data = f.read(0x800)
+def dump_png(bg_data):
+    with open(bg_data,"rb") as f:
+        color_data = f.read(0x800)
+        tile_data = f.read(0x800)
 
-row = 0
-col = 0
+    row = 0
+    col = 0
+    scale = 4
 
-outimg = Image.new("RGB",(32*8,64*8))
+    outimg = Image.new("RGB",(32*8*scale,64*8*scale))
 
-for idx,tile_index in zip(color_data,tile_data):
-    # rework
-    clut_index = 0
-    if tile_index & 0x80:
-        clut_index = 1<<4
-    clut_index |= (idx>>2) & 0xF
-    clut_index |= (idx&0x3) << 5
-    img = "img_{:02d}_{}.png".format(tile_index,clut_index)
-    img = os.path.join(dump_dir,img)
+    for idx,tile_index in zip(color_data,tile_data):
+        # rework
+        clut_index = 0
+        if idx & 1:
+            tile_index += 0x100
+        if tile_index & 0x80:
+            clut_index = 1<<4
+        clut_index |= ((idx & 0x3F)>>2)
+        clut_index |= (idx&0x3) << 5
+        img = "img_{:02d}_{}.png".format(tile_index,clut_index)
+        img = os.path.join(dump_dir,img)
 
-    if os.path.exists(img):
+        if os.path.exists(img):
 
-        pixels = Image.open(img)
-        outimg.paste(pixels,(row*8,col*8))
-    col += 1
-    if col == 32:
-        col = 0
-        row += 1
+            pixels = Image.open(img)
+            if idx & 0x80:
+                pixels = ImageOps.flip(pixels)
+            if idx & 0x40:
+                pixels = ImageOps.mirror(pixels)
+            outimg.paste(pixels,((32-row)*8*scale,col*8*scale))
+        col += 1
+        if col == 64:
+            col = 0
+            row += 1
 
-outimg.save("dumps/bgmap.png")
+    outimg.save(os.path.join("dumps","{}.png".format(os.path.basename(bg_data))))
+
+dump_png("bg_data_scroll")
+dump_png("bg_data_title")
+
