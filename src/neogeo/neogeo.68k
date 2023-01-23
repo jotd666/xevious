@@ -825,17 +825,21 @@ osd_update_sprite_shadow:
 update_sprite_shadow: | $0332
     move.b    (_STATE,a5),d0                    | state
     subq.b    #1,d0                             | =1 (inactive)?
-    bne.b     0f                                | no, skip
-    adda.w    #2*4*2,a1
+    beq.b     0f                                | yes, skip
+    addq.b    #1,d0                             | restore state
+    bne.b     1f                                | NZ (not going inactive)? no, continue
+    * deactivate
+    clr.w     (_X,a5)                           | spriteX=0
+    clr.w     (_Y,a5)                           | spriteY=0
+    move.b    #1,(_STATE,a5)                    | state=1 (inactive)
+    clr.w     (0,a3)
+    clr.w     (2,a3)
+0:  adda.w    #2*4*2,a1
     adda.w    #2,a2
     adda.w    #2*2,a3
     adda.w    #2*2,a4
     rts
-0:  addq.b    #1,d0                             | restore state
-    bne.b     1f                                | NZ (not going inactive)? yes, skip
-    clr.w     (_X,a5)                           | spriteX=0
-    clr.w     (_Y,a5)                           | spriteY=0
-    move.b    #1,(_STATE,a5)                    | state=1 (inactive)
+
     ** SCB1
 1:  moveq     #0,d0
     move.b    (_ATTR,a5),d0                     | bank,xflip,yflip,size
@@ -888,21 +892,18 @@ update_sprite_shadow: | $0332
     lsr.w     #5,d0                             | back to original
     move.b    d0,(a2)+                          | store Y[7:0] for hit-box calcs
     btst      #8,d0
-    beq.      3f
+    beq.b     3f
     and.w     #0xff00,d0                        | max=256
 3:  add.w     #0x110,d0
     lsl.w     #7,d0
-    cmp.b     #1,(_STATE,a5)                    | state=1 (inactive?)
-    beq.b     4f                                | yes, skip (size=0)
     ori.w     #1,d0                             | size=1 (default)
     btst.b    #1,(_ATTR,a5)                     | double height?
     beq.b     4f                                | no, skip
     addq.w    #1,d0                             | size=2
 4:  move.w    d0,(a3)+                          | SCB3 YPOS
-    move.b    (_ATTR,a5),d1
-    and.w     #1,d1                             | double width only
-    lsl.w     #6,d1                             | move to sticky bit
-    or.w      d1,d0
+    move.b    (_ATTR,a5),d0
+    and.w     #1,d0                             | double width only
+    lsl.w     #6,d0                             | move to sticky bit
     move.w    d0,(a3)+
     ** SCB4
     move.w    (_X,a5),d0                        | spriteX
