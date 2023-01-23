@@ -307,6 +307,9 @@ main_fn_0__main_thread: | $049B
     
 main_thread_main_loop: | $04BB
     clr.b     (is_real_game)
+    .ifne OPT_SKIP_TITLE
+    bra       coined_up
+    .endif
     tst.b     (num_credits)
     bne       coined_up
     move.w    #2,(attract_mode_stage)
@@ -343,7 +346,9 @@ coined_up:
     jsr       display_credits   
     jsr       display_1_only_or_1_2_players
     tst.b     (start_pressed)
+    .ifeq OPT_SKIP_TITLE
     beq       9f
+    .endif
     move.b    #1,(is_real_game)
     clr.b     (curr_player)
     clr.b     (start_pressed)
