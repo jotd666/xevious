@@ -576,7 +576,7 @@ update_bg_tile:
 	lsl.l	#8,d1
 	add.l	d1,d1
 	
-	btst	#6,d2			| X-flip?
+	btst	#7,d2			| X-flip?
 	beq.b	3f
 	addq.w	#2,d3			| mirror version
 3:
@@ -613,7 +613,7 @@ update_bg_tile:
 	move.l	(a0),a0			 | tile data
 	
 	* draw
-	btst	#7,d2    | Y-flip
+	btst	#6,d2    | Y-flip
 	bne.b	5f
 4:
 	.set	offset,0

@@ -1,6 +1,5 @@
 scrolling
 rip sounds
-buggy bg tiles: mirror/flip works, but scrolling tilemap seems broken
 sprite shadow management
 ascending blit for vertically flipped sprites to code
 sprite attributes to code
