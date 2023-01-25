@@ -45,9 +45,9 @@ def dump_png(bg_data):
         if os.path.exists(img):
 
             pixels = Image.open(img)
-            if idx & 0x80:
-                pixels = ImageOps.flip(pixels)
             if idx & 0x40:
+                pixels = ImageOps.flip(pixels)
+            if idx & 0x80:
                 pixels = ImageOps.mirror(pixels)
             outimg.paste(pixels,((32-row)*8*scale,col*8*scale))
         col += 1
