@@ -1034,7 +1034,7 @@ blit_16x16_bob:
 	moveq	#-1,d2
 1:
 	move.l	a1,a2
-	bsr.b	blit_plane_cookie_cut
+	bsr.b	blit_plane_cookie_cut_16x16
 	lea		(SCREEN_PLANE_SIZE,a1),a1
 	lea		(64,a0),a0  | next plane
 	dbf		d3,1b
@@ -1052,12 +1052,33 @@ blit_16x16_bob:
 * < D2: blit mask
 * trashes: D0-D1
 
-blit_plane_cookie_cut:
+blit_plane_cookie_cut_16x16:
     movem.l d2-d7/a1-a5,-(a7)
     lea _custom,A5
 	move.l d2,d3		|masking of first/last word    
     move.w  #4,d2       | 16 pixels + 2 shift bytes
     move.w  #16,d4      | 16 pixels height   
+    bsr blit_plane_any_internal_cookie_cut
+    movem.l (a7)+,d2-d7/a1-a5
+    rts
+
+* what: blits 16x16 data on one plane, cookie cut, flip
+* args:
+* < A0: data (16x16)
+* < A1: plane  (40 rows)
+* < A2: background (40 rows) to mix with cookie cut
+* < A3: source mask for cookie cut (16x16)
+* < D0: X
+* < D1: Y
+* < D2: blit mask
+* trashes: D0-D1
+
+blit_plane_cookie_cut_16x16_flipped:
+    movem.l d2-d7/a1-a5,-(a7)
+    lea _custom,A5
+	move.l d2,d3		|masking of first/last word    
+    move.w  #4,d2       | 16 pixels + 2 shift bytes
+    move.w  #-16,d4      | 16 pixels height
     bsr blit_plane_any_internal_cookie_cut
     movem.l (a7)+,d2-d7/a1-a5
     rts
@@ -1070,7 +1091,7 @@ blit_plane_cookie_cut:
 * < A3: source mask for cookie cut
 * < D2: width in bytes (inc. 2 extra for shifting)
 * < D3: blit mask
-* < D4: height
+* < D4: height. If negative, source is copied with negative modulo (flip)*       
 * blit mask set
 * returns: start of destination in A1 (computed from old A1+X,Y)
 * trashes: a1
@@ -1079,6 +1100,11 @@ blit_plane_any_internal_cookie_cut:
     movem.l d0-d6/a2/a4,-(a7)
     * pre-compute the maximum of shit here
     lea		mulNB_BYTES_PER_ROW_table,a4
+	tst.w	d4
+	bpl.b	1f
+	sub.w	d4,d1	| pre-add height to d1
+	subq.w	#1,d1	| minus one
+1:	
     swap    d1
     clr.w   d1
     swap    d1
@@ -1119,9 +1145,13 @@ blit_plane_any_internal_cookie_cut:
     add.w   d6,a2       | X offset for background
 
 	move.w	#NB_BYTES_PER_ROW,d0
+	tst.w	d4
+	bpl.b	1f
+	neg.w	d0
+	neg.w	d4    | make d4 positive again
+1:
 
     sub.w   d2,d0       | blit width
-
     lsl.w   #6,d4
     lsr.w   #1,d2
     add.w   d2,d4       | blit height
@@ -1143,8 +1173,8 @@ blit_plane_any_internal_cookie_cut:
 							
 	move.l a3,bltapt(a5)	|source graphic top left corner (mask)
 	move.l a0,bltbpt(a5)	|source graphic top left corner
-	move.l a2,bltcpt(a5)	|pristine background
-	move.l a1,bltdpt(a5)	|destination top left corner
+	move.l a2,bltcpt(a5)	|pristine background top (bottom) left corner
+	move.l a1,bltdpt(a5)	|destination top (bottom) left corner
 	move.w  d4,bltsize(a5)	|rectangle size, starts blit
     
     movem.l (a7)+,d0-d6/a2/a4

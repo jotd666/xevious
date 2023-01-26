@@ -1,6 +1,13 @@
 scrolling
 rip sounds
 sprite shadow management
-ascending blit for vertically flipped sprites to code
 sprite attributes to code
+controls
 
+Just a thought, are you display the correct section of the map based on
+the hardware scroll register?
+
+The *bottom* row on the screen is (24-(scroll_register>>3))&63.
+
+So in theory the top row visible (Neo Geo references the bottom only) is
+something like (60-(scroll_register>>3))&63???
