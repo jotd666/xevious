@@ -387,11 +387,13 @@ platform_init:
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
     move.w #0x0210,bplcon0(a5)  | 8 bitplanes
+    move.w #3,fmode(a5)  		| 8 bitplanes
 	
     clr.w bplcon1(a5) 
-    clr.w bplcon2(a5)                     
-    move.w #0,bpl1mod(a5) 
-    move.w #0,bpl2mod(a5)
+    clr.w bplcon2(a5)
+	move.w	#-8,d0
+    move.w d0,bpl1mod(a5) 
+    move.w d0,bpl2mod(a5)
 
 	bsr		set_bitplanes
 
@@ -734,6 +736,7 @@ update_fg_tile:
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
 	move.w	d6,scroll_offset
+	move.w	d6,0x200	| temp
 	* add to planes offset & change copperlist
 	bra		set_bitplanes
 
