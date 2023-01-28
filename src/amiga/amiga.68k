@@ -950,7 +950,7 @@ osd_update_32_sprite_hw:
 	
 	bra.b	2f
 7:
-	move.l	(a3,d1.w),a0	| get pointer on data
+	lea	(a3,d1.w),a0	| get pointer on data
 	move.w	(6,a4),d0
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
@@ -976,11 +976,6 @@ osd_update_32_sprite_hw:
 1:
 	move.w	(a7)+,d5
 	
-	btst	#6,d2			| Y-flip?
-	beq.b	8f
-	bsr	blit_16x16_bob_flipped
-	bra.b	2f
-8:
 	bsr	blit_16x16_bob
 2:
 	lea		(8,a4),a4		| next sprite
@@ -1145,49 +1140,31 @@ osd_no_yel:
 * < A0: data (16x16X(7+1))
 * < D0: X
 * < D1: Y
+* < D2: bit 6: 0: direct, 1: flip
 * trashes: D0-D1
 
 blit_16x16_bob:
-	movem.l	d2-d4/a0-a3,-(a7)
+	movem.l	d2-d4/a0-a5,-(a7)
 	lea		screen_data,a1
+	lea		blit_plane_cookie_cut_16x16(pc),a5
+	btst	#6,d2
+	beq.b	0f
+	lea		blit_plane_cookie_cut_16x16_flipped(pc),a5	
+0:
 	moveq	#NB_PLAYFIELD_PLANES-1,d3
-	lea		(64*NB_PLAYFIELD_PLANES,a0),a3		| mask
 	moveq	#-1,d2
+	move.l	a0,a4		| pointers on planes
+	move.l	(NB_PLAYFIELD_PLANES*4,a4),a3		| mask is the last plane
 1:
+	move.l	(a4)+,a0     | next plane
 	* blit each plane on both halves of the screen (scrolling)
 	.rept	2
 	move.l	a1,a2
-	bsr.b	blit_plane_cookie_cut_16x16
+	jsr		(a5)
 	lea		(SCREEN_PLANE_SIZE/2,a1),a1
 	.endr
-	lea		(64,a0),a0  | next plane
 	dbf		d3,1b
-	movem.l	(a7)+,d2-d4/a0-a3
-	rts
-	
-* what: blits 16x16 data on bg planes, cookie cut
-* args:
-* < A0: data (16x16X(7+1))
-* < D0: X
-* < D1: Y
-* trashes: D0-D1
-
-blit_16x16_bob_flipped:
-	movem.l	d2-d4/a0-a3,-(a7)
-	lea		screen_data,a1
-	moveq	#NB_PLAYFIELD_PLANES-1,d3
-	lea		(64*NB_PLAYFIELD_PLANES,a0),a3		| mask
-	moveq	#-1,d2
-1:
-	* blit each plane on both halves of the screen (scrolling)
-	.rept	2
-	move.l	a1,a2
-	bsr.b	blit_plane_cookie_cut_16x16_flipped
-	lea		(SCREEN_PLANE_SIZE/2,a1),a1
-	.endr
-	lea		(64,a0),a0  | next plane
-	dbf		d3,1b
-	movem.l	(a7)+,d2-d4/a0-a3
+	movem.l	(a7)+,d2-d4/a0-a5
 	rts
 	
 * what: blits 16x16 data on one plane, cookie cut

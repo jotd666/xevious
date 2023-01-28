@@ -208,13 +208,16 @@ if dump_pngs:
     for d in ["bg","fg","sprite"]:
         mkdir(os.path.join(dump_root,d))
 
-def write_tiles(t,matrix,f,is_sprite,compress_blank_planes):
+def write_tiles(t,matrix,f,is_bob):
     # background tiles/sprites: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
 
     f.write("\t.global\t{0}_picbase\n\t.global\t_{0}_tile\n_{0}_tile:".format(t))
 
     c = 0
     pic_list = []
+
+    bob_plane_cache = {}
+    bob_plane_id = 0
 
     for i,row in enumerate(matrix):
         f.write("\n* row {}".format(i))
@@ -243,33 +246,50 @@ def write_tiles(t,matrix,f,is_sprite,compress_blank_planes):
     # 1) one table with word offsets to save memory, pointing on pointers
     # 2) one table of pointers that point on actual data
     #
-    for i,_ in enumerate(pic_list):
-        picname = "{}_pic_{:03d}".format(t,i)
-        f.write("{0}:\n\tdc.l\t{0}_bytes\n".format(picname))
-    if is_sprite:
+
+    if is_bob:
+        for i,item in enumerate(pic_list):
+            f.write("{}_pic_{:03d}:\n".format(t,i))
+            # we know that a lot of images are similar:
+            # the palettes are different so the bitplanes are identical
+            # only in a different order. Also, there's a lot of only-zero
+            # planes as only 8 colors are used
+            # so the picture (including mask) is a list of pointers on planes
+            # plane data (32 bytes) are only listed once, and used a lot of times
+            for p in range(BG_NB_PLANES+1):  # +1: mask
+                block = tuple(item[p*64:p*64+64])
+                block_id = bob_plane_cache.get(block)
+                if block_id is None:
+                    # block is not in cache
+                    block_id = bob_plane_id
+                    bob_plane_cache[block] = block_id
+                    bob_plane_id += 1
+                f.write("\tdc.l\tplane_pic_{}\n".format(block_id))
         f.write("\t.datachip\n")
-    for i,item in enumerate(pic_list):
-        f.write("{}_pic_{:03d}_bytes:".format(t,i))
-        if compress_blank_planes:
-            # we have to rework data
-            if is_sprite:
-                # not supported
-                pass
-            else:
-                # bg tile
-                item_pack = []
+        for k,v in sorted(bob_plane_cache.items(),key=lambda x:x[1]):
+            f.write("plane_pic_{}:".format(v))
+            dump_asm_bytes(k,f)
+    else:
+        for i,_ in enumerate(pic_list):
+            picname = "{}_pic_{:03d}".format(t,i)
+            f.write("{0}:\n\tdc.l\t{0}_bytes\n".format(picname))
+        for i,item in enumerate(pic_list):
+            f.write("{}_pic_{:03d}_bytes:".format(t,i))
+            # bg tile
+            item_pack = []
+            # "compress" tile: detect all-zero plane and remove it
+            # so if 0, clear plane, if nonzero (0xca), consider the 8 following bytes
+            for p in range(BG_NB_PLANES):
+                block = item[p*8:p*8+8]
+                if any(block):
+                    # non-zero somewhere
+                    item_pack.append(0xca)   # 8 next bytes are useful
+                    item_pack.extend(block)
+                else:
+                    item_pack.append(0)      # clear tile plane
+            item = item_pack
 
-                for p in range(BG_NB_PLANES):
-                    block = item[p*8:p*8+8]
-                    if any(block):
-                        # non-zero somewhere
-                        item_pack.append(0xca)
-                        item_pack.extend(block)
-                    else:
-                        item_pack.append(0)
-                item = item_pack
-
-        dump_asm_bytes(item,f)
+            dump_asm_bytes(item,f)
 
 def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
     input_image = Image.new("RGB",(side,side))
@@ -412,8 +432,8 @@ if dump_graphics:
         f.write("\n")
 
 
-        write_tiles("bg",bg_matrix,f,is_sprite=False,compress_blank_planes=True)
+        write_tiles("bg",bg_matrix,f,is_bob=False)
 
         # sprites are blitted, so require chipmem
 
-        write_tiles("sprite",sprite_matrix,f,is_sprite=True,compress_blank_planes=False)
+        write_tiles("sprite",sprite_matrix,f,is_bob=True)

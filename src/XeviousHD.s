@@ -3,7 +3,7 @@
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 
-EXPSIZE = $200000
+EXPSIZE = $100000
 
 _base	SLAVE_HEADER					; ws_security + ws_id
 	dc.w	17					; ws_version (was 10)
