@@ -853,8 +853,9 @@ update_sprite_shadow: | $0332
     ori.w     #XS_PAL_BASE,d1
     lsl.w     #8,d1                             | 15:8=colour
     move.b    d5,d1                             | 7:0=ATTR
-    and.b     #0x0c,d1                          | xflip,yflip only
+    and.b     #0x0c,d1                          | yflip,xflip only
     lsr.b     #2,d1                             | d1.w=colour
+    move.b    d1,d4                             | d4.b[1:0]=yflip,xflip
     * handle sizes now...
     move.w    d5,d2                             | ATTR
     and.w     #3,d2                             | size only
@@ -872,17 +873,20 @@ update_sprite_shadow: | $0332
     * size=0x01 (2x1) - not used?
     bra.b     0f    
 3:  * size=0x02 (1x2)
+    * only used for Bacura, and never Y-flipped
     move.w    d0,(4,a1)                         | SCB1 code (sprite0,tile1)
     addq.w    #2,d0                             | code+2
     move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile0)
     bra.b     2f    
 4:  * size=0x03 (2x2)
+    * cab be X/Y flipped
+    eor.b     d4,d0                             | adjust starting code for flip
     move.w    d0,(12,a1)                        | SCB1 code (sprite1,tile1)
-    addq.w    #2,d0                             | code+2
-    move.w    d0,(8,a1)                         | SCB1 code (sprite1,tile0)
-    subq.w    #1,d0                             | code+1
+    eor.b     #1,d0
     move.w    d0,(4,a1)                         | SCB1 code (sprite0,tile1)
-    addq.w    #2,d0                             | code+3
+    eor.b     #3,d0
+    move.w    d0,(8,a1)                         | SCB1 code (sprite1,tile0)
+    eor.b     #1,d0
     move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile0)
 0:  move.w    d1,(14,a1)                        | SCB1 colour (sprite1,tile1)
     move.w    d1,(10,a1)                        | SCB1 colour (sprite1,tile0)
