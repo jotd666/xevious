@@ -832,8 +832,8 @@ update_sprite_shadow: | $0332
     clr.w     (_X,a5)                           | spriteX=0
     clr.w     (_Y,a5)                           | spriteY=0
     move.b    #1,(_STATE,a5)                    | state=1 (inactive)
-    clr.w     (0,a3)
-    clr.w     (2,a3)
+    clr.w     (0,a3)                            | sprite0 size=0 (deactivate)
+    clr.w     (2,a3)                            | sprite1 size=0 (deactivate)
 0:  adda.w    #2*4*2,a1
     adda.w    #2,a2
     adda.w    #2*2,a3
@@ -841,52 +841,54 @@ update_sprite_shadow: | $0332
     rts
 
     ** SCB1
-1:  moveq     #0,d0
-    move.b    (_ATTR,a5),d0                     | bank,xflip,yflip,size
-    move.b    d0,d3                             | save
+1:  moveq     #0,d5
+    move.b    (_ATTR,a5),d5                     | bank,xflip,yflip,size
+    move.w    d5,d0                             | save
     and.w     #(1<<7),d0                        | bank only
     lsl.w     #1,d0                             | :8=bank
     move.b    (_CODE,a5),d0                     | 7:0=code
-    ori.w     #XS_TILE_BASE,d0                  | d0=code
+    ori.w     #XS_TILE_BASE,d0                  | d0.w=code
     moveq     #0,d1           
     move.b    (_COLOUR,a5),d1                   | colour
     ori.w     #XS_PAL_BASE,d1
     lsl.w     #8,d1                             | 15:8=colour
-    move.b    (_ATTR,a5),d2                     | bank,xflip,yflip,size
-    and.b     #0x0c,d2                          | xflip,yflip only
-    lsr.b     #2,d2
-    or.b      d2,d1                             | d1=colour
-    and.b     #3,d3                             | size only
-    cmp.b     #0,d3                             | size=1x1?
-    bne.b     2f                                | no, go
-    * 1x1
+    move.b    d5,d1                             | 7:0=ATTR
+    and.b     #0x0c,d1                          | xflip,yflip only
+    lsr.b     #2,d1                             | d1.w=colour
+    * handle sizes now...
+    move.w    d5,d2                             | ATTR
+    and.w     #3,d2                             | size only
+    not.w     d2
+    and.w     d2,d0                             | adjust code
+    btst.b    #0,d5
+    bne.b     2f                                | size=0x01/0x03
+    btst.b    #1,d5
+    bne.b     3f                                | size=0x02
+    * size=0x00 (1x1)
     move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile0)
-    move.w    d1,(2,a1)                         | SCB1 colour (sprite0,tile0)
-    bra       0f    
-2:  cmp.b     #2,d3                             | size=1x2?
-    bne.b     6f                                | no, go
-    * 1x2
-    and.b     #~2,d0                            | code
-    move.w    d0,(4,a1)                         | SCB1 code (sprite0,tile0)
-    move.w    d1,(6,a1)                         | SCB1 colour (sprite0,tile0)
+    bra.b     1f    
+2:  btst.b    #1,d5
+    bne.b     4f                                | size=0x03
+    * size=0x01 (2x1) - not used?
+    bra.b     0f    
+3:  * size=0x02 (1x2)
+    move.w    d0,(4,a1)                         | SCB1 code (sprite0,tile1)
     addq.w    #2,d0                             | code+2
-    move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile1)
-    move.w    d1,(2,a1)                         | SCB1 colour (sprite0,tile1)
-    bra.b     0f  
-    * 2x2
-6:  and.b     #~3,d0                            | code
-    move.w    d0,(12,a1)                        | SCB1 code (sprite0,tile0)
-    move.w    d1,(14,a1)                        | SCB1 colour (sprite0,tile0)
+    move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile0)
+    bra.b     2f    
+4:  * size=0x03 (2x2)
+    move.w    d0,(12,a1)                        | SCB1 code (sprite1,tile1)
     addq.w    #2,d0                             | code+2
-    move.w    d0,(8,a1)                         | SCB1 code (sprite0,tile1)
-    move.w    d1,(10,a1)                        | SCB1 colour (sprite0,tile1)
+    move.w    d0,(8,a1)                         | SCB1 code (sprite1,tile0)
     subq.w    #1,d0                             | code+1
-    move.w    d0,(4,a1)                         | SCB1 code (sprite1,tile0)
-    move.w    d1,(6,a1)                         | SCB1 colour (sprite1,tile0)
+    move.w    d0,(4,a1)                         | SCB1 code (sprite0,tile1)
     addq.w    #2,d0                             | code+3
-    move.w    d0,(0,a1)                         | SCB1 code (sprite1,tile1)
-    move.w    d1,(2,a1)                         | SCB1 colour (sprite1,tile1)
-0:  adda.l    #2*8,a1
+    move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile0)
+0:  move.w    d1,(14,a1)                        | SCB1 colour (sprite1,tile1)
+    move.w    d1,(10,a1)                        | SCB1 colour (sprite1,tile0)
+2:  move.w    d1,(6,a1)                         | SCB1 colour (sprite0,tile1)
+1:  move.w    d1,(2,a1)                         | SCB1 colour (sprite0,tile0)
+    adda.l    #2*8,a1
     ** SCB3
     move.w    (_Y,a5),d0                        | spriteY
     lsr.w     #5,d0                             | back to original
@@ -894,16 +896,16 @@ update_sprite_shadow: | $0332
     btst      #8,d0
     beq.b     3f
     and.w     #0xff00,d0                        | max=256
-3:  add.w     #0x110,d0
+3:  add.w     #0x110,d0                         | Neo Geo coordinate mapping
     lsl.w     #7,d0
     ori.w     #1,d0                             | size=1 (default)
-    btst.b    #1,(_ATTR,a5)                     | double height?
+    btst.b    #1,d5                             | double height?
     beq.b     4f                                | no, skip
     addq.w    #1,d0                             | size=2
 4:  move.w    d0,(a3)+                          | SCB3 YPOS
-    move.b    (_ATTR,a5),d0
+    move.b    d5,d0                             | ATTR
     and.w     #1,d0                             | double width only
-    lsl.w     #6,d0                             | move to sticky bit
+    ror.b     #2,d0                             | move to sticky bit (size=0)
     move.w    d0,(a3)+
     ** SCB4
     move.w    (_X,a5),d0                        | spriteX
@@ -915,8 +917,8 @@ update_sprite_shadow: | $0332
     bcs.b     5f
     clr.w     d0
 5:  move.w    #319,d1
-    sub.w     d0,d1
-    btst.b    #0,(_ATTR,a5)                     | double width?
+    sub.w     d0,d1                             | Neo Geo coordinate mapping
+    btst.b    #0,d5                             | double width?
     beq.b     6f                                | no, skip
     sub.w     #16,d1                            | adjust
 6:  lsl.w     #7,d1
@@ -936,7 +938,7 @@ osd_update_32_sprite_hw:
 .endif    
     .ifeq OPT_DISABLE_SPRITES
     lea       VRAM_RW.l,a0
-    move.w    #1,2(a0)                          | VRAM_MOD=1
+    move.w    #1,(2,a0)                         | VRAM_MOD=1
     lsl.w     #1,d0                             | 2x Neo Geo sprites
     move.w    d0,d6                             | save base sprite (0/64)
     * SCB1 (code,colour,flip)
