@@ -6,6 +6,8 @@ import collections
 
 block_dict = {}
 
+BG_NB_PLANES = 7
+
 # where tile & sprite CLUT used configuration logs are fetch from
 # we cannot possibly generate all tile & sprite CLUT configurations
 # as that would generate gigabytes of graphics when only one or
@@ -206,7 +208,7 @@ if dump_pngs:
     for d in ["bg","fg","sprite"]:
         mkdir(os.path.join(dump_root,d))
 
-def write_tiles(t,matrix,f,datachip):
+def write_tiles(t,matrix,f,is_sprite,compress_blank_planes):
     # background tiles/sprites: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
 
     f.write("\t.global\t{0}_picbase\n\t.global\t_{0}_tile\n_{0}_tile:".format(t))
@@ -244,10 +246,29 @@ def write_tiles(t,matrix,f,datachip):
     for i,_ in enumerate(pic_list):
         picname = "{}_pic_{:03d}".format(t,i)
         f.write("{0}:\n\tdc.l\t{0}_bytes\n".format(picname))
-    if datachip:
+    if is_sprite:
         f.write("\t.datachip\n")
     for i,item in enumerate(pic_list):
         f.write("{}_pic_{:03d}_bytes:".format(t,i))
+        if compress_blank_planes:
+            # we have to rework data
+            if is_sprite:
+                # not supported
+                pass
+            else:
+                # bg tile
+                item_pack = []
+
+                for p in range(BG_NB_PLANES):
+                    block = item[p*8:p*8+8]
+                    if any(block):
+                        # non-zero somewhere
+                        item_pack.append(0xca)
+                        item_pack.extend(block)
+                    else:
+                        item_pack.append(0)
+                item = item_pack
+
         dump_asm_bytes(item,f)
 
 def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
@@ -330,7 +351,7 @@ if dump_graphics:
                 row[clut_index*2] = 0
                 row[clut_index*2+1] = 0
             else:
-                d = generate_tile(pic,side,current_palette,palette,nb_planes=7,is_sprite=False)
+                d = generate_tile(pic,side,current_palette,palette,nb_planes=BG_NB_PLANES,is_sprite=False)
                 row[clut_index*2] = d["standard"]
                 row[clut_index*2+1] = d["mirror"]
                 if dump_pngs:
@@ -391,8 +412,8 @@ if dump_graphics:
         f.write("\n")
 
 
-        write_tiles("bg",bg_matrix,f,False)
+        write_tiles("bg",bg_matrix,f,is_sprite=False,compress_blank_planes=True)
 
         # sprites are blitted, so require chipmem
 
-        write_tiles("sprite",sprite_matrix,f,True)
+        write_tiles("sprite",sprite_matrix,f,is_sprite=True,compress_blank_planes=False)

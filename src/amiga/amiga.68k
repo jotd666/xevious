@@ -384,7 +384,7 @@ platform_init:
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
     move.w #0x1C81,diwstrt(a5)
-    move.w #0x30D1,diwstop(a5)
+    move.w #0x38D1,diwstop(a5)
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
     move.w #0x0210,bplcon0(a5)  | 8 bitplanes
@@ -526,6 +526,15 @@ osd_w_bg_videoram:
     .endif | OPT_DISABLE_BG_LAYER
 	rts
 	
+.macro	CLEAR_TILE
+	.set	offset,0
+	.rept	8
+	clr.b	(offset,a1)
+	clr.b	(offset,a2)
+ 	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
+	.endm
+	
 * d0: offset
 * d1: tile code (0-256 but extends to 512 with bit 0 of attribute)
 * d2: attribute (0-255, color is in bits 0-5, X/Y flip in 6:7)
@@ -606,7 +615,7 @@ update_bg_tile:
 	move.w	(a0),a0
 	move.w	d0,d1
 	subq.w	#4,d1
-	bmi		6f
+	bmi		update_bg_tile_out
 	and.w	#0x3F,d1		| row
 	
 	* convert coords to address with proper shift vs foreground
@@ -620,11 +629,12 @@ update_bg_tile:
 
 	add.l	#bg_picbase,a0   | pointer on tile data
 	move.l	(a0),a0			 | tile data
-	
 	* draw
 	btst	#6,d2    | Y-flip
-	bne.b	5f
+	bne	5f
 4:
+	tst.b	(a0)+
+	beq	6f
 	.set	offset,0
 	.rept	8
 	move.b	(a0)+,d0
@@ -632,12 +642,19 @@ update_bg_tile:
 	move.b	d0,(offset,a2)
 	.set	offset,offset+NB_BYTES_PER_ROW
 	.endr
+1:
     lea   (SCREEN_PLANE_SIZE,a1),a1
     lea   (SCREEN_PLANE_SIZE,a2),a2
     dbf d3,4b
 	rts
+6:
+	CLEAR_TILE
+	bra.b	1b
 	
 5:   | y-flip
+	tst.b	(a0)+
+	beq.b	6f
+
 	.set	offset,NB_BYTES_PER_ROW*7
 	.rept	8
 	move.b	(a0)+,d0
@@ -645,18 +662,19 @@ update_bg_tile:
 	move.b	d0,(offset,a2)
 	.set	offset,offset-NB_BYTES_PER_ROW
 	.endr
+1:
 	lea		(SCREEN_PLANE_SIZE,a1),a1
 	lea		(SCREEN_PLANE_SIZE,a2),a2
     dbf		d3,5b
-6:
+update_bg_tile_out:
 	rts
-8:
-	.set	offset,0
-	.rept	8
-	clr.b	(offset,a1)
-	clr.b	(offset,a2)
- 	.set	offset,offset+NB_BYTES_PER_ROW
-	.endr
+
+6:
+	CLEAR_TILE
+	bra.b	1b
+
+8:	
+	CLEAR_TILE
    lea   (SCREEN_PLANE_SIZE,a1),a1
    lea   (SCREEN_PLANE_SIZE,a2),a2
     dbf d3,8b
