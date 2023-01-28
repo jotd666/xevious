@@ -3,17 +3,12 @@
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
 
-;;CHIP_ONLY
-EXPSIZE = $100000
+EXPSIZE = $200000
 
 _base	SLAVE_HEADER					; ws_security + ws_id
 	dc.w	17					; ws_version (was 10)
 	dc.w	WHDLF_NoError|WHDLF_ReqAGA
-    IFD CHIP_ONLY
 	dc.l	$200000					; ws_basememsize
-    ELSE
-	dc.l	EXPSIZE					; ws_expmem
-    ENDC
 	dc.l	0					; ws_execinstall
 	dc.w	start-_base		; ws_gameloader
 	dc.w	_data-_base					; ws_currentdir
@@ -23,11 +18,7 @@ _keydebug
 _keyexit
 	dc.b	$59					; ws_keyexit
 _expmem
-    IFD CHIP_ONLY
-    dc.l    0
-    ELSE
 	dc.l	EXPSIZE					; ws_expmem
-    ENDC
 	dc.w	_name-_base				; ws_name
 	dc.w	_copy-_base				; ws_copy
 	dc.w	_info-_base				; ws_info

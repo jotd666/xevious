@@ -2,8 +2,10 @@ scrolling
 rip sounds
 sprite shadow management
 sprite attributes to code
-controls
+controls: bomb
+optim: do not double draw if y>288 tile>36
 
+missing last row
 Just a thought, are you display the correct section of the map based on
 the hardware scroll register?
 

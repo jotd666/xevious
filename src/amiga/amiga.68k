@@ -384,7 +384,7 @@ platform_init:
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
     move.w #0x1C81,diwstrt(a5)
-    move.w #0x30C1,diwstop(a5)
+    move.w #0x30D1,diwstop(a5)
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
     move.w #0x0210,bplcon0(a5)  | 8 bitplanes
@@ -542,6 +542,7 @@ update_bg_tile:
 	rts
 1:
 	lea		_bg_tile,a0
+	move.l	a0,0x120    | temp
 	and.l	#0xFF,d1
 	btst	#0,d2
 	beq.b	2f
@@ -549,7 +550,7 @@ update_bg_tile:
 2:
 	.ifne  OPT_ENABLE_LOGGING
 	* log the tile, use start address in 0x100 then
-	* S bg_tile_log <address> !128*!512
+	* S bg_tile_log <address> !64*!512
 	lea		bg_tile_log,a1
 	move.l	a1,0x100
 	movem.l	d1/d2,-(a7)
@@ -591,6 +592,9 @@ update_bg_tile:
 	* tile is not known with that CLUT configuration: flash
 	move.w	#0,bplcon3+_custom
 	move.w	#0xF00,color+_custom
+	tst.b	unknown_tile_found
+	bne.w	9f
+	st.b	unknown_tile_found
 	lsr.l	#8,d1
 	lsr.l	#1,d1		| row
 	lsr.l	#2,d3		| column
@@ -601,9 +605,9 @@ update_bg_tile:
 7:
 	move.w	(a0),a0
 	move.w	d0,d1
-	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
 	bmi		6f
+	and.w	#0x3F,d1		| row
 	
 	* convert coords to address with proper shift vs foreground
 	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*12
@@ -747,7 +751,7 @@ update_fg_tile:
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
 	move.w	d6,scroll_offset
-	move.w	d6,0x200	| temp
+	move.w	d6,0x108	| temp
 	* add to planes offset & change copperlist
 	bra		set_bitplanes
 
@@ -881,6 +885,9 @@ osd_update_32_sprite_hw:
 	.ifne  OPT_ENABLE_LOGGING
 	* log the tile, use start address in 0x104 then
 	* S sprite_tile_log <address> !128*!320
+	* then run the "convert_graphics.py" script
+	* to discover the new sprite configurations
+	
 	lea		sprite_tile_log,a1
 	move.l	a1,0x104
 	movem.l	d0/d1,-(a7)
@@ -915,6 +922,14 @@ osd_update_32_sprite_hw:
 	* sprite is not known with that CLUT configuration: blue flash
 	move.w	#0,bplcon3+_custom
 	move.w	#0xF,color+_custom
+	tst.b	unknown_sprite_found
+	bne.b	2f
+	st.b	unknown_sprite_found
+	blitz
+	nop
+	nop
+	nop
+	
 	bra.b	2f
 7:
 	move.l	(a3,d1.w),a0	| get pointer on data
@@ -924,12 +939,24 @@ osd_update_32_sprite_hw:
 	* since sprites are blitted in the scrolling playfield, we have
 	* to make up for the scrolling
 	
-	addq.w	#4,d1		| sprite Y offset
-	move.l	d5,-(a7)
+	move.w	d5,-(a7)
 	move.w	scroll_offset(pc),d5
-	neg.w	d5
-	add.w	#480,d5
-	move.l	(a7)+,d5
+	cmp.w	#256,d5   | 512-288 (point where scrolling wraps)
+	bcs.b	9f
+
+	sub.w	#512,d5
+9:
+	add.w	d5,d1
+
+	subq.w	#2,d1
+	
+	bpl.b	1f
+	cmp.w	#288-16,d1
+	bcs.b	1f
+	bsr		zzz
+	moveq	#0,d1
+1:
+	move.w	(a7)+,d5
 	
 	btst	#6,d2			| Y-flip?
 	beq.b	8f
@@ -1019,7 +1046,6 @@ set_bitplanes:
     lea		screen_data,a0
     moveq #NB_PLAYFIELD_PLANES-1,d1
 	move.w	scroll_offset(pc),d2
-	move.l	d2,0x108
 	lea	mulNB_BYTES_PER_ROW_table(pc),a1
 	.ifdef	NO68020
 	add.w	d2,d2
@@ -1300,6 +1326,11 @@ current_sprite_state:
 previous_sprite_state:
 	ds.b	8*64
 	
+unknown_tile_found:
+	dc.b	0
+unknown_sprite_found:
+	dc.b	0
+	
 scroll_offset:
 	dc.w	0
 vbl_counter:
@@ -1457,6 +1488,7 @@ color_row_1:
 	* pal limit
     dc.w  0xFFDF,0xFFFE           
     dc.w  0x0401,0xFFFE
+	
 color_row_30:
 	dc.w	bplcon3,4<<13	| color 128
 	dc.w	color,0xFFF
@@ -1467,7 +1499,7 @@ color_row_30:
 	.set    testcol,0xF0
 	.set    beampos,0x1401
 color_row_30_plus:
-	.rept	48/8
+	.rept	(48/8)
 	dc.w	bplcon3,4<<13	| color 128
 	dc.w	color,(testcol & 0x0FFF)
 	dc.w	bplcon3,5<<13	| color 188
@@ -1476,9 +1508,9 @@ color_row_30_plus:
 	.set	beampos,beampos+0x800
 	.set	testcol,testcol+0x022
 	.endr
-   
+	dc.w	bplcon3,0  | reset ECS
+	dc.w	color,0xF00	| test
     dc.w	 intreq,0x8010
-	dc.w	bplcon3,0  | reset ECS	
     dc.l    -2					
 	
 

@@ -71,7 +71,7 @@ def get_used_bg_cluts():
     bg_json_base = "bg_tile_clut.json"
     # load previously recorded configurations
     rval = load_json_tile_file(bg_json_base)
-    copy_rval = rval.copy()
+    copy_rval = {k:v.copy() for k,v in rval.items()}
 
     # update with what was ripped in WinUAE directory
     contents = load_binary_tile_file(infile)
