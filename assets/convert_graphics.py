@@ -208,6 +208,25 @@ if dump_pngs:
     for d in ["bg","fg","sprite"]:
         mkdir(os.path.join(dump_root,d))
 
+def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,mask,image_names_dict,img_type,tile_clut):
+    for tile_index,cluts in tile_clut_dict.items():
+        # select the used tile
+        pic = pics[tile_index]
+        # select the proper row (for all tile color configurations - aka bitplane configurations)
+        row = matrix[tile_index]
+        # generate the proper palette
+        for clut_index in cluts:
+            current_palette = [palette[i & mask] for i in tile_clut[clut_index]]
+            if all(x==(0,0,0) for x in current_palette):
+                row[clut_index*2] = 0
+                row[clut_index*2+1] = 0
+            else:
+                d = generate_tile(pic,side,current_palette,palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
+                row[clut_index*2] = d["standard"]
+                row[clut_index*2+1] = d["mirror"]
+                if dump_pngs:
+                    ImageOps.scale(d["png"],scale,0).save("dumps/{}/{}_{:02}_{}.png".format(img_type,image_names_dict.get(tile_index,"img"),tile_index,clut_index))
+
 def write_tiles(t,matrix,f,is_bob):
     # background tiles/sprites: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
 
@@ -354,28 +373,17 @@ if dump_graphics:
 
     bg_matrix = raw_blocks[table] = [[None]*256 for _ in range(512)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
-    bg_tile_clut_dict = get_used_bg_cluts()
 
-    side = 8
-    pics = bg_data["data"]
 
-    for tile_index,cluts in bg_tile_clut_dict.items():
-        # select the used tile
-        pic = pics[tile_index]
-        # select the proper row (for all tile color configurations - aka bitplane configurations)
-        row = bg_matrix[tile_index]
-        # generate the proper palette
-        for clut_index in cluts:
-            current_palette = [palette[i] for i in bg_tile_clut[clut_index]]
-            if all(x==(0,0,0) for x in current_palette):
-                row[clut_index*2] = 0
-                row[clut_index*2+1] = 0
-            else:
-                d = generate_tile(pic,side,current_palette,palette,nb_planes=BG_NB_PLANES,is_sprite=False)
-                row[clut_index*2] = d["standard"]
-                row[clut_index*2+1] = d["mirror"]
-                if dump_pngs:
-                    ImageOps.scale(d["png"],scale,0).save("dumps/bg/img_{:02}_{}.png".format(tile_index,clut_index))
+    populate_tile_matrix(
+    matrix = bg_matrix,
+    side=8,
+    pics = bg_data["data"],
+    tile_clut_dict = get_used_bg_cluts(),
+    is_sprite = False,mask = 0xFFFF,
+    image_names_dict = {},
+    img_type = "bg",
+    tile_clut = bg_tile_clut)
 
 
     table = "sprite"
@@ -383,29 +391,16 @@ if dump_graphics:
 
     sprite_matrix = raw_blocks[table] = [[None]*256 for _ in range(320)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
-    sprite_tile_clut_dict = get_used_sprite_cluts()
-
-    side = 16
-    pics = raw_pic_data["data"]
-
-    for tile_index,cluts in sprite_tile_clut_dict.items():
-        # select the used tile
-        pic = pics[tile_index]
-        # select the proper row (for all tile color configurations - aka bitplane configurations)
-        row = sprite_matrix[tile_index]
-        # generate the proper palette
-        for clut_index in cluts:
-            current_palette = [palette[i & 0x7F] for i in sprite_tile_clut[clut_index]]
-            if all(x==(0,0,0) for x in current_palette):
-                row[clut_index*2] = 0
-                row[clut_index*2+1] = 0
-            else:
-                d = generate_tile(pic,side,current_palette,palette,nb_planes=7,is_sprite=True)
-                row[clut_index*2] = d["standard"]
-                row[clut_index*2+1] = d["mirror"]
-                if dump_pngs:
-                    ImageOps.scale(d["png"],5,0).save("dumps/sprite/{}_{:02}_{}.png".format(sprite_names.get(tile_index,"img"),tile_index,clut_index))
-
+    populate_tile_matrix(
+    side = 16,
+    pics = raw_pic_data["data"],
+    tile_clut_dict = get_used_sprite_cluts(),
+    is_sprite = True,
+    matrix = sprite_matrix,
+    mask = 0x7F,
+    image_names_dict = sprite_names,
+    img_type = "sprite",
+    tile_clut = sprite_tile_clut)
 
 
     outfile = os.path.join(src_dir,"graphics.68k")
