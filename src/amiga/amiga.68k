@@ -584,16 +584,11 @@ update_bg_tile:
 	* bit 4 of the colour is derived from bit 7 of the videoram byte
 	bset	#4,d3	| add bit 4 if tile id > 0x80
 2:
-	* now d3 is the index, mul by 4 to get row pointer offset
-	lsl.w	#2,d3
-	* d1 times 512 (<<9) is the row start pointer
+	* now d3 is the index, mul by 2 to get row pointer offset
+	add.w	d3,d3
+	* d1 times 256 (<<8) is the row start pointer
 	lsl.l	#8,d1
-	add.l	d1,d1
 	
-	btst	#7,d2			| X-flip?
-	beq.b	3f
-	addq.w	#2,d3			| mirror version
-3:
 	add.l	d1,a0		| row offset
 	add.w	d3,a0		| col offset
 	tst.w	(a0)
@@ -606,7 +601,7 @@ update_bg_tile:
 	st.b	unknown_tile_found
 	lsr.l	#8,d1
 	lsr.l	#1,d1		| row
-	lsr.l	#2,d3		| column
+	lsr.l	#1,d3		| column
 	lea		_bg_tile,a1
 	
 	blitz
@@ -628,6 +623,10 @@ update_bg_tile:
 	beq		8f		| blank (optim)
 
 	add.l	#bg_picbase,a0   | pointer on tile data
+	btst	#7,d2			 | X-flip?
+	beq.b	3f
+	addq.w	#4,a0			 | mirror version
+3:	
 	move.l	(a0),a0			 | tile data
 	* draw
 	btst	#6,d2    | Y-flip
@@ -922,15 +921,10 @@ osd_update_32_sprite_hw:
 	* now d1 is the index, mul by 4 to get row pointer offset
 	* (there are 2 versions of the sprite normal,mirror for each
 	* color configuration)
-	lsl.w	#2,d1
-	* d1 times 512 (<<9) is the row start pointer
+	add.w	d1,d1
+	* d1 times 128*2 (<<8) is the row start pointer
 	lsl.l	#8,d0
-	add.l	d0,d0
 
-	btst	#7,d2			| X-flip?
-	beq.b	3f
-	add.w	#2,d1			| mirror version comes right after
-3:
 	lea		_sprite_tile,a0
 
 	add.l	d0,a0		| row offset
@@ -950,6 +944,10 @@ osd_update_32_sprite_hw:
 	
 	bra.b	2f
 7:
+	btst	#7,d2			| X-flip?
+	beq.b	3f
+	add.w	#4*(NB_PLAYFIELD_PLANES+1),d1			| mirror planes come right after
+3:
 	lea	(a3,d1.w),a0	| get pointer on data
 	move.w	(6,a4),d0
 	subq.w	#8,d0		| sprite X offset

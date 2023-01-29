@@ -7,6 +7,7 @@ import collections
 block_dict = {}
 
 BG_NB_PLANES = 7
+STD_MIRROR_LIST = ("standard","mirror")
 
 # where tile & sprite CLUT used configuration logs are fetch from
 # we cannot possibly generate all tile & sprite CLUT configurations
@@ -196,7 +197,7 @@ sprite_tile_clut = block_dict["sprite_clut"]["data"]
 
 
 dump_graphics = True
-dump_pngs = True
+dump_pngs = False
 
 def mkdir(d):
     if not os.path.exists(d):
@@ -218,12 +219,11 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,mask,image_na
         for clut_index in cluts:
             current_palette = [palette[i & mask] for i in tile_clut[clut_index]]
             if all(x==(0,0,0) for x in current_palette):
-                row[clut_index*2] = 0
-                row[clut_index*2+1] = 0
+                row[clut_index] = 0
             else:
                 d = generate_tile(pic,side,current_palette,palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
-                row[clut_index*2] = d["standard"]
-                row[clut_index*2+1] = d["mirror"]
+                # put dict in each slot
+                row[clut_index] = d
                 if dump_pngs:
                     ImageOps.scale(d["png"],scale,0).save("dumps/{}/{}_{:02}_{}.png".format(img_type,image_names_dict.get(tile_index,"img"),tile_index,clut_index))
 
@@ -267,23 +267,27 @@ def write_tiles(t,matrix,f,is_bob):
     #
 
     if is_bob:
-        for i,item in enumerate(pic_list):
-            f.write("{}_pic_{:03d}:\n".format(t,i))
-            # we know that a lot of images are similar:
-            # the palettes are different so the bitplanes are identical
-            # only in a different order. Also, there's a lot of only-zero
-            # planes as only 8 colors are used
-            # so the picture (including mask) is a list of pointers on planes
-            # plane data (32 bytes) are only listed once, and used a lot of times
-            for p in range(BG_NB_PLANES+1):  # +1: mask
-                block = tuple(item[p*64:p*64+64])
-                block_id = bob_plane_cache.get(block)
-                if block_id is None:
-                    # block is not in cache
-                    block_id = bob_plane_id
-                    bob_plane_cache[block] = block_id
-                    bob_plane_id += 1
-                f.write("\tdc.l\tplane_pic_{}\n".format(block_id))
+        for i,item_data in enumerate(pic_list):
+            picname = "{}_pic_{:03d}".format(t,i)
+            f.write("{0}:\n".format(picname))
+            for k in STD_MIRROR_LIST:
+                item = item_data[k]
+                f.write("* {}\n".format(k))
+                # we know that a lot of images are similar:
+                # the palettes are different so the bitplanes are identical
+                # only in a different order. Also, there's a lot of only-zero
+                # planes as only 8 colors are used
+                # so the picture (including mask) is a list of pointers on planes
+                # plane data (32 bytes) are only listed once, and used a lot of times
+                for p in range(BG_NB_PLANES+1):  # +1: mask
+                    block = tuple(item[p*64:p*64+64])
+                    block_id = bob_plane_cache.get(block)
+                    if block_id is None:
+                        # block is not in cache
+                        block_id = bob_plane_id
+                        bob_plane_cache[block] = block_id
+                        bob_plane_id += 1
+                    f.write("\tdc.l\tplane_pic_{}\n".format(block_id))
         f.write("\t.datachip\n")
         for k,v in sorted(bob_plane_cache.items(),key=lambda x:x[1]):
             f.write("plane_pic_{}:".format(v))
@@ -291,24 +295,28 @@ def write_tiles(t,matrix,f,is_bob):
     else:
         for i,_ in enumerate(pic_list):
             picname = "{}_pic_{:03d}".format(t,i)
-            f.write("{0}:\n\tdc.l\t{0}_bytes\n".format(picname))
-        for i,item in enumerate(pic_list):
-            f.write("{}_pic_{:03d}_bytes:".format(t,i))
-            # bg tile
-            item_pack = []
-            # "compress" tile: detect all-zero plane and remove it
-            # so if 0, clear plane, if nonzero (0xca), consider the 8 following bytes
-            for p in range(BG_NB_PLANES):
-                block = item[p*8:p*8+8]
-                if any(block):
-                    # non-zero somewhere
-                    item_pack.append(0xca)   # 8 next bytes are useful
-                    item_pack.extend(block)
-                else:
-                    item_pack.append(0)      # clear tile plane
-            item = item_pack
+            f.write("{0}:\n".format(picname))
+            for k in STD_MIRROR_LIST:
+                f.write("\tdc.l\t{}_{}_bytes\n".format(picname,k))
+        for i,item_data in enumerate(pic_list):
+            for k in STD_MIRROR_LIST:
+                item = item_data[k]
+                f.write("{}_pic_{:03d}_{}_bytes:".format(t,i,k))
+                # bg tile
+                item_pack = []
+                # "compress" tile: detect all-zero plane and remove it
+                # so if 0, clear plane, if nonzero (0xca), consider the 8 following bytes
+                for p in range(BG_NB_PLANES):
+                    block = item[p*8:p*8+8]
+                    if any(block):
+                        # non-zero somewhere
+                        item_pack.append(0xca)   # 8 next bytes are useful
+                        item_pack.extend(block)
+                    else:
+                        item_pack.append(0)      # clear tile plane
+                item = item_pack
 
-            dump_asm_bytes(item,f)
+                dump_asm_bytes(item,f)
 
 def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
     input_image = Image.new("RGB",(side,side))
@@ -371,9 +379,8 @@ if dump_graphics:
     table = "bg_tile"
     bg_data = block_dict[table]
 
-    bg_matrix = raw_blocks[table] = [[None]*256 for _ in range(512)]
+    bg_matrix = raw_blocks[table] = [[None]*128 for _ in range(512)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
-
 
     populate_tile_matrix(
     matrix = bg_matrix,
@@ -389,7 +396,7 @@ if dump_graphics:
     table = "sprite"
     raw_pic_data = block_dict[table]
 
-    sprite_matrix = raw_blocks[table] = [[None]*256 for _ in range(320)]
+    sprite_matrix = raw_blocks[table] = [[None]*128 for _ in range(320)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
     populate_tile_matrix(
     side = 16,
