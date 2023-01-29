@@ -1,15 +1,11 @@
-scrolling
 rip sounds
+port ptplayer to mit 68k syntax
+better background tile refresh
 sprite shadow management
 sprite attributes to code
 controls: bomb
 optim: do not double draw if y>288 tile>36
-
-missing last row
-Just a thought, are you display the correct section of the map based on
-the hardware scroll register?
-
-The *bottom* row on the screen is (24-(scroll_register>>3))&63.
-
-So in theory the top row visible (Neo Geo references the bottom only) is
-something like (60-(scroll_register>>3))&63???
+problem of full grass at start when it should draw forest
+small scrolling issues?
+reduce diwstart/stop X-wise to kill sprite artifacts outside tile zone
+shiny star on Xevious logo looks bad now (tile refresh update??)

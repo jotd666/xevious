@@ -2,13 +2,19 @@
 	INCDIR	Include:
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
-
-EXPSIZE = $100000
-
+CHIP_ONLY
+	IFD	CHIP_ONLY
+CHIPMEMSIZE = $200000
+EXPMEMSIZE = 0
+	ELSE
+CHIPMEMSIZE = $100000
+EXPMEMSIZE = $100000
+	ENDC
+	
 _base	SLAVE_HEADER					; ws_security + ws_id
 	dc.w	17					; ws_version (was 10)
-	dc.w	WHDLF_NoError|WHDLF_ReqAGA
-	dc.l	$200000					; ws_basememsize
+	dc.w	WHDLF_NoError|WHDLF_ReqAGA|WHDLF_Req68020
+	dc.l	CHIPMEMSIZE					; ws_basememsize
 	dc.l	0					; ws_execinstall
 	dc.w	start-_base		; ws_gameloader
 	dc.w	_data-_base					; ws_currentdir
@@ -18,7 +24,7 @@ _keydebug
 _keyexit
 	dc.b	$59					; ws_keyexit
 _expmem
-	dc.l	EXPSIZE					; ws_expmem
+	dc.l	EXPMEMSIZE					; ws_expmem
 	dc.w	_name-_base				; ws_name
 	dc.w	_copy-_base				; ws_copy
 	dc.w	_info-_base				; ws_info
@@ -71,13 +77,13 @@ start:
     
     IFD CHIP_ONLY
     lea  _expmem(pc),a0
-    move.l  #$100000,(a0)
+    move.l  #CHIPMEMSIZE/2,(a0)
     ENDC
     lea progstart(pc),a0
     move.l  _expmem(pc),(a0)
 
 	move.l	_expmem(pc),d0
-	add.l	#EXPSIZE,D0
+	add.l	#EXPMEMSIZE,D0
 	move.l	d0,a7
 	
 	lea	exe(pc),a0
