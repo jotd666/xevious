@@ -383,8 +383,9 @@ platform_init:
 	
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
-    move.w #0x1C81,diwstrt(a5)
-    move.w #0x38D1,diwstop(a5)
+	* restrict borders: we don't see bobs on the borders!
+    move.w #0x1C99,diwstrt(a5)
+    move.w #0x3881,diwstop(a5)
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
     move.w #0x0210,bplcon0(a5)  | 8 bitplanes
@@ -534,6 +535,13 @@ osd_w_bg_videoram:
  	.set	offset,offset+NB_BYTES_PER_ROW
 	.endr
 	.endm
+.macro	CLEAR_TILE_NO_MIRROR
+	.set	offset,0
+	.rept	8
+	clr.b	(offset,a1)
+ 	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
+	.endm
 	
 * d0: offset
 * d1: tile code (0-256 but extends to 512 with bit 0 of attribute)
@@ -551,13 +559,13 @@ update_bg_tile:
 	rts
 1:
 	lea		_bg_tile,a0
-	move.l	a0,0x120    | temp
 	and.l	#0xFF,d1
 	btst	#0,d2
 	beq.b	2f
 	bset	#8,d1	| upper part of background tile code
 2:
 	.ifne  OPT_ENABLE_LOGGING
+	move.l	a0,0x120
 	* log the tile, use start address in 0x100 then
 	* S bg_tile_log <address> !64*!512
 	lea		bg_tile_log,a1
@@ -611,13 +619,16 @@ update_bg_tile:
 	move.w	d0,d1
 	subq.w	#4,d1
 	bmi		update_bg_tile_out
+
+	moveq	#NB_PLAYFIELD_PLANES-1,d3	| 7 planes (AGA)
+
 	and.w	#0x3F,d1		| row
-	
+	cmp.w	#36,d1
+	bcc.w	bg_no_mirror
 	* convert coords to address with proper shift vs foreground
 	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*12
 	* duplicate display (scrolling)
 	lea		(SCREEN_PLANE_SIZE/2,a1),a2
-	moveq	#NB_PLAYFIELD_PLANES-1,d3	| 7 planes (AGA)
 
 	cmp.w	#1,a0
 	beq		8f		| blank (optim)
@@ -680,7 +691,67 @@ update_bg_tile_out:
 9:
 	rts
 	
-		
+	* same thing but without updating the mirror plane
+	* as it will never be displayed (used only to simulate
+	* the tile display hardware wrap so no need to go until
+	* 64 rows for the mirror, only 36 are enough
+bg_no_mirror:
+	* convert coords to address with proper shift vs foreground
+	GET_XY_ADDRESS		screen_data+NB_BYTES_PER_ROW*12
+
+	cmp.w	#1,a0
+	beq		8f		| blank (optim)
+
+	add.l	#bg_picbase,a0   | pointer on tile data
+	btst	#7,d2			 | X-flip?
+	beq.b	3f
+	addq.w	#4,a0			 | mirror version
+3:	
+	move.l	(a0),a0			 | tile data
+	* draw
+	btst	#6,d2    | Y-flip
+	bne	5f
+4:
+	tst.b	(a0)+
+	beq	6f
+	.set	offset,0
+	.rept	8
+	move.b	(a0)+,(offset,a1)
+	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
+1:
+    lea   (SCREEN_PLANE_SIZE,a1),a1
+    dbf d3,4b
+	rts
+6:
+	CLEAR_TILE_NO_MIRROR
+	bra.b	1b
+	
+5:   | y-flip
+	tst.b	(a0)+
+	beq.b	6f
+
+	.set	offset,NB_BYTES_PER_ROW*7
+	.rept	8
+	move.b	(a0)+,(offset,a1)
+	.set	offset,offset-NB_BYTES_PER_ROW
+	.endr
+1:
+	lea		(SCREEN_PLANE_SIZE,a1),a1
+    dbf		d3,5b
+	rts
+
+6:
+	CLEAR_TILE_NO_MIRROR
+	bra.b	1b
+
+8:	
+	CLEAR_TILE_NO_MIRROR
+   lea   (SCREEN_PLANE_SIZE,a1),a1
+    dbf d3,8b
+9:
+	rts
+			
 * d0: offset
 * d1: tile code
 * d2: attribute
@@ -981,8 +1052,20 @@ osd_update_32_sprite_hw:
 zzz:
 			blitz
 			rts
+*P1 B2 = DSWB bit 0
+*P2 B2 = DWSB bit 4
+
+*Both are active LOW.
+
 * d0=DSWA, d1=DSWB
 osd_read_dipswitches:
+	moveq	#-1,d0
+	moveq	#-1,d1
+	move.l	_joypad_state(pc),d2
+	btst	#JPB_BTN_BLU,d2
+	beq.b	1f
+	bclr	#0,d1
+1:
 	rts
 
 bit_UP = 0

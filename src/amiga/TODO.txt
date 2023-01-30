@@ -1,11 +1,13 @@
 rip sounds
 port ptplayer to mit 68k syntax
 better background tile refresh
-sprite shadow management
+sprite shadow management: complete?
 sprite attributes to code
-controls: bomb
-optim: do not double draw if y>288 tile>36
+controls: bomb not working
+optim: do not sprite double draw if y>288 tile>36 (bg tile: ok!!)
 problem of full grass at start when it should draw forest
-small scrolling issues?
-reduce diwstart/stop X-wise to kill sprite artifacts outside tile zone
-shiny star on Xevious logo looks bad now (tile refresh update??)
+small scrolling issues? (planes don't all scroll on top sometimes?, 
+like when scroll offset = exactly 0)
+shiny star on Xevious logo looks bad now (sprite data is destroyed?)
+strange stripe bob at start (snoop?)
+dynamic copperlist not working for "namco" logo
