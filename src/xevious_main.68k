@@ -410,10 +410,10 @@ main_gameplay_loop: | $0593
     clr.b     (num_bacura)
     clr.b     (bacura_inc_cnt)
     clr.b     (solvalou_exploding)
-    jsr       fill_fg_rams_with_0x24
-    jsr       fill_bg_with_0x88
-    jsr       display_all_scores
-    jsr       display_solvalou_left
+    bsr       fill_fg_rams_with_0x24
+    bsr       fill_bg_with_0x88
+    bsr       display_all_scores
+    bsr       display_solvalou_left
     movea.l   #main_fn_31__handle_bombing,a0
     move.l    a0,(main_fn_tbl_RAM+4*31)         | reset entry point
     movea.l   #main_fn_1__handle_solvalou,a0
@@ -421,16 +421,16 @@ main_gameplay_loop: | $0593
     clr.b     (scroll_disabled)
     ** TBD sound
     move.b    #0xa0,(countdown_timer_1)
-    jsr       display_player_start_msgs
-    jsr       save_PC_to_fn_tbl_and_ret
+    bsr       display_player_start_msgs
+    bsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
     beq       1f
     rts
-1:  jsr       wipe_player_start_msgs
-    jsr       save_PC_to_fn_tbl_and_ret
+1:  bsr       wipe_player_start_msgs
+    bsr       save_PC_to_fn_tbl_and_ret
     tst.b     (scroll_disabled)
     beq       9f
-    jsr       fill_bg_with_0x88
+    bsr       fill_bg_with_0x88
     move.b    #64,(countdown_timer_1)
     * this is handled in the SUB CPU...
     * so not quite sure why this needs to be done here (as well)?
@@ -472,10 +472,10 @@ main_gameplay_loop: | $0593
 game_over: | $064E
     tst.b     (two_player_game)
     beq       2f
-    jsr       fill_fg_rams_with_0x24
-    jsr       fill_bg_with_0x88
-    jsr       display_all_scores
-    jsr       display_game_over_player_1_2
+    bsr       fill_fg_rams_with_0x24
+    bsr       fill_bg_with_0x88
+    bsr       display_all_scores
+    bsr       display_game_over_player_1_2
     move.b    #128,(countdown_timer_1)
     jsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
@@ -487,7 +487,7 @@ game_over: | $064E
     beq       game_over_1_player
 
 next_player: | $0674
-    jsr       swap_curr_other_player
+    bsr       swap_curr_other_player
     eor.b     #1,(curr_player)
     bra       main_gameplay_loop
     
@@ -497,19 +497,19 @@ main_gameplay_loop_cont: | $0682
     bra       main_gameplay_loop
 
 game_over_1_player: | $068B
-    jsr       fill_fg_rams_with_0x24
-    jsr       fill_bg_with_0x88
-    jsr       display_all_scores
-    jsr       display_game_over_player_1_2
+    bsr       fill_fg_rams_with_0x24
+    bsr       fill_bg_with_0x88
+    bsr       display_all_scores
+    bsr       display_game_over_player_1_2
     move.b    #128,(countdown_timer_1)
-    jsr       save_PC_to_fn_tbl_and_ret
+    bsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
     beq       1f
     rts
-1:  jsr       wipe_game_over_player_1_2
+1:  bsr       wipe_game_over_player_1_2
     tst.b     (curr_player)
     beq       main_thread_main_loop
-    jsr       swap_curr_other_player
+    bsr       swap_curr_other_player
     clr.b     (curr_player)
     bra       main_thread_main_loop
 
