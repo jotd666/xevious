@@ -257,7 +257,7 @@ loc_3BF:
 * to index into the flying enemy type offset table
 * a0 = ptr byte 3
 sub_2_fn_3__inc_enemy_AI_and_flying_enemies: | $03D1
-    move.b    (dswb_0115),d1
+    move.b    (dswb),d1
     not.b     d1
     rol.b     #3,d1
     and.w     #3,d1
