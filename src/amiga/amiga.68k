@@ -468,9 +468,9 @@ osd_disable_vblank_interrupt:
 osd_w_fg_colorram:
     .ifeq OPT_DISABLE_FG_LAYER
 	movem.l	d0-d5/a0-a1,-(a7)
-	lea		_fg_color_data,a1
+	lea		fg_colorram,a1
 	move.b	d1,(a1,d0.w)	| store color X/Y flip attribute in fg table
-	lea		_fg_char_data,a1
+	lea		fg_videoram,a1
 	move.b	d1,d2
 	move.b	(a1,d0.w),d1	| fetch tile from character grid
 	* now update tile to reflect the color change
@@ -484,9 +484,9 @@ osd_w_fg_colorram:
 osd_w_bg_colorram:
     .ifeq OPT_DISABLE_BG_LAYER
 	movem.l	d0-d5/a0-a1,-(a7)
-	lea		_bg_color_data,a1
+	lea		bg_colorram,a1
 	move.b	d1,(a1,d0.w)	| store attribute in bg table
-	lea		_bg_char_data,a1
+	lea		bg_videoram,a1
 	move.b	d1,d2
 	move.b	(a1,d0.w),d1	| fetch tile from character grid
 	bsr	update_bg_tile
@@ -501,8 +501,8 @@ osd_w_bg_colorram:
 osd_w_fg_videoram:
     .ifeq OPT_DISABLE_FG_LAYER
 	movem.l	d0-d5/a0-a2,-(a7)
-	lea		_fg_color_data,a1
-	lea		_fg_char_data,a2
+	lea		fg_colorram,a1
+	lea		fg_videoram,a2
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
 	moveq	#1,d3
@@ -515,8 +515,8 @@ osd_w_fg_videoram:
 osd_w_bg_videoram:
     .ifeq OPT_DISABLE_BG_LAYER
 	movem.l	d0-d5/a0-a2,-(a7)
-	lea		_bg_color_data,a1
-	lea		_bg_char_data,a2
+	lea		bg_colorram,a1
+	lea		bg_videoram,a2
 	* dump both tables (color+char): S bg_data <address@0x110> $1000
 	move.l	a1,0x110		| temp
 	
@@ -901,8 +901,8 @@ osd_update_32_sprite_hw:
 	* positions of the previously active objects
 	movem.l	d0-d5/a0-a2/a5,-(a7)
 	move.w	#31,d4			| 32 sprites
-	lea		_bg_color_data,a1
-	lea		_bg_char_data,a2
+	lea		bg_colorram,a1
+	lea		bg_videoram,a2
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
 	beq	3f
@@ -1062,9 +1062,9 @@ osd_read_dipswitches:
 	moveq	#-1,d0
 	moveq	#-1,d1
 	move.l	_joypad_state(pc),d2
-	btst	#JPB_BTN_BLU,d2
+	btst	#JPB_BTN_BLU,d2   | 2nd button: bomb
 	beq.b	1f
-	bclr	#0,d1
+	bclr	#0,d1	| active low
 1:
 	rts
 
@@ -1467,15 +1467,7 @@ _fg_color_table:
 	.set	fgrow_offset,fgrow_offset+20
 	.endr
 	
-_fg_color_data:
-	ds.b	GRID_SIZE
-_fg_char_data:
-	ds.b	GRID_SIZE
-	* contiguous: easier to dump
-_bg_color_data:
-	ds.b	GRID_SIZE
-_bg_char_data:
-	ds.b	GRID_SIZE
+
 		.bsschip
 screen_data:
 	ds.b	SCREEN_SIZE
