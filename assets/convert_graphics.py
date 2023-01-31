@@ -3,6 +3,15 @@ from PIL import Image,ImageOps
 
 import collections
 
+# this script uses the original graphics.c with palette & cluts
+# and generates the bitmaps for the amiga version
+#
+# it uses a json file which is enriched by in-game logs of used
+# bg tile/color & sprite/color used configurations (not all configurations
+# are used). Without those in-game logs, it would be impossible to generate
+# all possible combinations, it would take too much space (I think) even if
+# there are already some optimizations to re-use bitplanes of differently colored
+# sprites
 
 block_dict = {}
 
@@ -190,11 +199,28 @@ with open("xevious_gfx.c") as f:
 
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
 
+
 sprite_names = load_names("sprite_names.json")
+
+
+# convert palette indexes to actual colors
+# getting rid of palette imposed order, which allow us to organize the palette
+# as we want to - for instance - impose color order so we can use sprites for
+# most displayed items which are:
+# player ship, bomb sights, shots, bombs (colors 16-31)
+#
+for n,mask in (("bg_tile_clut",0xFFFF),("sprite_clut",0x7F)):
+    tc = block_dict[n]["data"]
+    block_dict[n]["data"] = [[palette[i & mask] for i in tile_clut] for tile_clut in tc ]
+
+# reorganize palete like we want, leaving 0,0,0 first, keeping the xevious title
+# filling color index unchanged (now that we found the color !) and putting the sprite
+# colors in the required locations (bobs & bg tiles can still use them)
+##import random
+##palette = [palette[0]]+random.sample(palette[1:],len(palette)-1)
 
 bg_tile_clut = block_dict["bg_tile_clut"]["data"]
 sprite_tile_clut = block_dict["sprite_clut"]["data"]
-
 
 dump_graphics = True
 dump_pngs = False
@@ -209,7 +235,7 @@ if dump_pngs:
     for d in ["bg","fg","sprite"]:
         mkdir(os.path.join(dump_root,d))
 
-def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,mask,image_names_dict,img_type,tile_clut):
+def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_dict,img_type,tile_clut):
     for tile_index,cluts in tile_clut_dict.items():
         # select the used tile
         pic = pics[tile_index]
@@ -217,7 +243,7 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,mask,image_na
         row = matrix[tile_index]
         # generate the proper palette
         for clut_index in cluts:
-            current_palette = [palette[i & mask] for i in tile_clut[clut_index]]
+            current_palette = tile_clut[clut_index]
             if all(x==(0,0,0) for x in current_palette):
                 row[clut_index] = 0
             else:
@@ -387,7 +413,7 @@ if dump_graphics:
     side=8,
     pics = bg_data["data"],
     tile_clut_dict = get_used_bg_cluts(),
-    is_sprite = False,mask = 0xFFFF,
+    is_sprite = False,
     image_names_dict = {},
     img_type = "bg",
     tile_clut = bg_tile_clut)
@@ -404,7 +430,6 @@ if dump_graphics:
     tile_clut_dict = get_used_sprite_cluts(),
     is_sprite = True,
     matrix = sprite_matrix,
-    mask = 0x7F,
     image_names_dict = sprite_names,
     img_type = "sprite",
     tile_clut = sprite_tile_clut)

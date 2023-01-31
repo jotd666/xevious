@@ -17,19 +17,13 @@ OPT_ENABLE_LOGGING = 1
 _custom = 0xDFF000
 
 NB_PLAYFIELD_PLANES = 7
-GRID_SIZE = 1<<11   | 6+5 bits to encode position
 NB_BYTES_PER_ROW = 40
 NB_LINES = 288
 NB_PLAYFIELD_LINES = 512
 SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_PLAYFIELD_LINES*2
 FG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_LINES
-* 7 scrollable planes + 1 non-scrollable so shorter
+* 7 scrollable planes
 SCREEN_SIZE = NB_PLAYFIELD_PLANES*SCREEN_PLANE_SIZE
-
-
-;.macro pixw nm, x, y
-; .set \nm, (\x+\y*240)*2
-;.endm
 
 	bra	_user
 
@@ -883,6 +877,8 @@ osd_update_sprite_shadow:
 	add.w	#\yoff-(\xoff<<6),d0
 	move.b	(a1,d0.w),d2
 	move.b	(a2,d0.w),d1
+	*clr.b	d2
+	*clr.b	d1		| temp
 	bsr	update_bg_tile
 	movem.l	(a7)+,d0/d4/a1/a2
 	.endm
@@ -916,31 +912,38 @@ osd_update_32_sprite_hw:
 	subq.w	#2,d1
 	and.w	#0x1FF,d1	| Y wrap
 	
+	* divide by 8 to get to tile resolution
 	lsr.w	#3,d1
 	lsr.w	#3,d0
 	neg.w	d0
-	add.w	#32,d0	| mirror
+	add.w	#33,d0	| mirror plus one
+	subq.w	#2,d1
 	* update background tile below sprite
 	* translate sprite x,y in tile offset
 	* offset = (32-x)<<6 + y
 	lsl.w	#6,d0
 	add.w	d1,d0	| should do it
-	move.b	(a1,d0.w),d2
-	move.b	(a2,d0.w),d1	| char
-	movem.l	d0/d4/a1/a2,-(a7)
-	bsr	update_bg_tile
-	movem.l	(a7)+,d0/d4/a1/a2
+	
 	* suboptimal but works ATM
+	UPDATE_BG_TILE_OFFSET	0,0
+	UPDATE_BG_TILE_OFFSET	0,1
+	UPDATE_BG_TILE_OFFSET	0,2
+	UPDATE_BG_TILE_OFFSET	0,3
 	UPDATE_BG_TILE_OFFSET	1,0
 	UPDATE_BG_TILE_OFFSET	1,1
+	UPDATE_BG_TILE_OFFSET	1,2
+	UPDATE_BG_TILE_OFFSET	1,3
 	UPDATE_BG_TILE_OFFSET	2,0
 	UPDATE_BG_TILE_OFFSET	2,1
-	UPDATE_BG_TILE_OFFSET	1,-1
-	UPDATE_BG_TILE_OFFSET	-1,-1
-	UPDATE_BG_TILE_OFFSET	-1,0
-	UPDATE_BG_TILE_OFFSET	-1,1
-	UPDATE_BG_TILE_OFFSET	0,-1
-	UPDATE_BG_TILE_OFFSET	2,-1
+	UPDATE_BG_TILE_OFFSET	2,2
+	UPDATE_BG_TILE_OFFSET	2,3
+	UPDATE_BG_TILE_OFFSET	3,0
+	UPDATE_BG_TILE_OFFSET	3,1
+	UPDATE_BG_TILE_OFFSET	3,2
+	UPDATE_BG_TILE_OFFSET	3,3
+
+
+
 
 3:
 	lea		(8,a5),a5
@@ -1033,10 +1036,18 @@ osd_update_32_sprite_hw:
 	subq.w	#2,d1
 	and.w	#0x1FF,d1	| Y wrap
 	
+	cmp.w	#36*8,d3
+	bcc.w	21f		| too low on screen: no need for mirror
 	bsr	blit_16x16_bob
+	lea		(8,a4),a4		| next sprite
+	dbf		d4,4b
+	bra.b	5f
+21:
+	bsr	blit_16x16_bob_no_mirror
 2:
 	lea		(8,a4),a4		| next sprite
 	dbf		d4,4b
+5:
 	* then back up current object state (X,Y,STATE) for next update
 	move.l	(a7)+,a4
 	move.w	#31,d0	| 32*8 bytes
@@ -1244,6 +1255,37 @@ blit_16x16_bob:
 	jsr		(a5)
 	lea		(SCREEN_PLANE_SIZE/2,a1),a1
 	.endr
+	dbf		d3,1b
+	movem.l	(a7)+,d2-d4/a0-a5
+	rts
+	
+* what: blits 16x16 data on bg planes, cookie cut
+* args:
+* < A0: data (16x16X(7+1))
+* < D0: X
+* < D1: Y
+* < D2: bit 6: 0: direct, 1: flip
+* trashes: D0-D1
+
+blit_16x16_bob_no_mirror:
+	movem.l	d2-d4/a0-a5,-(a7)
+	lea		screen_data,a1
+	lea		blit_plane_cookie_cut_16x16(pc),a5
+	btst	#6,d2
+	beq.b	0f
+	lea		blit_plane_cookie_cut_16x16_flipped(pc),a5	
+0:
+	moveq	#NB_PLAYFIELD_PLANES-1,d3
+	moveq	#-1,d2
+	move.l	a0,a4		| pointers on planes
+	move.l	(NB_PLAYFIELD_PLANES*4,a4),a3		| mask is the last plane
+1:
+	move.l	(a4)+,a0     | next plane
+	* blit each plane on the first half (no need for the other
+	* half, as it won't be displayed)
+	move.l	a1,a2
+	jsr		(a5)
+	lea		(SCREEN_PLANE_SIZE,a1),a1
 	dbf		d3,1b
 	movem.l	(a7)+,d2-d4/a0-a5
 	rts

@@ -1,12 +1,16 @@
 rip sounds
 port ptplayer to mit 68k syntax
-better background tile refresh
+if bob moves exactly like tiles don't redraw tiles, just blit bob
 sprite shadow management: complete?
 sprite attributes to code
+sprites for ship, bomb sight and shots and bomb
 controls: bomb not working
-optim: do not sprite double draw if y>288 tile>36 (bg tile: ok!!)
+optim: do not sprite double draw if y>288 tile>36. Coded but still
+fg plane is destroyed 
 small scrolling issues? (planes don't all scroll on top sometimes?, 
 like when scroll offset = exactly 0)
 shiny star on Xevious logo looks bad now (sprite data is destroyed?)
+=> debug sprite display
 strange stripe bob at start (snoop?)
 dynamic copperlist not working for "namco" logo
+background restore not optimal at all
