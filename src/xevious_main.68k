@@ -47,62 +47,66 @@
 
 _start_of_xevious_main_rom:
 
+xevious_reset: | $0000
+    jsr       xevious_sub_reset                 | obviously 68K only
+    bra       start
+
 exit_caller: | $001D
-    adda.l    #4,a7
+    lea       (4,a7),a7
     
 null_fn: | $001f
     rts
 
 add_to_score: | $0020
     moveq     #3-1,d7
-    movea.l   #curr_player_score_lsb,a1
+    lea       curr_player_score_lsb,a1
     andi      #0x0f,ccr                         | clear X flag
 add_to_score_cont: | $0054
-    move.b    (a0)+,d0
-    move.b    (a1),d1
-    abcd      d0,d1
-    move.b    d1,(a1)
+    move.b    (a0)+,d0                          | addition byte
+    move.b    (a1),d1                           | score byte
+    abcd      d0,d1                             | add BCD digits
+    move.b    d1,(a1)                           | update score
     subq.l    #1,a1                             | byte-swapped
-    dbf       d7,add_to_score_cont
-    bcc       1f
-    jsr       set_score_to_999999
-1:  jsr       check_1_2_for_new_high_score_and_update
+    dbf       d7,add_to_score_cont              | all bytes
+    bcc.b     1f                                | no overflow
+    jsr       set_score_to_9999990
+1:  bsr.b     check_1_2_for_new_high_score_and_update
     bra       check_for_extra_solvalou
     
 check_1_2_for_new_high_score_and_update: | $1311
-    movea.l   #curr_player_score_msb,a1
-    jsr       check_for_new_high_score_and_update
-    movea.l   #other_player_score_msb,a1
+    lea       curr_player_score_msb,a1
+    bsr.b     check_for_new_high_score_and_update
+    lea       other_player_score_msb,a1
     
 check_for_new_high_score_and_update: | $131A
-    movea.l   #high_score_msb,a0
-    moveq     #3-1,d7
+    lea       high_score_msb,a0
+    moveq     #3-1,d7                           | scores are 3 bytes
     
 check_new_high_score: | $131F
-    move.b    (a1),d1
-    cmp.b     (a0),d1
-    bcs       9f
-    bne       update_high_score
+    move.b    (a1),d1                           | player score byte
+    cmp.b     (a0),d1                           | less than high score byte?
+    bcs.b     9f                                | yes, return
+    bne       update_high_score                 | greater, go
     addq.l    #1,a0                             | byte-swapped
     addq.l    #1,a1                             | byte-swapped
-    dbf       d7,check_new_high_score
+    dbf       d7,check_new_high_score           | all bytes
 9:  rts
 
 update_high_score: | $1329
-    move.b    (a1),(a0)
+    move.b    (a1),(a0)                         | update high score byte
     addq.l    #1,a0                             | byte-swapped
     addq.l    #1,a1                             | byte_swapped
-    dbf       d7,update_high_score
+    dbf       d7,update_high_score              | all bytes
     move.b    (curr_player),d0
     addq.b    #1,d0
-    *move.b    d0,(unk_8027)
-    jsr       display_high_score
-    rts
+    *move.b    d0,(unk_8027)                    | appears unused by any CPU
+    jmp       display_high_score
          
 check_for_extra_solvalou: | $133A
     jsr       display_player_scores
+    *** There is a call to a protection check routine here
     tst.b     (bonus_life_none)
-    bne       9f
+    bne.w     9f
     ** Another Xevious BUG **
     ** whenever next_bonus_life_Ks is less than curr_player_score_Ks
     ** (which will be the case when eg. score=9,999,990)
@@ -112,16 +116,16 @@ check_for_extra_solvalou: | $133A
     move.w    (curr_player_score_msb),d0        | swapped, Ks in Z80
     sub.w     d1,d0
     add.w     d1,d0                             | reached next bonus word?
-    bcs       9f                                | no, exit
-    move.b    (dswa_0115),d0
+    bcs.w     9f                                | no, exit
+    move.b    (dswa),d0
     rol.b     #3,d0
     and.w     #3,d0                             | starting lives setting
-    beq       1f                                | 5, skip
+    beq.b     1f                                | 5, skip
     move.w    #1,d0                             | use 2nd table
-1:  movea.l   #bonus_tbl_ptrs,a0
+1:  lea       bonus_tbl_ptrs,a0
     lsl.w     #2,d0                             | x4 (entry offset)
     move.l    (a0,d0.w),a0                      | table address
-    move.b    (dswa_0115),d0
+    move.b    (dswa),d0
     not.b     d0
     lsr.b     #2,d0
     and.w     #7,d0                             | bonus life setting
@@ -133,13 +137,13 @@ check_for_extra_solvalou: | $133A
     move.w    (next_bonus_life_Ks),d0
     sub.w     d1,d0
     add.w     d1,d0
-    bcs       update_next_bonus_life_Ks
+    bcs.b     update_next_bonus_life_Ks
     * this handles when there is only 2 bonuses    
-    move.b    (dswa_0115),d0
+    move.b    (dswa),d0
     not.b     d0
     and.w     #7,d0
     cmp.b     #6,d0                             | only 2 bonuses?
-    bne       2f                                | no, skip
+    bne.b     2f                                | no, skip
     move.b    #1,(bonus_life_none)              | flag no more bonuses
 2:  andi      #0x0f,ccr                         | clear X
     abcd      d1,d0
@@ -164,10 +168,6 @@ save_PC_to_fn_tbl_and_ret: | $0030
     move.l    (a7)+,(a6)                        | pop return and store in table
     rts                                         | return up the call stack
         
-xevious_reset: | $0000
-    jsr       xevious_sub_reset
-    bra       start
-
 xevious_im1_irq: | $0038
     movem.l   d0-d7/a0-a6,-(a7)
     move.w    #0x4F00,d0                        | red
@@ -181,12 +181,16 @@ xevious_im1_irq: | $0038
     rts
 
 xevious_nmi: | $0066
+    *** this routine in no way resembles the Z80 equivalent
+    *** which accessed inputs via the 06XX custom chips
+    *** - we just read inputs directly here
     movem.l   d0-d7/a0-a6,-(a7)
     move.w    #0x4F00,d0                        | red
     jsr       osd_debug_hook
     jsr       osd_read_p1_inputs
     move.b    d0,(P1_inputs)
-    *jsr        osd_read_p2_inputs
+    jsr       osd_read_p2_inputs
+    move.b    d0,(P2_inputs)
     move.w    #0x8000,d0                        | black
     jsr       osd_debug_hook
     movem.l   (a7)+,d0-d7/a0-a6
@@ -196,22 +200,25 @@ update_sprite_hw_and_other_things: | $0096
     * copy sprites from shadow to OSD
     move.w    #0,d0                             | start at sprite 0
     jsr       osd_update_32_sprite_hw
-    jsr       read_dipswitches_0115
+    jsr       read_dipswitches
     move.b    #1,(vb_semaphore_sub)
     move.b    #1,(vb_semaphore_main)
     rts
     
-read_dipswitches_0115: | $0115
+read_dipswitches: | $0115
     jsr       osd_read_dipswitches
-    move.b    d0,(dswa_0115)
-    move.b    d1,(dswb_0115)
+    move.b    d0,(dswa)
+    move.b    d1,(dswb)
     rts
     
 start: | $012E
     * zero some RAM here, including seed
+    * see $01F5 *** TBD
+    * $0388 initialise some coinage information
+    * $03F9 zero some RAM here *** TBD
     clr.w     (pseudo_random_seed)
     clr.b     (maincpu_inited)        
-    * $040f setup function table in RAM
+    * $0414 setup function table in RAM
     lea       main_fn_tbl_ROM,a0
     lea       main_fn_tbl_RAM,a1
     moveq     #32-1,d7                          | 32 functions to copy
@@ -221,7 +228,7 @@ start: | $012E
     jsr       osd_ack_vblank_interrupt
     jsr       osd_enable_vblank_interrupt
     
-    * fudges move me
+    * fudges move me *** TBD
     clr.b     (num_credits)
 
 restart_main_loop: | $0437
@@ -358,7 +365,7 @@ coined_up:
     clr.b     (a0)+
     lea       starting_solvalou_tbl,a0
     moveq     #0,d0
-    move.b    (dswa_0115),d0
+    move.b    (dswa),d0
     lsr.b     #5,d0
     and.b     #3,d0                               | lives setting
     move.b    (d0.w,a0),d0                        | lives   
@@ -366,7 +373,7 @@ coined_up:
     move.w    #OPT_START_AREA-1,(area)
     clr.b     (enemy_AI_level)
     moveq     #0,d0
-    move.b    (dswa_0115),d0
+    move.b    (dswa),d0
     lsr.b     #5,d0
     and.b     #3,d0                               | lives setting
     eori.b    #3,d0                               | +ve logic
@@ -375,14 +382,14 @@ coined_up:
 1:  movea.l   #first_bonus_life_tbls,a0
     lsl.w     #4,d0                               | table offset
     move.l    (a0,d0.w),a0                        | get table address
-    move.b    (dswa_0115),d0
+    move.b    (dswa),d0
     not.b     d0
     lsr.b     #2,d0
     and.w     #7,d0
     lsl.w     #1,d0
     move.w    (a0,d0.w),(next_bonus_life_Ks)
     move.b    #1,(solvalou_number)                | used in AI
-    move.b    (dswa_0115),d1
+    move.b    (dswa),d1
     not.b     d1
     ror.b     #2,d1
     and.w     #7,d1
@@ -444,7 +451,7 @@ main_gameplay_loop: | $0593
     move.w    #6,(area)                         | restart at area=7
     * decrement the AI level according to the
     * STARTING LIVES dipswitch setting
-2:  move.b    (dswb_0115),d0
+2:  move.b    (dswb),d0
     not.b     d0
     rol.b     #3,d0 
     and.w     #3,d0                             | starting lives
@@ -1586,7 +1593,7 @@ name_entry_inc_char: | $1272
 
 * returns character in d1
 check_lowercase: | $127F
-    move.b    (dswb_0115),d1
+    move.b    (dswb),d1
     moveq     #0,d0
     lsr.b     #1,d1                             | b2?
     bcs       1f                                | no, skip
@@ -1637,7 +1644,7 @@ display_high_score_text: | $12EF
 
 * a1=1 byte beyond score
 * - still works with byte-swapped score
-set_score_to_999999: | $1309
+set_score_to_9999990: | $1309
     moveq     #3-1,d7
 1:  move.b    #0x99,-(a1)
     dbf       d7,1b
@@ -2185,7 +2192,7 @@ main_fn_31__handle_bombing: | $1862
     tst.b     (attract_mode_stage)              | in attract mode?
     bne       gen_random_bomb_press             | yes, go
 * read BUTTON2 from h/w
-    btst.b    #0,(dswb_0115)                    | bomb pressed?
+    btst.b    #0,(dswb)                    | bomb pressed?
     bne       9f                                | no, return
     jsr       save_PC_to_fn_tbl_and_ret
 
@@ -2871,7 +2878,7 @@ reveal_bonus_flag: | $1F8D
     bra       add_obj_handler
 
 score_bonus_flag: | $1FA8
-    btst.b    #1,(dswb_0115)
+    btst.b    #1,(dswb)
     bne       inc_num_solvalou
     movea.l   #pts_10000,a0
     jsr       add_to_score
@@ -6035,8 +6042,8 @@ pseudo_random_seed:                     ds.w  1
 bg_scroll_x_shadow:                     ds.w  1
 scroll_cntr:                            ds.w  1
 scroll_delta:                           ds.w  1
-dswa_0115:                              ds.b  1
-dswb_0115:                              ds.b  1
+dswa:                              ds.b  1
+dswb:                              ds.b  1
 
     .align 0x1000
 * 64 objects, 32 bytes per object

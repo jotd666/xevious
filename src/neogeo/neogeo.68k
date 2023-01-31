@@ -1012,24 +1012,24 @@ osd_read_dipswitches:
     rts
 
 * - neogeo   5=B2, 4=B1, 3=right, 2=left, 1=down,  0=up
-    
+
+* returns inputs in d0    
 osd_read_p1_inputs:
     move.b    BIOS_P1CURRENT,d0                 | read IN1
     move.b    d0,d1                             | copy
     and.w     #0x0f,d0
     movem.l   a0,-(a7)
     movea.l   #input_map_tbl,a0
-    move.b    (a0,d0.w),d0
-    move.b    d1,d2
+    move.b    (a0,d0.w),d0                      | d0=joystick
     and.b     #(1<<4),d1                        | B1 only
     lsl.b     #1,d1                             | 5=B1
     eor.b     d1,d0                             | add to joystick
-    * looks like bit4 is a debounced version of bit5
+    * looks like bit4 is a one-shot version of bit5
     * - this is the only way to get name input to work
     btst.b    #5,d0                             | B1?
-    bne       1f                                | no, skip
+    bne.b     1f                                | no, skip
     btst.b    #5,(p1_input_r)                   | B1 last time?
-    beq       1f                                | yes, skip
+    beq.b     1f                                | yes, skip
     and.b     #~(1<<4),d0                       | flag B1 (active low)  
 1:  move.b    d0,(p1_input_r)                   | save for next time
     movem.l   (a7)+,a0

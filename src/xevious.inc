@@ -9,12 +9,12 @@
     OPT_DISABLE_FG_LAYER=0
     OPT_DISABLE_BG_LAYER=0
     OPT_DISABLE_SPRITES=0
-    OPT_DISABLE_DISPLAY_MASKS=1
+    OPT_DISABLE_DISPLAY_MASKS=0
 
     * game options    
     OPT_START_AREA=1
     OPT_LOOP_AREA=0
-    OPT_INVINCIBLE=1
+    OPT_INVINCIBLE=0
     OPT_INFINITE_LIVES=0
     OPT_TCDEV_EASTER_EGG=1
     OPT_REVEAL_SOL_TOWER=0
@@ -91,7 +91,7 @@
     .global andor_genesis_end_flag
     .global scroll_delta
     .global area_offset_in_map
-    .global dswb_0115
+    .global dswb
     .global pulsing_colour_1
     .global pulsing_colour_2
     .global next_domogram
