@@ -9,8 +9,7 @@ GCC_BIN = C:\amiga-gcc\bin
 ASM = $(GCC_BIN)/m68k-amigaos-as -c 
 MAIN_OBJ = amiga.o
 # leave MAIN_OBJ first
-OBJS = $(MAIN_OBJ) xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o 
-#ptplayer.o 
+OBJS = $(MAIN_OBJ) xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
 all: $(MAIN) $(WHDLOADER)
 
 clean:

@@ -9,7 +9,8 @@
 |    IFND    CUSTOM
 |CUSTOM		=	0xdff000
 |    .endif
-    
+
+	
 BLTDDAT		=	0x000
 DMACONR		=	0x002
 VPOSR		=	0x004

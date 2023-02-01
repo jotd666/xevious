@@ -16,24 +16,25 @@
 *    XREF _ciaa
 *    XREF _ciab
 *
-
+CIAA = 0xbfe001
+CIAB = 0xbfd000
 
 * cia register offsets
-ciapra		  =	0x0000
-ciaprb		  =	0x0100
-ciaddra	  =	0x0200
-ciaddrb	  =	0x0300
-ciatalo	  =	0x0400
-ciatahi	  =	0x0500
-ciatblo	  =	0x0600
-ciatbhi	  =	0x0700
-ciatodlow	  =	0x0800
-ciatodmid	  =	0x0900
-ciatodhi	  =	0x0A00
-ciasdr		  =	0x0C00
-ciaicr		  =	0x0D00
-ciacra		  =	0x0E00
-ciacrb		  =	0x0F00
+CIAPRA		  =	0X0000
+CIAPRB		  =	0X0100
+CIADDRA	  =	0X0200
+CIADDRB	  =	0X0300
+CIATALO	  =	0X0400
+CIATAHI	  =	0X0500
+CIATBLO	  =	0X0600
+CIATBHI	  =	0X0700
+CIATODLOW	  =	0X0800
+CIATODMID	  =	0X0900
+CIATODHI	  =	0X0A00
+CIASDR		  =	0X0C00
+CIAICR		  =	0X0D00
+CIACRA		  =	0X0E00
+CIACRB		  =	0X0F00
 
 * interrupt control register bit numbers
 CIAICRB_TA	  =	0
