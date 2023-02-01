@@ -212,25 +212,26 @@ read_dipswitches: | $0115
     rts
     
 start: | $012E
-    * zero some RAM here, including seed
-    * see $01F5 *** TBD
-    * $0388 initialise some coinage information
-    * $03F9 zero some RAM here *** TBD
-    clr.w     (pseudo_random_seed)
-    clr.b     (maincpu_inited)        
+    * zero $8000-$83FF (including sprite shadow)
+    lea       vb_semaphore_main,a0
+0:  clr.b     (a0)+
+    cmpa.l    #watermark_0x8400,a0
+    bne.b     0b
+    * $0388 not interested in coinage information
+    * $03F9 zeroes $8000-$81FF after tests 
+    * - not required as we don't run self-tests
+    clr.b     (maincpu_inited)                  | during RAM tests
     * $0414 setup function table in RAM
     lea       main_fn_tbl_ROM,a0
     lea       main_fn_tbl_RAM,a1
     moveq     #32-1,d7                          | 32 functions to copy
 1:  move.l    (a0)+,(a1)+
     dbf       d7,1b
+    *** brings SUB,SUB2 CPUs out of RESET here
     move.b    #1,(maincpu_inited)
     jsr       osd_ack_vblank_interrupt
     jsr       osd_enable_vblank_interrupt
     
-    * fudges move me *** TBD
-    clr.b     (num_credits)
-
 restart_main_loop: | $0437
     move.b    (vb_semaphore_main),d0
     subq.b    #1,d0                             | signalled?
@@ -253,13 +254,13 @@ restart_main_loop: | $0437
     * loops through main function table
     * - A6 points to current function table entry
     lea       main_fn_tbl_RAM,a6
-    moveq     #32-1,d7
+    moveq     #32-1,d7                          | 32 functions
 main_loop: | $0447
     move.l    (a6),a0                           | get jump address
     movem.l   d7/a6,-(a7)
     jsr       (a0)                              | call function
     movem.l   (a7)+,d7/a6
-    adda.l    #4,a6                             | next table entry
+    lea       (4,a6),a6                         | next table entry
     dbf       d7,main_loop
 
     move.w    #0x8000,d0                        | black
@@ -276,9 +277,9 @@ main_fn_tbl_ROM: | $045B
     .long     main_fn_3__init_bacura
     .long     main_fn_4__spawn_flying_enemies
     .long     main_fn_5__inc_num_bacura
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
+    .long     null_fn                           | protection
+    .long     null_fn                           | protection_check
+    .long     null_fn                           | check_fn_7_code
     .long     null_fn
     .long     null_fn
     .long     null_fn
@@ -305,8 +306,8 @@ main_fn_tbl_ROM: | $045B
 
 main_fn_0__main_thread: | $049B
     jsr       zero_share1
-    jsr       fill_fg_rams_with_0x24
-    jsr       zero_bg_rams
+    jsr       clear_fg_to_transparent
+    jsr       clear_bg_to_black
     jsr       init_high_score_table
     * don't need to worry about cocktail mode
     move.b    #1,(scroll_disabled)
@@ -317,31 +318,30 @@ main_thread_main_loop: | $04BB
     .ifne OPT_SKIP_TITLE
     bra       coined_up
     .endif
-    tst.b     (num_credits)
-    bne       coined_up
+    tst.b     (num_credits)                     | zero?
+    bne       coined_up                         | no, skip
     move.w    #2,(attract_mode_stage)
     jsr       save_PC_to_fn_tbl_and_ret
 
 attract_mode_main_loop: | $04D6
     move.w    (attract_mode_stage),d0
     subq.w    #1,d0
-    movea.l   #attract_mode_jump_tbl,a0
-    lsl.w     #2,d0
+    lea       attract_mode_jump_tbl,a0
+    lsl.w     #2,d0                             | jump table offset
     move.l    (a0,d0.w),a0
-    jmp       (a0)
-    rts
+    jmp       (a0)                              | go
 
 flash_insert_coin_and_check_credits: | $04E3
     jsr       display_insert_coin_flashing
 check_credits: | $04E6
-    tst.b     (num_credits)
-    beq       9f    
+    tst.b     (num_credits)                     | zero?
+    beq       9f                                | yes, exit
 coined_up:    
     jsr       zero_obj_state_tbl
     clr.w     (attract_mode_stage)
-    move.b    #1,(scroll_disabled)
-    jsr       fill_fg_rams_with_0x24
-    jsr       zero_bg_rams
+    move.b    #1,(scroll_disabled)              | disable
+    jsr       clear_fg_to_transparent
+    jsr       clear_bg_to_black
     jsr       display_push_start_button
     jsr       display_all_scores
     jsr       display_copyright_msgs
@@ -352,55 +352,56 @@ coined_up:
 *
     jsr       display_credits   
     jsr       display_1_only_or_1_2_players
-    tst.b     (start_pressed)
+    tst.b     (start_pressed)                   | set in SUB CPU
     .ifeq OPT_SKIP_TITLE
-    beq       9f
+    beq.w     9f
     .endif
     move.b    #1,(is_real_game)
     clr.b     (curr_player)
     clr.b     (start_pressed)
-    lea       curr_player_score_msb,a0            | byte swapped
+    lea       curr_player_score_msb,a0          | byte swapped
     clr.b     (a0)+
     clr.b     (a0)+
     clr.b     (a0)+
     lea       starting_solvalou_tbl,a0
-    moveq     #0,d0
     move.b    (dswa),d0
     lsr.b     #5,d0
-    and.b     #3,d0                               | lives setting
-    move.b    (d0.w,a0),d0                        | lives   
+    and.w     #3,d0                             | lives setting
+    move.b    (d0.w,a0),d0                      | lives   
     move.b    d0,(curr_player_solvalou_left)
     move.w    #OPT_START_AREA-1,(area)
     clr.b     (enemy_AI_level)
-    moveq     #0,d0
     move.b    (dswa),d0
     lsr.b     #5,d0
-    and.b     #3,d0                               | lives setting
-    eori.b    #3,d0                               | +ve logic
-    beq       1f
-    move.b    #1,d0
-1:  movea.l   #first_bonus_life_tbls,a0
-    lsl.w     #4,d0                               | table offset
-    move.l    (a0,d0.w),a0                        | get table address
+    and.w     #3,d0                             | lives setting
+    eori.b    #3,d0                             | +ve logic
+    beq.b     1f
+    moveq     #1,d0
+1:  lea       first_bonus_life_tbls,a0
+    lsl.w     #4,d0                             | table offset
+    move.l    (a0,d0.w),a0                      | get table address
     move.b    (dswa),d0
     not.b     d0
     lsr.b     #2,d0
-    and.w     #7,d0
+    and.w     #7,d0                             | bonus life setting 
     lsl.w     #1,d0
     move.w    (a0,d0.w),(next_bonus_life_Ks)
-    move.b    #1,(solvalou_number)                | used in AI
+    move.b    #1,(solvalou_number)              | used in AI
     move.b    (dswa),d1
     not.b     d1
     ror.b     #2,d1
-    and.w     #7,d1
     moveq     #0,d0
-    tst.b     d1
-    bne       2f
+    and.w     #7,d1                             | bonus life setting (again)
+    bne.b     2f
     addq.b    #1,d0
 2:  move.b    d0,(bonus_life_none)
-    tst.b     (two_player_game)
-    beq       main_gameplay_loop
-    ** clear score areas
+    tst.b     (two_player_game)                 | 2 players?
+    beq.b     main_gameplay_loop                | no, skip
+    lea       curr_player_score_msb,a0
+    lea       other_player_score_msb,a1
+3:  move.b    (a0)+,(a1)+                       | init P2 settings
+    cmpa.l    #other_player_score_msb,a0
+    bne.b     3b
     ** TBD sound
     
 main_gameplay_loop: | $0593
@@ -417,10 +418,10 @@ main_gameplay_loop: | $0593
     clr.b     (num_bacura)
     clr.b     (bacura_inc_cnt)
     clr.b     (solvalou_exploding)
-    bsr       fill_fg_rams_with_0x24
-    bsr       fill_bg_with_0x88
-    bsr       display_all_scores
-    bsr       display_solvalou_left
+    jsr       clear_fg_to_transparent
+    jsr       fill_bg_with_0x88
+    jsr       display_all_scores
+    jsr       display_solvalou_left
     movea.l   #main_fn_31__handle_bombing,a0
     move.l    a0,(main_fn_tbl_RAM+4*31)         | reset entry point
     movea.l   #main_fn_1__handle_solvalou,a0
@@ -428,16 +429,16 @@ main_gameplay_loop: | $0593
     clr.b     (scroll_disabled)
     ** TBD sound
     move.b    #0xa0,(countdown_timer_1)
-    bsr       display_player_start_msgs
-    bsr       save_PC_to_fn_tbl_and_ret
+    jsr       display_player_start_msgs
+    jsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
     beq       1f
     rts
-1:  bsr       wipe_player_start_msgs
-    bsr       save_PC_to_fn_tbl_and_ret
+1:  jsr       wipe_player_start_msgs
+    jsr       save_PC_to_fn_tbl_and_ret
     tst.b     (scroll_disabled)
     beq       9f
-    bsr       fill_bg_with_0x88
+    jsr       fill_bg_with_0x88
     move.b    #64,(countdown_timer_1)
     * this is handled in the SUB CPU...
     * so not quite sure why this needs to be done here (as well)?
@@ -479,10 +480,10 @@ main_gameplay_loop: | $0593
 game_over: | $064E
     tst.b     (two_player_game)
     beq       2f
-    bsr       fill_fg_rams_with_0x24
-    bsr       fill_bg_with_0x88
-    bsr       display_all_scores
-    bsr       display_game_over_player_1_2
+    jsr       clear_fg_to_transparent
+    jsr       fill_bg_with_0x88
+    jsr       display_all_scores
+    jsr       display_game_over_player_1_2
     move.b    #128,(countdown_timer_1)
     jsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
@@ -494,7 +495,7 @@ game_over: | $064E
     beq       game_over_1_player
 
 next_player: | $0674
-    bsr       swap_curr_other_player
+    jsr       swap_curr_other_player
     eor.b     #1,(curr_player)
     bra       main_gameplay_loop
     
@@ -504,19 +505,19 @@ main_gameplay_loop_cont: | $0682
     bra       main_gameplay_loop
 
 game_over_1_player: | $068B
-    bsr       fill_fg_rams_with_0x24
-    bsr       fill_bg_with_0x88
-    bsr       display_all_scores
-    bsr       display_game_over_player_1_2
+    jsr       clear_fg_to_transparent
+    jsr       fill_bg_with_0x88
+    jsr       display_all_scores
+    jsr       display_game_over_player_1_2
     move.b    #128,(countdown_timer_1)
-    bsr       save_PC_to_fn_tbl_and_ret
+    jsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
     beq       1f
     rts
-1:  bsr       wipe_game_over_player_1_2
+1:  jsr       wipe_game_over_player_1_2
     tst.b     (curr_player)
     beq       main_thread_main_loop
-    bsr       swap_curr_other_player
+    jsr       swap_curr_other_player
     clr.b     (curr_player)
     bra       main_thread_main_loop
 
@@ -525,8 +526,9 @@ game_over_1_player: | $068B
 
 zero_share1: | $06E1
     * - does main_2_fn tables, main_30_fn_tbl and object tables
+    * *** FIXME
     lea       obj_tbl,a0
-    move.w    #32*64/4-1,d7
+    move.w    #_OBJSIZE*64/4-1,d7
 1:  clr.l     (a0)+
     dbf       d7,1b
     rts
@@ -544,7 +546,7 @@ zero_obj_state_tbl: | $06F0
     dbf       d7,2b
     rts
     
-fill_fg_rams_with_0x24: | $070D
+clear_fg_to_transparent: | $070D
     moveq     #0,d0                             | video offset
     move.w    #0x800-1,d7                       | length
     move.w    #0x24,d1                          | fg_attrib
@@ -559,7 +561,7 @@ fill_fg_rams_with_0x24: | $070D
     dbf       d7,2b
     rts
 
-zero_bg_rams: | $072A
+clear_bg_to_black: | $072A
     move.w    #0,d0                             | offset
     move.w    #3,d1                             | colour
     move.w    #0x800-1,d7
@@ -1053,8 +1055,8 @@ attract_mode_jump_tbl: | $0C40
     .long     attract_mode_high_score_table
 
 attract_mode_title_screen: | $0C48
-    jsr       zero_bg_rams
-    jsr       fill_fg_rams_with_0x24
+    jsr       clear_bg_to_black
+    jsr       clear_fg_to_transparent
     jsr       display_copyright_msgs
     jsr       display_all_scores
     jsr       display_xevious_logo_flashing
@@ -1144,7 +1146,7 @@ attract_mode_gameplay: | $0D35
     movea.l   #area_object_tbl_tbl,a0
     lsl.w     #1,d0                             | redundant
     move.l    (a0,d0.w),(area_obj_ptr)          | init area object ptr
-    jsr       fill_fg_rams_with_0x24
+    jsr       clear_fg_to_transparent
     jsr       fill_bg_with_0x88
     jsr       display_all_scores
     jsr       display_copyright_msgs
@@ -1321,13 +1323,13 @@ display_solvalou_left: | $0F68
     bra       display_char_B_times
     
 flash_logo_and_high_score_table: | $1000
-    jsr       fill_fg_rams_with_0x24
-    jsr       zero_bg_rams
+    jsr       clear_fg_to_transparent
+    jsr       clear_bg_to_black
     jsr       display_xevious_logo_flashing
     bra       loc_1011
 
 cls_display_high_score_table: | $100B
-    jsr       fill_fg_rams_with_0x24
+    jsr       clear_fg_to_transparent
     jsr       fill_bg_with_0x88
 
 loc_1011: | $1011
@@ -2192,7 +2194,7 @@ main_fn_31__handle_bombing: | $1862
     tst.b     (attract_mode_stage)              | in attract mode?
     bne       gen_random_bomb_press             | yes, go
 * read BUTTON2 from h/w
-    btst.b    #0,(dswb)                    | bomb pressed?
+    btst.b    #0,(dswb)                         | bomb pressed?
     bne       9f                                | no, return
     jsr       save_PC_to_fn_tbl_and_ret
 
@@ -5566,28 +5568,28 @@ str_AMIGA_by_tcdev_jotd:
 .endif
     
 cpl_and_display_string_16: | $3B48
-    movea.l   #unk_8480,a1
+    movea.l   #str_decrypt_buf,a1
     moveq     #16-1,d7
 1:  move.b    (a0)+,d0
     not.b     d0
     move.b    d0,(a1)+
     dbf       d7,1b
     move.w    #0x1921,d0                        | screen col,row
-    lea       unk_8480,a0                       | string
+    lea       str_decrypt_buf,a0                | string
     moveq     #16,d7                            | length
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_string
     rts 
     
 cpl_and_display_string_24: | $3B62
-    movea.l   #unk_8480,a1
+    movea.l   #str_decrypt_buf,a1
     moveq     #24-1,d7
 1:  move.b    (a0)+,d0
     not.b     d0
     move.b    d0,(a1)+
     dbf       d7,1b
     move.w    #0x1722,d0                        | screen col,row
-    lea       unk_8480,a0                       | string
+    lea       str_decrypt_buf,a0                | string
     moveq     #24,d7                            | length
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_string
@@ -5895,41 +5897,37 @@ _end_of_xevious_main_rom:
     
 * RAM and variables
 
-    .align 4                            
-main_fn_tbl_RAM:                        ds.l  32
-main_2_fn_tbl_1:                        ds.l  32          | 32 objects
-                                        ds.l  4           | solvalou
-main_30_fn_tbl:                         ds.l  3           | player shots
-main_2_fn_tbl_2:                        ds.l  25          | 25 objects
-                                        
-    .align 2                            
-attract_mode_stage:                     ds.w  1
-vb_semaphore_main:                      ds.b  1           | 
-countup_timer_1:                        ds.b  1           | 
-                                        
+* $7900-
+
+    .align 0x1000
+* 64 objects, 32 bytes per object
+obj_tbl:                                ds.b  _OBJSIZE*64
+
+* $8000-$83FF
+
+vb_semaphore_main:                      ds.b  1
+countup_timer_1:                        ds.b  1
 vb_semaphore_sub:                       ds.b  1
-                                        
+    .align 2
+pseudo_random_seed:                     ds.w  1
+bg_scroll_x_shadow:                     ds.w  1
+scroll_cntr:                            ds.w  1
+area_offset_in_map:                     ds.b  1
+    .align 2
+scroll_delta:                           ds.w  1
+dswa:                                   ds.b  1
+dswb:                                   ds.b  1
 P1_inputs:                              ds.b  1
-P2_inputs:                              ds.b  1           | must follow P1_inputs
+P2_inputs:                              ds.b  1   | must follow P1_inputs
 start_pressed:                          ds.b  1
 pulsing_colour_1:                       ds.b  1
 curr_player:                            ds.b  1
 two_player_game:                        ds.b  1
 is_real_game:                           ds.b  1
-pulsing_colour_2:                       ds.b  1
-shot_flag:                              ds.b  1
-shot_timer_init_value:                  ds.b  1
-shot_timer:                             ds.b  1
-andor_genesis_colour:                   ds.b  1
-countdown_timer_1:                      ds.b  1
-solvalou_exploding:                     ds.b  1
-new_high_score_entry_index:             ds.b  1
-name_entry_char_cnt:                    ds.b  1
-    .align 2
-name_entry_curr_char_screen_offset:     ds.w  2
-name_entry_ptr_curr_char:               ds.l  1
 RAM_high_score:
 high_score_msb:                         ds.b  3
+    .align 2
+attract_mode_stage:                     ds.w  1
 num_credits:                            ds.b  1
 scroll_disabled:                        ds.b  1
 num_flying_enemies:                     ds.b  1
@@ -5937,12 +5935,25 @@ flying_enemy_type_tbl_offset:           ds.b  1
 num_bacura:                             ds.b  1
 sheonite_end_flag:                      ds.b  1
 andor_genesis_end_flag:                 ds.b  1
-area_offset_in_map:                     ds.b  1
-
-* current player state information
-
+shot_flag:                              ds.b  1
+shot_timer_init_value:                  ds.b  1
+shot_timer:                             ds.b  1
+andor_genesis_colour:                   ds.b  1
+countdown_timer_1:                      ds.b  1
     .align 2
+next_domogram:                          ds.w  1
+pulsing_colour_2:                       ds.b  1
+solvalou_exploding:                     ds.b  1
+new_high_score_entry_index:             ds.b  1
+name_entry_char_cnt:                    ds.b  1
+    .align 2
+name_entry_curr_char_screen_offset:     ds.w  2
+name_entry_ptr_curr_char:               ds.l  1
+*** SPRITERAM_1_SHADOW was here ***
+* current player state information
+* - was $40 (64) bytes, P2 needs to be the same
 * need to read msb,Ks as a word
+    .align 2
 curr_player_score_msb:                  ds.b  1
 curr_player_score_Ks:                   ds.b  1
 curr_player_score_lsb:                  ds.b  1
@@ -5950,70 +5961,74 @@ curr_player_solvalou_left:              ds.b  1
     .align 2                            
 area_obj_ptr:                           ds.l  1
 area:                                   ds.w  1
-next_domogram:                          ds.w  1
-next_bonus_life_Ks:                     ds.w  1
-
 enemy_AI_level:                         ds.b  1
+    .align 2                            
+next_bonus_life_Ks:                     ds.w  1
 solvalou_number:                        ds.b  1
 bonus_life_none:                        ds.b  1
-bacura_inc_cnt:                         ds.b  1
-one_second_cntr:                        ds.b  1
-
 * this value is set from the object table
 * in the SUB CPU as the map is generated
 * used for both Derota & Garu Derota
 * area01=$0F, area03=$03, area05=$07,$0F, area06=$07
 ffreq_mask_derota:                      ds.b  1
-
 * this value is set from the object table
 * in the SUB CPU as the map is generated
 * area01=$07, area12=$03
 ffreq_mask_kapi:                        ds.b  1
-
 * this value is set from the object table
 * in SUB CPU as map is generated
 * area01=$07 area12=$03
 ffreq_mask_terrazi:                     ds.b  1
-
 * this value is set from the object table
 * in SUB CPU as map is generated
 * area01=$FF,$1F area05=$0F
 ffreq_mask_logram:                      ds.b  1
-
 * this value is set from the object table
 * in SUB CPU as map is generated
 * area01=$1F area12=$0F
 ffreq_mask_zoshi:                      ds.b 1
-
 * this value is set from the object table
 * in SUB CPU as map is generated
 * area01=$1F area05=$0F area07=$07
 ffreq_mask_boza_logram:                 ds.b  1
-
 * this value is set from the object table
 * in SUB CPU as map is generated
 * area01=$1F area05=$0F area06=$FF,$0F area07=$3F
 * area08=$FF, area10=$3F, area12=$0F, area16=$1F
 ffreq_mask_domogram:                    ds.b  1
-
-
 * this value is set from the object table
 * in SUB CPU as map is generated
 * area04=$2F area09=$0F area14=$0F
 ffreq_mask_andor_genesis:               ds.b  1
-                                        
 gnd_stop_firing_row:                    ds.b  1
-
 * other player state information
-
+* - needs to be at least 64 ($40) bytes
 other_player_score_msb:                 ds.b  3
 other_player_solvalou_left:             ds.b  1
+other_player_filler:                    ds.b  60
+*** SPRITERAM_2_SHADOW was here ***
+    .align 4                            
+main_fn_tbl_RAM:                        ds.l  32
+main_2_fn_tbl_1:                        ds.l  32          | 32 objects
+                                        ds.l  4           | solvalou
+main_30_fn_tbl:                         ds.l  3           | player shots
+main_2_fn_tbl_2:                        ds.l  25          | 25 objects
+*** SPRITERAM_3_SHADOW was here ***
+watermark_0x8400:
+
+* $8400-
+                                        
+bacura_inc_cnt:                         ds.b  1
+one_second_cntr:                        ds.b  1
+* buffer for decrypting easter egg messsages
+str_decrypt_buf:                        ds.b  32
+
+* $8500-
 
 * name_buffer MUST follow RAM_test_result_final_score
 RAM_test_result_final_score:            ds.b  3
 name_buffer:                            ds.b  10
                                         ds.b  3
-                                        
 high_score_1st_msb:                     ds.b  3
 high_score_1st_name:                    ds.b  10
                                         ds.b  3
@@ -6029,25 +6044,9 @@ high_score_4th_name:                    ds.b  10
 high_score_5th_msb:                     ds.b  3
 high_score_5th_name:                    ds.b  10
                                         ds.b  3
-                                        
 maincpu_inited:                         ds.b  1
 
-* buffer for decrypting easter egg messsages
-unk_8480:                               ds.b  32
-                              
-*** different size/align or not from transcode
-
-    .align 2
-pseudo_random_seed:                     ds.w  1
-bg_scroll_x_shadow:                     ds.w  1
-scroll_cntr:                            ds.w  1
-scroll_delta:                           ds.w  1
-dswa:                              ds.b  1
-dswb:                              ds.b  1
-
-    .align 0x1000
-* 64 objects, 32 bytes per object
-obj_tbl:                                ds.b  _OBJSIZE*64
+* $9380-
 
 * 12 entries, 64 bytes per entry
 domogram_tbl:                           ds.b  64*12
