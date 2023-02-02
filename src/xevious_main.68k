@@ -399,9 +399,9 @@ coined_up:
     beq.b     main_gameplay_loop                | no, skip
     lea       curr_player_score_msb,a0
     lea       other_player_score_msb,a1
+    move.w    #64-1,d7                          | 64 bytes to copy
 3:  move.b    (a0)+,(a1)+                       | init P2 settings
-    cmpa.l    #other_player_score_msb,a0
-    bne.b     3b
+    dbf       d7,3b
     ** TBD sound
     
 main_gameplay_loop: | $0593
@@ -508,7 +508,7 @@ game_over_1_player: | $068B
     jsr       clear_fg_to_transparent
     jsr       fill_bg_with_forest
     jsr       display_all_scores
-    jsr       display_game_over_player_1_2
+    jsr       display_game_over
     move.b    #128,(countdown_timer_1)          | init timer
     jsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
@@ -549,27 +549,27 @@ zero_obj_state_tbl: | $06F0
 clear_fg_to_transparent: | $070D
     moveq     #0,d0                             | video offset
     move.w    #0x800-1,d7                       | length
-    move.w    #0x24,d1                          | fg_attrib
+    moveq     #0x24,d1                          | fg_attrib
 1:  jsr       osd_w_fg_colorram
     addq.w    #1,d0
     dbf       d7,1b
     moveq     #0,d0                             | video offset
     move.w    #0x800-1,d7                       | length
-    move.w    #0x24,d1                          | fg_tile
+    moveq     #0x24,d1                          | fg_tile
 2:  jsr       osd_w_fg_videoram
     addq.w    #1,d0                             | next offset
     dbf       d7,2b
     rts
 
 clear_bg_to_black: | $072A
-    move.w    #0,d0                             | offset
-    move.w    #3,d1                             | colour
+    moveq     #0,d0                             | offset
+    moveq     #3,d1                             | colour
     move.w    #0x800-1,d7
 1:  jsr       osd_w_bg_colorram
     addq.w    #1,d0
     dbf       d7,1b
-    move.w    #0,d0                             | offset
-    move.w    #0,d1                             | tile
+    moveq     #0,d0                             | offset
+    moveq     #0,d1                             | tile
     move.w    #0x800-1,d7
 2:  jsr       osd_w_bg_videoram
     addq.w    #1,d0
@@ -577,15 +577,15 @@ clear_bg_to_black: | $072A
     rts
 
 fill_bg_with_forest: | $0747
-    move.w    #0,d0                             | offset
-    move.w    #0,d1                             | colour
+    moveq     #0,d0                             | offset
+    moveq     #0,d1                             | colour
     move.w    #0x800-1,d7
 1:  jsr       osd_w_bg_colorram
     addq.w    #1,d0
     dbf       d7,1b
-    move.w    #0,d0                             | offset
+    moveq     #0,d0                             | offset
     move.w    #0x88,d1                          | starting tile
-    move.w    #0x1c-1,d7                        | one column
+    moveq     #0x1c-1,d7                        | one column
 2:  jsr       osd_w_bg_videoram
     addq.w    #1,d0                             | inc offset
     addq.w    #1,d1                             | next tile
@@ -600,17 +600,23 @@ fill_bg_with_forest: | $0747
     rts
 
 swap_curr_other_player: | $076D
-    **
+    lea       curr_player_score_msb,a0
+    lea       other_player_score_msb,a1
+    moveq     #64-1,d7                          | 64 bytes to swap
+1:  move.b    (a0),d0
+    move.b    (a1),(a0)+
+    move.b    d0,(a1)+
+    dbf       d7,1b
     rts
     
 display_player_start_msgs: | $077F
     moveq     #0,d0
     move.b    (curr_player),d0
-    movea.l   #player_1_2_str_tbl,a0
-    lsl.w     #1,d0
-    move.l    (a0,d0.w),a0
+    lea       player_1_2_str_tbl,a0
+    lsl.w     #2,d0                             | calc offset
+    move.l    (a0,d0.w),a0                      | ptr to P1/P2 string addr
     move.w    #0x1217,d0                        | screen col,row
-    move.w    #10,d7
+    moveq     #10,d7                            | 10 bytes to display
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_string
     move.w    #0x1019,d0                        | screen col,row
@@ -625,77 +631,77 @@ display_player_start_msgs: | $077F
     jsr       display_string
     move.w    #0x151B,d0                        | screen col,row
     move.b    (curr_player_solvalou_left),d1
-    jsr       display_char
-    rts
+    jsr       display_char                      | this could be a jmp
+    rts                                         | preseverved to document
     
 wipe_player_start_msgs: | $07B7
     move.w    #0x1217,d0                        | screen col,row
-    move.w    #10,d7                            | length
-    move.w    #0x24,d1                          | tile
+    moveq     #10,d7                            | length
+    moveq     #0x24,d1                          | tile
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_char_B_times
     move.w    #0x1019,d0                        | screen col,row
-    move.w    #6,d7                             | length
-    move.w    #0x24,d1                          | tile
+    moveq     #6,d7                             | length
+    moveq     #0x24,d1                          | tile
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_char_B_times
-    move.w    #16,d7                            | length
+    moveq     #16,d7                            | length
     move.w    #0x151B,d0                        | screen col,row
-    move.w    #0x24,d1                          | tile
+    moveq     #0x24,d1                          | tile
     moveq     #BANK_FG_VIDEORAM,d2
-    jsr       display_char_B_times
-    rts
+    jsr       display_char_B_times              | this could be a jmp    
+    rts                                         | preseverved to document
         
 display_copyright_msgs: | $07DC
     move.w    #0x161f,d0                        | screen col,row
     lea       strCOPYRIGHT,a0
-    move.w    #19,d7                            | string length
+    moveq     #19,d7                            | string length
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_string
     move.w    #0x1021,d0                        | screen col,row
     lea       strNAMCO,a0
-    move.w    #7,d7                             | string length
+    moveq     #7,d7                             | string length
     jsr       display_string
     move.w    #0x1021,d0                        | screen col,row
-    move.w    #7,d7                             | length
+    moveq     #7,d7                             | length
     move.w    #0x1a,d1                          | attr
     moveq     #BANK_FG_COLORRAM,d2
-    jsr       display_char_B_times
-    rts
+    jsr       display_char_B_times              | this could be a jmp    
+    rts                                         | preseverved to document
 
 display_credits: | $0801
     move.w    #0x923,d0                         | screen col,row
     lea       strCREDIT,a0
-    move.w    #6,d7                             | string length
+    moveq     #6,d7                             | string length
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_string
     sub.w     #0x0100,d0                        | skip column
-    move.b    (num_credits),d1
+    move.b    (num_credits),d1                  | BCD
     lsr.b     #4,d1
-    and.w     #0x0f,d1
+    and.w     #0x0f,d1                          | tens
     jsr       display_char
     move.b    (num_credits),d1
-    and.w     #0x0f,d1
+    and.w     #0x0f,d1                          | units
     bra       display_char
     
 display_1_only_or_1_2_players: | $0823
     moveq     #0,d0
     move.b    (num_credits),d0
     cmp.b     #1,d0
-    beq       1f
+    beq.b     1f
     clr.w     d0
 1:  lea       one_only_one_or_two_str_tbl,a0
-    lsl.w     #2,d0
+    lsl.w     #2,d0                             | calc offset
     movea.l   (a0,d0.w),a0
     move.w    #0x1519,d0                        | screen col,row
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     moveq     #BANK_FG_VIDEORAM,d2
     bra       display_string        
     
 display_push_start_button: | $083C
     move.w    #0x1517,d0                        | screen col,row
     lea       strPUSH_START_BUTTON,a0
-    move.w    #17,d7                            | string length
+    moveq     #17,d7                            | string length
     moveq     #BANK_FG_VIDEORAM,d2
     bra       display_string
 
@@ -720,8 +726,8 @@ display_game_over_player_1_2: | $086A
     jsr       display_game_over
     moveq     #0,d0
     move.b    (curr_player),d0
-    movea.l   #player_1_2_str_tbl,a0
-    lsl.b     #1,d0
+    lea       player_1_2_str_tbl,a0
+    lsl.b     #2,d0                             | calc offset
     move.l    (a0,d0.w),a0                      | get string address
     move.w    #0x121A,d0                        | screen col,row
     moveq     #10,d7
@@ -730,198 +736,197 @@ display_game_over_player_1_2: | $086A
         
 display_insert_coin_flashing: | $0881
     move.b    (countup_timer_1),d0
-    move.b    d0,d1
-    and.b     #0x0f,d0
-    bne       9f
+    move.b    d0,d1                             | copy
+    and.b     #0x0f,d0                          | timer expired?
+    bne.b     9f                                | no, return
     lsr.b     #4,d1
-    and.b     #1,d1
-    beq       wipe_insert_coin
+    and.b     #1,d1                             | timer to wipe msg?
+    beq.b     wipe_insert_coin                  | yes, go
     move.w    #0x121C,d0                        | offset
     lea       strINSERT_COIN,a0
-    move.w    #11,d7                            | string length
+    moveq     #11,d7                            | string length
     move.w    #BANK_FG_VIDEORAM,d2
     bra       display_string
+9:  rts
 
 wipe_insert_coin: | $089E
     move.w    #0x121C,d0                        | offset
-    move.w    #11,d7                            | string length
+    moveq     #11,d7                            | string length
     move.w    #BANK_FG_VIDEORAM,d2
-    move.w    #0x24,d1                          | tile
+    moveq     #0x24,d1                          | tile
     bra       display_char_B_times
         
-9:  rts
-
 display_xevious_logo_flashing: | $08AA
     move.w    #4,(bg_scroll_x_shadow)
     moveq     #BANK_BG_VIDEORAM,d2
     move.w    #0x1509,d0                        | screen col,row
     lea       xevious_logo_flashing_pt1,a0
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     jsr       display_string
     move.w    #0x160A,d0                        | screen col,row
     lea       xevious_logo_flashing_pt2,a0
-    move.w    #19,d7                            | string length
+    moveq     #19,d7                            | string length
     jsr       display_string
     move.w    #0x150B,d0                        | screen col,row
     lea       xevious_logo_flashing_pt3,a0
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     jsr       display_string
     move.w    #0x160C,d0                        | screen col,row
     lea       xevious_logo_flashing_pt4,a0
-    move.w    #19,d7                            | string length
+    moveq     #19,d7                            | string length
     jsr       display_string
     move.w    #0x170D,d0                        | screen col,row
     lea       xevious_logo_flashing_pt5,a0
-    move.w    #20,d7                            | string length
+    moveq     #20,d7                            | string length
     jsr       display_string
     move.w    #0x170E,d0                        | screen col,row
     lea       xevious_logo_flashing_pt6,a0
-    move.w    #19,d7                            | string length
+    moveq     #19,d7                            | string length
     jsr       display_string
     move.w    #0x170F,d0                        | screen col,row
     lea       xevious_logo_flashing_pt7,a0
-    move.w    #17,d7                            | string length
+    moveq     #17,d7                            | string length
     jsr       display_string
     move.w    #0x1510,d0                        | screen col,row
     move.w    #0xf9,d1                          | tile
     jsr       display_char
     moveq     #BANK_BG_COLORRAM,d2
     move.w    #0x1509,d0                        | screen col,row
-    move.w    #0x0D,d1                          | attr
-    move.w    #18,d7                            | string length
+    moveq     #0x0D,d1                          | attr
+    moveq     #18,d7                            | string length
     jsr       display_char_B_times
     move.w    #0x160A,d0                        | screen col,row
-    move.w    #0x0d,d1                          | attr
-    move.w    #19,d7                            | string length
+    moveq     #0x0d,d1                          | attr
+    moveq     #19,d7                            | string length
     jsr       display_char_B_times
     move.w    #0x150B,d0                        | screen col,row
-    move.w    #0x11,d1                          | attr
-    move.w    #2,d7                             | string length
+    moveq     #0x11,d1                          | attr
+    moveq     #2,d7                             | string length
     jsr       display_char_B_times
     move.w    #0x15,d1                          | attr
-    move.w    #15,d7                            | string length
+    moveq     #15,d7                            | string length
     jsr       display_char_B_times
-    move.w    #0x11,d1                          | attr
+    moveq     #0x11,d1                          | attr
     jsr       display_char
     move.w    #0x160C,d0                        | screen col,row
-    move.w    #0x13,d1                          | attr
-    move.w    #2,d7                             | string length
+    moveq     #0x13,d1                          | attr
+    moveq     #2,d7                             | string length
     jsr       display_char_B_times
-    move.w    #0x17,d1                          | attr
-    move.w    #16,d7                            | string length
+    moveq     #0x17,d1                          | attr
+    moveq     #16,d7                            | string length
     jsr       display_char_B_times
-    move.w    #0x13,d1                          | attr
+    moveq     #0x13,d1                          | attr
     jsr       display_char
     move.w    #0x170D,d0                        | screen col,row
-    move.w    #0x13,d1                          | attr
-    move.w    #2,d7                             | string length
+    moveq     #0x13,d1                          | attr
+    moveq     #2,d7                             | string length
     jsr       display_char_B_times
-    move.w    #0x17,d1                          | attr
-    move.w    #16,d7                            | string length
+    moveq     #0x17,d1                          | attr
+    moveq     #16,d7                            | string length
     jsr       display_char_B_times
-    move.w    #0x0f,d1                          | attr
+    moveq     #0x0f,d1                          | attr
     jsr       display_char
-    move.w    #0x13,d1                          | attr
+    moveq     #0x13,d1                          | attr
     jsr       display_char
     move.w    #0x170E,d0                        | screen col,row
-    move.w    #0x13,d1                          | attr
+    moveq     #0x13,d1                          | attr
     jsr       display_char
-    move.w    #0x19,d1                          | attr
-    move.w    #17,d7                            | string length
+    moveq     #0x19,d1                          | attr
+    moveq     #17,d7                            | string length
     jsr       display_char_B_times
-    move.w    #0x18,d1                          | attr
+    moveq     #0x18,d1                          | attr
     jsr       display_char
     move.w    #0x170F,d0                        | screen col,row
-    move.w    #0x18,d1                          | attr
-    move.w    #2,d7                             | string length
+    moveq     #0x18,d1                          | attr
+    moveq     #2,d7                             | string length
     jsr       display_char_B_times
-    move.w    #0x19,d1                          | attr
+    moveq     #0x19,d1                          | attr
     jsr       display_char
-    move.w    #0x18,d1                          | attr
-    move.w    #14,d7                            | string length
+    moveq     #0x18,d1                          | attr
+    moveq     #14,d7                            | string length
     jsr       display_char_B_times
     move.w    #0x1510,d0                        | screen col,row
-    move.w    #0x18,d1                          | attr
+    moveq     #0x18,d1                          | attr
     jsr       display_char
     moveq     #BANK_FG_VIDEORAM,d2
     move.w    #0x150B,d0                        | screen col,row
     lea       xevious_logo_flashing_pt8,a0
-    move.w    #17,d7                            | string length
+    moveq     #17,d7                            | string length
     jsr       display_string
     move.w    #0x130C,d0                        | screen col,row
     lea       xevious_logo_flashing_pt9,a0
-    move.w    #14,d7                            | string length
+    moveq     #14,d7                            | string length
     jsr       display_string
     move.w    #0x140D,d0                        | screen col,row
     lea       xevious_logo_flashing_pt10,a0
-    move.w    #16,d7                            | string length
+    moveq     #16,d7                            | string length
     jsr       display_string
     move.w    #0x150E,d0                        | screen col,row
     lea       xevious_logo_flashing_pt11,a0
-    move.w    #16,d7                            | string length
+    moveq     #16,d7                            | string length
     jsr       display_string
-    move.w    #0x1A,d1                          | red
+    moveq     #0x1A,d1                          | red
     
 set_colour_xevious_flashing_logo:
     moveq     #BANK_FG_COLORRAM,d2
     move.w    #0x150B,d0                        | screen col,row
-    move.w    #17,d7                            | string length
+    moveq     #17,d7                            | string length
     jsr       display_char_B_times
     move.w    #0x130C,d0                        | screen col,row
-    move.w    #14,d7                            | string length
+    moveq     #14,d7                            | string length
     jsr       display_char_B_times
     move.w    #0x140D,d0                        | screen col,row
-    move.w    #16,d7                            | string length
+    moveq     #16,d7                            | string length
     jsr       display_char_B_times
     move.w    #0x150E,d0                        | screen col,row
-    move.w    #16,d7                            | string length
+    moveq     #16,d7                            | string length
     bra       display_char_B_times
 
 display_xevious_logo_yellow: | $09E8
     moveq     #BANK_FG_VIDEORAM,d2
     move.w    #0x160A,d0                        | screen col,row
     lea       xevious_logo_yellow_pt1,a0
-    move.w    #19,d7                            | string length
+    moveq     #19,d7                            | string length
     jsr       display_string
     move.w    #0x150B,d0                        | screen col,row
     lea       xevious_logo_yellow_pt2,a0
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     jsr       display_string
     move.w    #0x150C,d0                        | screen col,row
     lea       xevious_logo_yellow_pt3,a0
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     jsr       display_string
     move.w    #0x160D,d0                        | screen col,row
     lea       xevious_logo_yellow_pt4,a0
-    move.w    #19,d7                            | string length
+    moveq     #19,d7                            | string length
     jsr       display_string
     move.w    #0x170E,d0                        | screen col,row
     lea       xevious_logo_yellow_pt5,a0
-    move.w    #20,d7                            | string length
+    moveq     #20,d7                            | string length
     jsr       display_string
     move.w    #0x170F,d0                        | screen col,row
     lea       xevious_logo_yellow_pt6,a0
-    move.w    #13,d7                            | string length
+    moveq     #13,d7                            | string length
     jsr       display_string
-    move.w    #0x1B,d1                          | yellow
+    moveq     #0x1B,d1                          | yellow
     move.w    #0x160A,d0                        | screen col,row
     moveq     #BANK_FG_COLORRAM,d2
-    move.w    #19,d7                            | string length
+    moveq     #19,d7                            | string length
     jsr       display_char_B_times    
     move.w    #0x150B,d0                        | screen col,row
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     jsr       display_char_B_times    
     move.w    #0x150C,d0                        | screen col,row
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     jsr       display_char_B_times    
     move.w    #0x160D,d0                        | screen col,row
-    move.w    #19,d7                            | string length
+    moveq     #19,d7                            | string length
     jsr       display_char_B_times    
     move.w    #0x170E,d0                        | screen col,row
-    move.w    #20,d7                            | string length
+    move.q    #20,d7                            | string length
     jsr       display_char_B_times    
     move.w    #0x170F,d0                        | screen col,row
-    move.w    #13,d7                            | string length
+    move.q    #13,d7                            | string length
     bra       display_char_B_times    
     
 xevious_logo_flashing_pt8:
@@ -5959,7 +5964,8 @@ name_entry_curr_char_screen_offset:     ds.w  2
 name_entry_ptr_curr_char:               ds.l  1
 *** SPRITERAM_1_SHADOW was here ***
 * current player state information
-* - was $40 (64) bytes, P2 needs to be the same
+* - needs to be at least 64 ($40) bytes
+* - other needs to be the same
 * need to read msb,Ks as a word
     .align 2
 curr_player_score_msb:                  ds.b  1
@@ -6009,11 +6015,12 @@ ffreq_mask_domogram:                    ds.b  1
 * area04=$2F area09=$0F area14=$0F
 ffreq_mask_andor_genesis:               ds.b  1
 gnd_stop_firing_row:                    ds.b  1
+curr_player_filler:                     ds.b  64
 * other player state information
 * - needs to be at least 64 ($40) bytes
 other_player_score_msb:                 ds.b  3
 other_player_solvalou_left:             ds.b  1
-other_player_filler:                    ds.b  60
+other_player_filler:                    ds.b  64
 *** SPRITERAM_2_SHADOW was here ***
     .align 4                            
 main_fn_tbl_RAM:                        ds.l  32
