@@ -411,7 +411,7 @@ main_gameplay_loop: | $0593
     move.b    (a0,d0.w),(area_offset_in_map)
     move.w    #0xd00,(scroll_cntr)
     lea       area_object_tbl_tbl,a0
-    lsl.w     #2,d0                             | offset 4 area in table
+    lsl.w     #2,d0                             | offset for area in table
     move.l    (a0,d0.w),(area_obj_ptr)          | init area object ptr
     clr.b     (num_flying_enemies)
     clr.b     (flying_enemy_type_tbl_offset)
@@ -419,36 +419,36 @@ main_gameplay_loop: | $0593
     clr.b     (bacura_inc_cnt)
     clr.b     (solvalou_exploding)
     jsr       clear_fg_to_transparent
-    jsr       fill_bg_with_0x88
+    jsr       fill_bg_with_forest
     jsr       display_all_scores
     jsr       display_solvalou_left
-    movea.l   #main_fn_31__handle_bombing,a0
+    lea       main_fn_31__handle_bombing,a0
     move.l    a0,(main_fn_tbl_RAM+4*31)         | reset entry point
-    movea.l   #main_fn_1__handle_solvalou,a0
+    lea       main_fn_1__handle_solvalou,a0
     move.l    a0,(main_fn_tbl_RAM+4*1)          | reset entry point
     clr.b     (scroll_disabled)
     ** TBD sound
     move.b    #0xa0,(countdown_timer_1)
     jsr       display_player_start_msgs
     jsr       save_PC_to_fn_tbl_and_ret
-    subq.b    #1,(countdown_timer_1)
-    beq       1f
+    subq.b    #1,(countdown_timer_1)            | time to wipe start msgs?
+    beq.b     1f                                | yes, skip
     rts
 1:  jsr       wipe_player_start_msgs
     jsr       save_PC_to_fn_tbl_and_ret
-    tst.b     (scroll_disabled)
-    beq       9f
-    jsr       fill_bg_with_0x88
+    tst.b     (scroll_disabled)                 | disabled?
+    beq.w     9f                                | no, return
+    jsr       fill_bg_with_forest
     move.b    #64,(countdown_timer_1)
     * this is handled in the SUB CPU...
     * so not quite sure why this needs to be done here (as well)?
     move.b    (scroll_cntr),d0                  | MSB
     sub.b     #14,d0
     cmp.b     #54,d0                            | more than 70% thru?
-    bcc       2f                                | no, skip
+    bcc.b     2f                                | no, skip
     addq.w    #1,(area)                         | next area
     cmp.b     #16,(area)                        | last area?
-    bne       2f                                | no, skip
+    bne.b     2f                                | no, skip
     move.w    #6,(area)                         | restart at area=7
     * decrement the AI level according to the
     * STARTING LIVES dipswitch setting
@@ -459,90 +459,90 @@ main_gameplay_loop: | $0593
     movea.l   #enemy_AI_dec_value,a0
     move.b    (enemy_AI_level),d1
     sub.b     (a0,d0.w),d1                      | subtract table entry
-    bcc       3f                                | skip if positive
+    bcc.b     3f                                | skip if positive
     clr.b     d1
 3:  move.b    d1,(enemy_AI_level)
     jsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
-    bne       9f
+    bne.b     9f
     * remove all solvalou-related objects
     moveq     #7-1,d7                           | 7 solvolou objects
-    movea.l   #obj_tbl+_OBJSIZE*0x20,a0         | bomb target
+    lea       obj_tbl+_OBJSIZE*0x20,a0          | bomb target
 4:  clr.b     (_STATE,a0)
     clr.b     (_ATTR,a0)
-    adda.l    #_OBJSIZE,a0
+    lea       (_OBJSIZE,a0),a0
     dbf       d7,4b
-    tst.b     (curr_player_solvalou_left)
-    bne       main_gameplay_loop_cont
+    tst.b     (curr_player_solvalou_left)       | any solvalou left?
+    bne       main_gameplay_loop_cont           | yes, continue
     bra       check_for_high_score
 9:  rts
 
 game_over: | $064E
-    tst.b     (two_player_game)
-    beq       2f
+    tst.b     (two_player_game)                 | two players?
+    beq.b     2f                                | no, skip
     jsr       clear_fg_to_transparent
-    jsr       fill_bg_with_0x88
+    jsr       fill_bg_with_forest
     jsr       display_all_scores
     jsr       display_game_over_player_1_2
-    move.b    #128,(countdown_timer_1)
+    move.b    #128,(countdown_timer_1)          | init timer
     jsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
-    beq       1f
+    beq.b     1f
     rts
 1:  jsr       wipe_game_over_player_1_2
     
-2:  tst.b     (other_player_solvalou_left)
-    beq       game_over_1_player
+2:  tst.b     (other_player_solvalou_left)      | other player still playing?
+    beq.b     game_over_1_player                | no, go
 
 next_player: | $0674
     jsr       swap_curr_other_player
-    eor.b     #1,(curr_player)
+    eor.b     #1,(curr_player)                  | switch player
     bra       main_gameplay_loop
     
 main_gameplay_loop_cont: | $0682
-    tst.b     (other_player_solvalou_left)
-    bne       next_player
+    tst.b     (other_player_solvalou_left)      | other player still playing?
+    bne.b     next_player                       | yes, go
     bra       main_gameplay_loop
 
 game_over_1_player: | $068B
     jsr       clear_fg_to_transparent
-    jsr       fill_bg_with_0x88
+    jsr       fill_bg_with_forest
     jsr       display_all_scores
     jsr       display_game_over_player_1_2
-    move.b    #128,(countdown_timer_1)
+    move.b    #128,(countdown_timer_1)          | init timer
     jsr       save_PC_to_fn_tbl_and_ret
     subq.b    #1,(countdown_timer_1)
-    beq       1f
+    beq.b     1f
     rts
 1:  jsr       wipe_game_over_player_1_2
-    tst.b     (curr_player)
-    beq       main_thread_main_loop
+    tst.b     (curr_player)                     | player 1?
+    beq       main_thread_main_loop             | yes, go
     jsr       swap_curr_other_player
-    clr.b     (curr_player)
+    clr.b     (curr_player)                     | set player=1
     bra       main_thread_main_loop
 
 *** $06B6-$06E0 contains code that blats memory
 *** and is never called. Why is it here?
 
 zero_share1: | $06E1
-    * - does main_2_fn tables, main_30_fn_tbl and object tables
-    * *** FIXME
-    lea       obj_tbl,a0
-    move.w    #_OBJSIZE*64/4-1,d7
-1:  clr.l     (a0)+
-    dbf       d7,1b
+    lea       main_2_fn_tbl_1,a0
+1:  clr.b     (a0)+
+    cmpa.l    #watermark_0x8000,a0
+    bne.b     1b
     rts
             
 zero_obj_state_tbl: | $06F0
-    movea.l   #obj_tbl,a5
-    moveq     #32-1,d7                          | 64/2=32 objects
+    lea       obj_tbl,a5
+    moveq     #32-1,d7                          | 32 objects
 1:  clr.w     (_STATE,a5)                       | state,bank
-    adda.w    #32,a5                            | next object
+    lea       (32,a5),a5                        | next object
     dbf       d7,1b
-    movea.l   #obj_tbl+_OBJSIZE*0x3A,a5         | flying enemies
-    moveq     #6,d7                             | fixing a bug - was 3
+    lea       obj_tbl+_OBJSIZE*0x3A,a5          | flying enemies
+    *** There was a BUG in the original
+    *** which cleared 6 bytes, rather than 6 objects (12 bytes)
+    moveq     #6-1,d7
 2:  clr.w     (_STATE,a5)                       | state,bank
-    adda.w    #32,a5                            | next object
+    lea       (32,a5),a5                        | next object
     dbf       d7,2b
     rts
     
@@ -576,7 +576,7 @@ clear_bg_to_black: | $072A
     dbf       d7,2b
     rts
 
-fill_bg_with_0x88: | $0747
+fill_bg_with_forest: | $0747
     move.w    #0,d0                             | offset
     move.w    #0,d1                             | colour
     move.w    #0x800-1,d7
@@ -584,18 +584,18 @@ fill_bg_with_0x88: | $0747
     addq.w    #1,d0
     dbf       d7,1b
     move.w    #0,d0                             | offset
-    move.w    #0x88,d1                          | tile
-    move.w    #0x1c-1,d7
+    move.w    #0x88,d1                          | starting tile
+    move.w    #0x1c-1,d7                        | one column
 2:  jsr       osd_w_bg_videoram
-    addq.w    #1,d0
-    addq.w    #1,d1
+    addq.w    #1,d0                             | inc offset
+    addq.w    #1,d1                             | next tile
     dbf       d7,2b
-    lea       bg_videoram,a0
-    move.w    #0x7e4-1,d7
+    lea       bg_videoram,a0                    | start of copy
+    move.w    #0x7e4-1,d7                       | length
     moveq     #0,d1
 3:  move.b    (a0)+,d1
-    jsr       osd_w_bg_videoram
-    addq.w    #1,d0
+    jsr       osd_w_bg_videoram                 | copy tile
+    addq.w    #1,d0                             | inc offset
     dbf       d7,3b
     rts
 
@@ -1147,7 +1147,7 @@ attract_mode_gameplay: | $0D35
     lsl.w     #1,d0                             | redundant
     move.l    (a0,d0.w),(area_obj_ptr)          | init area object ptr
     jsr       clear_fg_to_transparent
-    jsr       fill_bg_with_0x88
+    jsr       fill_bg_with_forest
     jsr       display_all_scores
     jsr       display_copyright_msgs
     jsr       display_xevious_logo_yellow
@@ -1330,7 +1330,7 @@ flash_logo_and_high_score_table: | $1000
 
 cls_display_high_score_table: | $100B
     jsr       clear_fg_to_transparent
-    jsr       fill_bg_with_0x88
+    jsr       fill_bg_with_forest
 
 loc_1011: | $1011
     jsr       display_player_scores
@@ -5897,6 +5897,13 @@ _end_of_xevious_main_rom:
     
 * RAM and variables
 
+* $7800-
+
+main_2_fn_tbl_1:                        ds.l  32          | 32 objects
+                                        ds.l  4           | solvalou
+main_30_fn_tbl:                         ds.l  3           | player shots
+main_2_fn_tbl_2:                        ds.l  25          | 25 objects
+
 * $7900-
 
     .align 0x1000
@@ -5905,6 +5912,7 @@ obj_tbl:                                ds.b  _OBJSIZE*64
 
 * $8000-$83FF
 
+watermark_0x8000:
 vb_semaphore_main:                      ds.b  1
 countup_timer_1:                        ds.b  1
 vb_semaphore_sub:                       ds.b  1
@@ -6009,15 +6017,11 @@ other_player_filler:                    ds.b  60
 *** SPRITERAM_2_SHADOW was here ***
     .align 4                            
 main_fn_tbl_RAM:                        ds.l  32
-main_2_fn_tbl_1:                        ds.l  32          | 32 objects
-                                        ds.l  4           | solvalou
-main_30_fn_tbl:                         ds.l  3           | player shots
-main_2_fn_tbl_2:                        ds.l  25          | 25 objects
 *** SPRITERAM_3_SHADOW was here ***
-watermark_0x8400:
 
 * $8400-
                                         
+watermark_0x8400:
 bacura_inc_cnt:                         ds.b  1
 one_second_cntr:                        ds.b  1
 * buffer for decrypting easter egg messsages
