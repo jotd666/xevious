@@ -16,6 +16,8 @@
 *    XREF _ciaa
 *    XREF _ciab
 *
+ciaa = 0xbfe001
+ciab = 0xbfd000
 CIAA = 0xbfe001
 CIAB = 0xbfd000
 

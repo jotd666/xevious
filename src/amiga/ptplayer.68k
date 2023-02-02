@@ -111,8 +111,7 @@ AUDLEN		=	4
 AUDPER		=	6
 AUDVOL		=	8
 
-CIAB = _ciab
-CIAA = _ciaa
+intreqR = intreqr
 
 * Sound effects structure, passed into _mt_playfx
 
@@ -302,7 +301,7 @@ mt_TimerAInt:
 	lea	_custom,a6
 	.ifdef	SDATA
 	lea	_LinkerDB,a4
-	else
+	.else
 	lea	mt_data(pc),a4
 	.endif
 
@@ -379,7 +378,7 @@ mt_TimerBsetrep:
 	* it was a TB interrupt, set repeat sample pointers and lengths
 	.ifdef	SDATA
 	lea	_LinkerDB,a4
-	else
+	.else
 	lea	mt_data(pc),a4
 	.endif
 	move.l	mt_chan1+n_loopstart(a4),AUD0LC-intreq(a6)
@@ -461,7 +460,7 @@ _mt_init:
 	cmp.b	d2,d1
 	bls	3f
 	move.b	d1,d2
-3:	dbf	d0,.2
+3:	dbf	d0,2b
 	addq.b	#1,d2		| number of patterns
 
 	* now we can calculate the base address of the sample data
@@ -484,7 +483,7 @@ _mt_init:
 	bra	7f
 6:	clr.w	42(a0)		| length 1 means zero -> no sample
 7:	lea	30(a0),a0
-	dbf	d0,.5
+	dbf	d0,5b
 
 	movem.l	(sp)+,d2/a2
 
@@ -554,7 +553,7 @@ _mt_end:
 
 	.ifdef	SDATA
 	clr.b	mt_Enable(a4)
-	else
+	.else
 	lea	mt_data+mt_Enable(pc),a0
 	clr.b	(a0)
 	.endif
@@ -608,7 +607,7 @@ _mt_playfx:
 
 	.ifdef	SDATA
 	movem.l	d2-d7/a0-a3/a5,-(sp)
-	else
+	.else
 	movem.l	d2-d7/a0-a5,-(sp)
 	lea	mt_data(pc),a4
 	.endif
@@ -882,7 +881,7 @@ exit_playfx:
 
 	.ifdef	SDATA
 	movem.l	(sp)+,d2-d7/a0-a3/a5
-	else
+	.else
 	movem.l	(sp)+,d2-d7/a0-a5
 	.endif
     * JOTD: moved the enable interrupt here because else
@@ -943,7 +942,7 @@ _mt_mastervol:
 	move.w	#0x4000,INTENA(a6)
 	.ifdef	SDATA
 	move.l	a0,mt_MasterVolTab(a4)
-	else
+	.else
 	lea	mt_data+mt_MasterVolTab(pc),a1
 	move.l	a0,(a1)
 	.endif
@@ -1680,7 +1679,7 @@ mt_toneporta:
 
 mt_toneporta_nc:
 	move.w	n_wantedperiod(a2),d1
-	beq	.6
+	beq	6f
 
 	move.w	n_toneportspeed(a2),d0
 	move.w	n_period(a2),d2
@@ -1713,7 +1712,7 @@ mt_toneporta_nc:
 	moveq	#-2,d1
 3:	addq.w	#2,d1
 	cmp.w	(a0)+,d2
-	dbhs	d0,.4
+	dbhs	d0,4f
 
 	move.w	d1,n_noteoff(a2)	| @@@ needed?
 	move.w	-(a0),d2

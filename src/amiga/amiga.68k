@@ -289,6 +289,12 @@ _user:
 	*move.l	#-1,pr_WindowPtr(A0)	| no more system requesters (insert volume, write protected...)
 
 .no_forbid:
+	* soundfx lib
+	lea		_custom,a6
+	sub.l	a0,a0	| assuming vbr=0
+	moveq	#1,d0	| PAL
+	jsr		_mt_install_cia
+	
 	jsr	 _detect_controller_types 
 
 
@@ -1193,7 +1199,7 @@ osd_debug_hook:
 	rts
 	
 osd_read_coin:
-	movem.l	d1/d2,-(a7)
+	movem.l	a0/d1/d2,-(a7)
 	move.b	#0,d0
 	move.l	_joypad_state(pc),d1
 	btst	#JPB_BTN_GRN,d1	
@@ -1201,10 +1207,13 @@ osd_read_coin:
 	move.l	_previous_joypad_state(pc),d2
 	btst	#JPB_BTN_GRN,d2	
 	bne.b	1f
+	lea		credit_sound,a0
+	lea		_custom,a6
+	jsr		_mt_playfx
 	bset	#0,d0
 1:
 	move.l	d1,_previous_joypad_state
-	movem.l	(a7)+,d1/d2
+	movem.l	(a7)+,a0/d1/d2
 	tst.b		d0	| required as API needs CCR!
 	rts
 		
@@ -1463,6 +1472,21 @@ _previous_joypad_state:
 		dc.l	0
 _gfxbase:
 	dc.l	0
+	
+FXFREQBASE = 3579564
+SOUNDFREQ = 22050
+
+	.macro	SOUND_ENTRY	sound_name,size,channel,soundfreq,volume
+\sound_name\()_sound:
+	.long	\sound_name\()_raw
+    .word   \size
+    .word   FXFREQBASE/\soundfreq,\volume
+	.byte	\channel
+	.byte	1
+    .endm
+
+	SOUND_ENTRY	credit,11808,1,SOUNDFREQ,40
+	
 *graphicsname:
 *	.ascii	"graphics.library"
 	
