@@ -1263,7 +1263,6 @@ octant_angle_tbl: | $0EE7
 * *** PROTECTION ROUTINTE $0F08-$0F4A
 * main_fn_6__protection
     
-*** TEST ME PROPERLY!!!   
 * returns in d0
 pseudo_random_gen: | $0F4B
     moveq     #0,d0
@@ -1287,106 +1286,109 @@ pseudo_random_gen: | $0F4B
 display_solvalou_left: | $0F68
     moveq     #0,d7
     move.b    (curr_player_solvalou_left),d7
-    bne       1f
-    rts
-1:  move.w    #0x25,d1                          | tile (solvalou icon)
+    beq.b     9f
+    moveq     #0x25,d1                          | tile (solvalou icon)
     move.w    #0x1B23,d0                        | screen col,row
     movem.w   d0/d7,-(a7)
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_char_B_times
     movem.w   (a7)+,d0/d7
     moveq     #BANK_FG_COLORRAM,d2
-    move.w    #0x2A,d1                          | colour
+    moveq     #0x2A,d1                          | colour
     bra       display_char_B_times
-    
+9:  rts
+
+* *** UNUSED block of $FF $0F83-$0FFF
+* *** padding for ROM device #1 (xvi_1.3p)
+  
 flash_logo_and_high_score_table: | $1000
     jsr       clear_fg_to_transparent
     jsr       clear_bg_to_black
     jsr       display_xevious_logo_flashing
-    bra       loc_1011
+    bra.s     display_high_score_table
 
 cls_display_high_score_table: | $100B
     jsr       clear_fg_to_transparent
     jsr       fill_bg_with_forest
 
-loc_1011: | $1011
+display_high_score_table: | $1011
     jsr       display_player_scores
     jsr       display_high_score_text
     jsr       display_high_score
     move.w    #0x1615,d0                        | screen col,row
     lea       strBest_Five_WARRIORS,a0
     moveq     #BANK_FG_VIDEORAM,d2
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     jsr       display_string
     move.w    #0x1918,d0                        | screen col,row
     lea       str1st,a0
-    move.w    #3,d7                             | string length
+    moveq     #3,d7                             | string length
     jsr       display_string
     move.w    #0x1418,d0                        | screen col,row
     lea       high_score_1st_msb,a0
     jsr       display_score
     move.w    #0x0B18,d0                        | screen col,row
     lea       high_score_1st_name,a0
-    move.w    #10,d7
+    moveq     #10,d7
     jsr       display_string
     move.w    #0x191A,d0                        | screen col,row
     lea       str2nd,a0
-    move.w    #3,d7                             | string length
+    moveq     #3,d7                             | string length
     jsr       display_string
     move.w    #0x141A,d0                        | screen col,row
     lea       high_score_2nd_msb,a0
     jsr       display_score
     move.w    #0x0B1A,d0                        | screen col,row
     lea       high_score_2nd_name,a0
-    move.w    #10,d7
+    moveq     #10,d7
     jsr       display_string
     move.w    #0x191C,d0                        | screen col,row
     lea       str3rd,a0
-    move.w    #3,d7                             | string length
+    moveq     #3,d7                             | string length
     jsr       display_string
     move.w    #0x141C,d0                        | screen col,row
     lea       high_score_3rd_msb,a0
     jsr       display_score
     move.w    #0x0B1C,d0                        | screen col,row
     lea       high_score_3rd_name,a0
-    move.w    #10,d7
+    moveq     #10,d7
     jsr       display_string
     move.w    #0x191E,d0                        | screen col,row
     lea       str4th,a0
-    move.w    #3,d7                             | string length
+    moveq     #3,d7                             | string length
     jsr       display_string
     move.w    #0x141E,d0                        | screen col,row
     lea       high_score_4th_msb,a0
     jsr       display_score
     move.w    #0x0B1E,d0                        | screen col,row
     lea       high_score_4th_name,a0
-    move.w    #10,d7
+    moveq     #10,d7
     jsr       display_string
     move.w    #0x1920,d0                        | screen col,row
     lea       str5th,a0
-    move.w    #3,d7                             | string length
+    moveq     #3,d7                             | string length
     jsr       display_string
     move.w    #0x1420,d0                        | screen col,row
     lea       high_score_5th_msb,a0
     jsr       display_score
     move.w    #0x0B20,d0                        | screen col,row
     lea       high_score_5th_name,a0
-    move.w    #10,d7
+    moveq     #10,d7
     bra       display_string
 
 strBest_Five_WARRIORS:
     .byte 0xB, 0x3A, 0x48, 0x49, 0x24, 0xF, 0x3E, 0x4B, 0x3A, 0x24, 0x20, 0xA, 0x1B, 0x1B, 0x12, 0x18
-    .byte 0x1B, 0x1C
+    .byte 0x1B, 0x1C                            | "Best Five Warriors"
 str1st:
-    .byte 1, 0x48, 0x49
+    .byte 1, 0x48, 0x49                         | "1st"
 str2nd:
-    .byte 2, 0x43, 0x39
+    .byte 2, 0x43, 0x39                         | "2nd"
 str3rd:
-    .byte 3, 0x47, 0x39
+    .byte 3, 0x47, 0x39                         | "3rd"
 str4th:
-    .byte 4, 0x49, 0x3D
+    .byte 4, 0x49, 0x3D                         | "4th"
 str5th:
-    .byte 5, 0x49, 0x3D
+    .byte 5, 0x49, 0x3D                         | "5th"
     
     .align 2
 
@@ -1424,12 +1426,12 @@ ROM_high_score_tbl: | $10F0
   .align 2
 
 check_for_high_score: | $1143
-    movea.l   #curr_player_score_msb,a0         | byte-swapped
-    movea.l   #RAM_test_result_final_score,a1
+    lea       curr_player_score_msb,a0         | byte-swapped
+    lea       RAM_test_result_final_score,a1
     moveq     #3-1,d7
 1:  move.b    (a0)+,(a1)+
     dbf       d7,1b                             | copy score to buffer
-    movea.l   #name_buffer+1,a0
+    lea       name_buffer+1,a0
     move.b    #0x24,(a1)
     moveq     #9-1,d7
 2:  move.b    (a1)+,(a0)+
@@ -1437,33 +1439,33 @@ check_for_high_score: | $1143
     
     moveq     #5-1,d7                         | 5 scores to check
 compare_high_score_entry: | $115B
-    movea.l   #RAM_test_result_final_score,a0
+    lea       RAM_test_result_final_score,a0
     move.w    d7,d0                           | iteration
     addq.w    #1,d0                           | (68k only)
     lsl.w     #4,d0                           | x16
     move.w    d0,d2                           | copy
     *addq.w    #2,d0                           | x16+2 (not for 68K)
     lea       (a0,d0.w),a0                    | entry address
-    movea.l   #RAM_test_result_final_score,a1
+    lea       RAM_test_result_final_score,a1
     move.b    (a1),d1
-    cmp.b     (a0),d1
-    bcs       score_lower_than_entry
-    bne       move_high_score_entry_down
-    adda.l    #1,a0
-    adda.l    #1,a1
+    cmp.b     (a0),d1                         | MSB score higher?
+    bcs.b     score_lower_than_entry          | no, go
+    bne.b     move_high_score_entry_down      | higher, go
+    lea       (1,a0),a0
+    lea       (1,a1),a1
     move.b    (a1),d1
-    cmp.b     (a0),d1
-    bcs       score_lower_than_entry
-    bne       move_high_score_entry_down
-    adda.l    #1,a0
-    adda.l    #1,a1
+    cmp.b     (a0),d1                         | next byte score higher?
+    bcs.b     score_lower_than_entry          | no, go
+    bne.b     move_high_score_entry_down      | higher, go
+    lea       (1,a0),a0
+    lea       (1,a1),a1
     move.b    (a1),d1
-    cmp.b     (a0),d1
-    bcs       score_lower_than_entry
+    cmp.b     (a0),d1                         | LSB score higher?
+    bcs.b     score_lower_than_entry          | no, go
 
 move_high_score_entry_down: | $117E
-    movea.l   #RAM_test_result_final_score,a0
-    lea       (a0,d2.w),a0
+    lea       RAM_test_result_final_score,a0
+    lea       (a0,d2.w),a0                    | 
     lea       (0x10,a0),a1
     move.l    d7,-(a7)
     moveq     #16-1,d7
