@@ -128,8 +128,10 @@ def get_used_sprite_cluts():
 
     return rval
 
-def quantize_palette(tile_clut,global_palette):
-    rgb_configs = set(global_palette[i & 0x7F] for clut in tile_clut for i in clut)  # 75 unique colors now
+# should rather 1) create a big pic with all sprites & all cluts
+# 2) apply quantize on that image
+def quantize_palette(tile_clut):
+    rgb_configs = set(tile_clut)  # 75 unique colors now
     # remove 0, we don't want it quantized
     black = (0,0,0)
     white = (255,255,255)
@@ -148,7 +150,7 @@ def quantize_palette(tile_clut,global_palette):
     # get the reduced palette
     reduced_palette = [reduced_colors_clut_img.getpixel((i,0)) for i,_ in enumerate(rgb_configs)]
     # apply rounding now
-    reduced_palette = bitplanelib.palette_round(reduced_palette,0xF0)
+    # reduced_palette = bitplanelib.palette_round(reduced_palette,0xF0)
     #print(len(set(reduced_palette))) # should still be 15
     # now create a dictionary
     rval = dict(zip(rgb_configs,reduced_palette))
@@ -284,7 +286,6 @@ def write_tiles(t,matrix,f,is_bob):
         f.write("\n")
 
     # add 2 bytes so relative addresses aren't 0
-    f.write("{}_picbase:\n\tdc.w\t0\n".format(t))
     # now write all defined pointers to pics (no relative shit
     # as data can be pretty big and overshoot 0x7FFF limit, which
     # explains the double indirection in the tables
@@ -294,6 +295,10 @@ def write_tiles(t,matrix,f,is_bob):
 
     if is_bob:
         for i,item_data in enumerate(pic_list):
+            if i == len(pic_list)//2:
+                # base in the middle of the pics to avoid overflow
+                f.write("{}_picbase:\n\tdc.w\t0\n".format(t))
+
             picname = "{}_pic_{:03d}".format(t,i)
             f.write("{0}:\n".format(picname))
             for k in STD_MIRROR_LIST:
@@ -319,6 +324,7 @@ def write_tiles(t,matrix,f,is_bob):
             f.write("plane_pic_{}:".format(v))
             dump_asm_bytes(k,f)
     else:
+        f.write("{}_picbase:\n\tdc.w\t0\n".format(t))
         for i,_ in enumerate(pic_list):
             picname = "{}_pic_{:03d}".format(t,i)
             f.write("{0}:\n".format(picname))

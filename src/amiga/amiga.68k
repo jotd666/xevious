@@ -1012,9 +1012,9 @@ osd_update_32_sprite_hw:
 
 	lea		_sprite_tile,a0
 
+
 	add.l	d0,a0		| row offset
-	add.w	d1,a0		| col offset
-	move.w	(a0),d1
+	move.w	(a0,d1.w),d1	| col offset
 	bne.b	7f
 	* sprite is not known with that CLUT configuration: blue flash
 	move.w	#0,bplcon3+_custom
@@ -1031,7 +1031,10 @@ osd_update_32_sprite_hw:
 	beq.b	3f
 	add.w	#4*(NB_PLAYFIELD_PLANES+1),d1			| mirror planes come right after
 3:
-	lea	(a3,d1.w),a0	| get pointer on data
+	cmp.w	#1,d1		| test blankptr
+	beq.b	2f			| skip
+	
+	lea	(a3,d1.w),a0	| get pointer on bitplane pointer list
 	move.w	(6,a4),d0
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
