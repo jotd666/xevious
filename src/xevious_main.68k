@@ -1067,81 +1067,81 @@ attract_mode_title_screen: | $0C48
     jsr       display_xevious_logo_flashing
     move.b    #0x40,(countdown_timer_1)
     SET_REENTRY_ADDR_HERE
-    subq.b    #1,(countdown_timer_1)
-    beq       animate_sparkle_appearing
+    subq.b    #1,(countdown_timer_1)            | timer expired?
+    beq.b     animate_sparkle_appearing         | yes, continue
     bra       flash_insert_coin_and_check_credits
-    rts
 
 animate_sparkle_appearing: | $0C6E
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a5
+    movea.l   #obj_tbl+_OBJSIZE*0x0f,a5         | sparkle object
     move.w    #0xd60,(_X,a5)
     move.w    #0x1660,(_Y,a5)
     move.w    #0x300F,(_CODE,a5)                | code,color
     move.w    #0x0280,(_STATE,a5)               | state,attr
     clr.b     (_TIMER,a5)                       | init timer
     SET_REENTRY_ADDR_HERE
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a5
+    lea       obj_tbl+_OBJSIZE*0x0f,a5          | sparkle object
     addq.b    #1,(_TIMER,a5)                    | inc timer
     cmp.b     #0x10,(_TIMER,a5)                 | expired?
-    beq       animate_sparkle_moving
+    beq.b     animate_sparkle_moving            | yes, go
     move.b    (_TIMER,a5),d0
     lsr.b     #1,d0
     and.b     #7,d0
-    add.b     #0x30,d0
+    add.b     #0x30,d0                          | convert to sparkle sprite
     move.b    d0,(_CODE,a5)
     bra       flash_insert_coin_and_check_credits
 
 animate_sparkle_moving: | $0CA9
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a5
+    lea       obj_tbl+_OBJSIZE*0x0f,a5          | sparkle object
     move.b    #0x78,(_TIMER,a5)                 | init timer
     SET_REENTRY_ADDR_HERE
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a5
+    lea       obj_tbl+_OBJSIZE*0x0f,a5          | sparkle object
     addq.b    #1,(_TIMER,a5)                    | inc timer
-    beq       animate_sparkle_disappearing
+    beq.b     animate_sparkle_disappearing
     move.b    (_TIMER,a5),d0
     and.b     #7,d0
-    add.b     #0x38,d0
+    add.b     #0x38,d0                          | convert to sparkle sprite
     move.b    d0,(_CODE,a5)
     add.w     #0xffe0,(_Y,a5)
     bra       flash_insert_coin_and_check_credits
 
 animate_sparkle_disappearing: | $0CD3
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a5
+    lea       obj_tbl+_OBJSIZE*0x0f,a5          | sparkle object
     move.b    #0x10,(_TIMER,a5)                 | init timer
     SET_REENTRY_ADDR_HERE
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a5
-    subq.b    #1,(_TIMER,a5)                    | inc timer
-    beq       animate_flashing_logo
+    lea       obj_tbl+_OBJSIZE*0x0f,a5          | sparkle object
+    subq.b    #1,(_TIMER,a5)                    | dec timer
+    beq.b     animate_flashing_logo
     move.b    (_TIMER,a5),d0
     lsr.b     #1,d0
     and.b     #7,d0
-    add.b     #0x30,d0
+    add.b     #0x30,d0                          | convert to sparkle sprite
     move.b    d0,(_CODE,a5)
     bra       flash_insert_coin_and_check_credits
 
 animate_flashing_logo: | $0CF5
-    clr.b     (countdown_timer_1)
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a5
-    clr.b     (_STATE,a5)   
+    clr.b     (countdown_timer_1)               | init timer
+    lea       obj_tbl+_OBJSIZE*0x0f,a5          | sparkle object
+    clr.b     (_STATE,a5)                       | remove
     SET_REENTRY_ADDR_HERE
-    btst      #0,(countup_timer_1)
+    btst      #0,(countup_timer_1)              | timer expired?
     bne       flash_insert_coin_and_check_credits
-    subq.b    #1,(countdown_timer_1)
-    beq       exit_attract_mode_title_screen
+    subq.b    #1,(countdown_timer_1)            | dec timer
+    beq.b     exit_attract_mode_title_screen
     move.b    (countdown_timer_1),d0
-    and.w     #7,d0
+    and.w     #7,d0                             | use timer for colour index
     lea       xevious_flashing_logo_colour_tbl,a0
-    move.b    (d0.w,a0),d1
+    move.b    (d0.w,a0),d1                      | get colour
     jsr       set_colour_xevious_flashing_logo
     bra       flash_insert_coin_and_check_credits
 
 exit_attract_mode_title_screen: | $0D21
+    jsr       zero_obj_state_tbl
     move.w    #3,(attract_mode_stage)
     SET_REENTRY_ADDR attract_mode_main_loop
     bra       flash_insert_coin_and_check_credits
                 
 attract_mode_gameplay: | $0D35
-    clr.b     (curr_player)
+    clr.b     (curr_player)                     | player 1
     clr.b     (area)
     clr.b     (enemy_AI_level)
     lea       area_offset_in_map_tbl,a0
@@ -1162,24 +1162,24 @@ attract_mode_gameplay: | $0D35
     clr.b     (bacura_inc_cnt)
     clr.b     (scroll_disabled)                 | enabled
     SET_REENTRY_ADDR_HERE
-    tst.b     (scroll_disabled)
-    bne       exit_attract_mode_gameplay
+    tst.b     (scroll_disabled)                 | disabled?
+    bne.b     exit_attract_mode_gameplay        | yes, done, exit
     bra       flash_insert_coin_and_check_credits
 
 exit_attract_mode_gameplay: | $0D8C
     jsr       zero_obj_state_tbl
-    addq.w    #1,(attract_mode_stage)
+    addq.w    #1,(attract_mode_stage)           | next stage
     SET_REENTRY_ADDR attract_mode_main_loop
     bra       flash_insert_coin_and_check_credits
     
 attract_mode_high_score_table: | $0DA2
     jsr       flash_logo_and_high_score_table
-    move.b    #0x40,(countdown_timer_1)
+    move.b    #0x40,(countdown_timer_1)         | init timer
     SET_REENTRY_ADDR_HERE
     move.b    (countup_timer_1),d0
-    and.b     #7,d0
-    bne       check_credits
-    subq.b    #1,(countdown_timer_1)
+    and.b     #7,d0                             | timer expired?
+    bne       check_credits                     | no, exit
+    subq.b    #1,(countdown_timer_1)            | timer expired?
     beq       exit_attract_mode_high_score_table
     bra       check_credits
 
@@ -1188,45 +1188,12 @@ exit_attract_mode_high_score_table: | $0DC4
     SET_REENTRY_ADDR attract_mode_main_loop
     bra       flash_insert_coin_and_check_credits
 
-    .align 4
-bonus_tbl_ptrs: | $13FB
-    .long bonus_tbl_5
-    .long bonus_tbl_123
-    
-    .align 2    
-bonus_tbl_5:    
-    .word 0x70
-    .word 0x50
-    .word 0x50
-    .word 0x60
-    .word 0x80
-    .word 0x100
-    .word 0x80
-    .word 0xFFFF
-    
-bonus_tbl_123:  
-    .word 0x60
-    .word 0x40
-    .word 0x50
-    .word 0x50
-    .word 0x70
-    .word 0x80
-    .word 0x60
-    .word 0xFFFF
-    
-* d0=offset (MSB=31-col,LSB=row), d2=bank
-display_string: | $141F
-    subq.w    #1,d7
-    moveq     #0,d1
-1:  move.b    (a0)+,d1
-    jsr       display_char
-    dbf       d7,1b   
-    rts
-
 display_all_scores: | $0DD5
     jsr       display_high_score
     jsr       display_player_scores
     bra       display_high_score_text
+
+* *** UNUSED CODE $0DDE-$E22
 
 * calculates ratio between 2 differences
 * d0=larger diff, d1=smaller diff
@@ -1238,13 +1205,15 @@ calc_dX_dY_ratio: | $0E23
     moveq     #16-1,d7
 1:  lsl.w     #1,d1
     roxl.b    #1,d0
-    bcs       2f
+    bcs.b     2f
     cmp.b     d2,d0
-    bcs       3f
+    bcs.b     3f
 2:  sub.b     d2,d0
     addq.w    #1,d1
 3:  dbf       d7,1b
     rts
+
+* *** UNUSED CODE/DATA $0E35-$EB1
 
 * d0=xdiff, d1=ydiff, ret: d2=index
 get_index_for_angle: | $0EB2
@@ -1252,29 +1221,29 @@ get_index_for_angle: | $0EB2
     jsr       get_index_for_quadrant_angle
     movem.l   (a7)+,d0-d1
     btst.b    #7,d0                             | xdiff -ve?
-    beq       1f                                | no, skip
+    beq.b     1f                                | no, skip
     not.b     d2
     add.b     #0x81,d2                          | adjust for polarity
 1:  btst.b    #7,d1                             | ydiff -ve?
-    beq       9f                                | no, skip
+    beq.b     9f                                | no, skip
     neg.b     d2                                | adjust for polarity
 9:  rts
 
 * d0=xdiff, d1=ydiff
 get_index_for_quadrant_angle: | $0CE4
     tst.b     d1
-    bpl       1f
+    bpl.b     1f
     neg.b     d1
 1:  tst.b     d0
-    bpl       2f
+    bpl.b     2f
     neg.b     d0
 2:  cmp.b     d1,d0                             | ydiff > xdiff?
-    bcs       swap_for_large_small
+    bcs.b     swap_for_large_small
     
 get_index_for_abs_angle: | $0ECD
     jsr       calc_dX_dY_ratio
     lsr.w     #3,d1
-    movea.l   #octant_angle_tbl,a3              | base address
+    lea       octant_angle_tbl,a3               | base address
     move.b    (a3,d1.w),d2                      | get_entry
     rts
 
@@ -1290,10 +1259,13 @@ octant_angle_tbl: | $0EE7
     .byte 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1D, 0x1E, 0x1F, 0x1F
     .byte 0x20
     .align 2
+
+* *** PROTECTION ROUTINTE $0F08-$0F4A
+* main_fn_6__protection
     
 *** TEST ME PROPERLY!!!   
 * returns in d0
-pseudo_random_gen: | $0F4b
+pseudo_random_gen: | $0F4B
     moveq     #0,d0
     move.b    (pseudo_random_seed+1),d0         | LSB
     mulu      #5,d0
@@ -1302,14 +1274,14 @@ pseudo_random_gen: | $0F4b
     moveq     #0,d1
     move.b    (pseudo_random_seed),d1           | MSB
     and.b     #0x84,d1
-    beq       1f
+    beq.b     1f
     eor.b     #0x84,d1
-    bne       2f
+    bne.b     2f
 1:  ori       #(1<<4),ccr                       | set extend
 2:  move.b    (pseudo_random_seed),d1           | MSB again
     addx.b    d1,d1
     move.b    d1,(pseudo_random_seed)           | save MSB
-    add.b     d1,d0                             | rnd number
+    add.b     d1,d0                             | d0 = return value
     rts
     
 display_solvalou_left: | $0F68
@@ -1657,6 +1629,41 @@ set_score_to_9999990: | $1309
     dbf       d7,1b
     rts
         
+    .align 4
+bonus_tbl_ptrs: | $13FB
+    .long bonus_tbl_5
+    .long bonus_tbl_123
+    
+    .align 2    
+bonus_tbl_5:    
+    .word 0x70
+    .word 0x50
+    .word 0x50
+    .word 0x60
+    .word 0x80
+    .word 0x100
+    .word 0x80
+    .word 0xFFFF
+    
+bonus_tbl_123:  
+    .word 0x60
+    .word 0x40
+    .word 0x50
+    .word 0x50
+    .word 0x70
+    .word 0x80
+    .word 0x60
+    .word 0xFFFF
+    
+* d0=offset (MSB=31-col,LSB=row), d2=bank
+display_string: | $141F
+    subq.w    #1,d7
+    moveq     #0,d1
+1:  move.b    (a0)+,d1
+    jsr       display_char
+    dbf       d7,1b   
+    rts
+
 display_player_scores: | $1427
     moveq     #BANK_FG_VIDEORAM,d2
     move.w    #0x1B01,d0                        | screen col,row
