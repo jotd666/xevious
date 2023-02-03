@@ -1473,19 +1473,9 @@ _previous_joypad_state:
 _gfxbase:
 	dc.l	0
 	
-FXFREQBASE = 3579564
-SOUNDFREQ = 22050
 
-	.macro	SOUND_ENTRY	sound_name,size,channel,soundfreq,volume
-\sound_name\()_sound:
-	.long	\sound_name\()_raw
-    .word   \size
-    .word   FXFREQBASE/\soundfreq,\volume
-	.byte	\channel
-	.byte	1
-    .endm
 
-	SOUND_ENTRY	credit,11808,1,SOUNDFREQ,40
+	.include	"sound_entries.68k"
 	
 *graphicsname:
 *	.ascii	"graphics.library"
