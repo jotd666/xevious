@@ -1,12 +1,22 @@
+* to see with Mark:
+
 rip sounds
-if bob moves exactly like tiles don't redraw tiles, just blit bob
 sprite shadow management: complete?
-sprite attributes to code (ship explosion)
-sprites for ship, bomb sight and shots and bomb
-controls: bomb not working
-optim: do not sprite double draw if y>288 tile>36. Coded but still
-fg plane is destroyed 
+sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
 small scrolling issues? (planes don't all scroll on top sometimes?, 
 like when scroll offset = exactly 0)
-dynamic copperlist not working for "namco" logo
+
+* not an issue if AGA DPF:
+ 
 background restore not optimal at all
+if bob moves exactly like tiles don't redraw tiles, just blit bob
+dynamic copperlist not working for "namco" logo
+
+* can be worked on now:
+
+controls: bomb not working
+sprites for ship, bomb sight and shots and bomb!: superimpose 2 sprites to get more colors
+compute 16-color palette for tiles, 16-color palette for sprites => create original RGB => reduced colors dictionary
+revert to AGA dual playfield, scratch FG tiles ATM, keep dynamic color
+for fg title tile flash
+optim: do not sprite double draw if y>288 tile>36. Coded but still fg plane is destroyed 
