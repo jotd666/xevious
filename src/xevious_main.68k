@@ -360,9 +360,15 @@ coined_up:
     clr.b     (curr_player)
     clr.b     (start_pressed)
     lea       curr_player_score_msb,a0          | byte swapped
+  .ifne OPT_START_SCORE
+    move.b    #(OPT_START_SCORE>>20)&0xff,(a0)+
+    move.b    #(OPT_START_SCORE>>12)&0xff,(a0)+
+    move.b    #(OPT_START_SCORE>>4)&0xff,(a0)+
+  .else
     clr.b     (a0)+
     clr.b     (a0)+
     clr.b     (a0)+
+  .endif
     lea       starting_solvalou_tbl,a0
     move.b    (dswa),d0
     lsr.b     #5,d0
@@ -1426,7 +1432,7 @@ ROM_high_score_tbl: | $10F0
   .align 2
 
 check_for_high_score: | $1143
-    lea       curr_player_score_msb,a0         | byte-swapped
+    lea       curr_player_score_msb,a0          | byte-swapped
     lea       RAM_test_result_final_score,a1
     moveq     #3-1,d7
 1:  move.b    (a0)+,(a1)+
@@ -1435,172 +1441,173 @@ check_for_high_score: | $1143
     move.b    #0x24,(a1)
     moveq     #9-1,d7
 2:  move.b    (a1)+,(a0)+
-    dbf       d7,2b                           | clear name buffer
-    
-    moveq     #5-1,d7                         | 5 scores to check
-compare_high_score_entry: | $115B
-    lea       RAM_test_result_final_score,a0
-    move.w    d7,d0                           | iteration
-    addq.w    #1,d0                           | (68k only)
-    lsl.w     #4,d0                           | x16
-    move.w    d0,d2                           | copy
-    *addq.w    #2,d0                           | x16+2 (not for 68K)
-    lea       (a0,d0.w),a0                    | entry address
-    lea       RAM_test_result_final_score,a1
-    move.b    (a1),d1
-    cmp.b     (a0),d1                         | MSB score higher?
-    bcs.b     score_lower_than_entry          | no, go
-    bne.b     move_high_score_entry_down      | higher, go
-    lea       (1,a0),a0
-    lea       (1,a1),a1
-    move.b    (a1),d1
-    cmp.b     (a0),d1                         | next byte score higher?
-    bcs.b     score_lower_than_entry          | no, go
-    bne.b     move_high_score_entry_down      | higher, go
-    lea       (1,a0),a0
-    lea       (1,a1),a1
-    move.b    (a1),d1
-    cmp.b     (a0),d1                         | LSB score higher?
-    bcs.b     score_lower_than_entry          | no, go
-
-move_high_score_entry_down: | $117E
-    lea       RAM_test_result_final_score,a0
-    lea       (a0,d2.w),a0                    | 
-    lea       (0x10,a0),a1
-    move.l    d7,-(a7)
-    moveq     #16-1,d7
-3:  move.b    (a0)+,(a1)+
-    dbf       d7,3b
-    move.l    (a7)+,d7
+    dbf       d7,2b                             | clear name buffer
+                                                
+    moveq     #5-1,d7                           | 5 scores to check
+compare_high_score_entry: | $115B               
+    lea       RAM_test_result_final_score,a0    
+    move.w    d7,d0                             | iteration
+    addq.w    #1,d0                             | (68k only)
+    lsl.w     #4,d0                             | x16
+    move.w    d0,d2                             | copy
+    *addq.w    #2,d0                            | x16+2 (not for 68K)
+    lea       (a0,d0.w),a0                      | entry address
+    lea       RAM_test_result_final_score,a1    
+    move.b    (a1),d1                           
+    cmp.b     (a0),d1                           | MSB score higher?
+    bcs.b     score_lower_than_entry            | no, go
+    bne.b     move_high_score_entry_down        | higher, go
+    lea       (1,a0),a0                         
+    lea       (1,a1),a1                         
+    move.b    (a1),d1                           
+    cmp.b     (a0),d1                           | next byte score higher?
+    bcs.b     score_lower_than_entry            | no, go
+    bne.b     move_high_score_entry_down        | higher, go
+    lea       (1,a0),a0                         
+    lea       (1,a1),a1                         
+    move.b    (a1),d1                           
+    cmp.b     (a0),d1                           | LSB score higher?
+    bcs.b     score_lower_than_entry            | no, go
+                                                
+move_high_score_entry_down: | $117E             
+    lea       RAM_test_result_final_score,a0    
+    lea       (a0,d2.w),a0                      | ptr entry to move down
+    lea       (0x10,a0),a1                      | ptr next entry
+    move.l    d7,-(a7)                          | save entry index
+    moveq     #16-1,d7                          | #bytes for each entry
+3:  move.b    (a0)+,(a1)+                       | move entry byte
+    dbf       d7,3b                             | all bytes
+    move.l    (a7)+,d7                          | restore score index
     dbf       d7,compare_high_score_entry
 
 score_lower_than_entry: | $1191
     move.w    d7,d0
-    addq.b    #1,d0                             | (68k only)
+    addq.w    #1,d0                             | (68k only)
     move.b    d0,(new_high_score_entry_index)
     cmp.b     #5,d0
     beq       game_over
-    movea.l   #high_score_1st_msb,a1            | bye-swapped
-    lsl.w     #4,d0
+    lea       high_score_1st_msb,a1             | byte-swapped
+    lsl.w     #4,d0                             | calc offset
     lea       (a1,d0.w),a1
-    movea.l   #RAM_test_result_final_score,a0
-    moveq     #16-1,d7
-4:  move.b    (a0)+,(a1)+
+    lea       RAM_test_result_final_score,a0
+    moveq     #16-1,d7                          | 16 bytes to copy
+4:  move.b    (a0)+,(a1)+                       | copy new entry to table
     dbf       d7,4b
     jsr       cls_display_high_score_table
     jsr       display_high_score_entry_screen
     move.w    #0x1900,d0                        | screen col
     moveq     #0,d1
     move.b    (new_high_score_entry_index),d1
-    lsl.w     #1,d1
+    add.w     d1,d1
     add.w     #0x18,d1
     add.w     d1,d0                             | screen col,row
-    move.w    #24,d7
+    moveq     #24,d7                            | 24 chars to fill
     moveq     #BANK_FG_COLORRAM,d2
-    move.w    #0x1B,d1
+    moveq     #0x1B,d1                          | attrib
     jsr       display_char_B_times
     and.w     #0x00ff,d0                        | screen row
     or.w      #0x0b00,d0                        | screen col
     move.w    d0,d1                             | save a copy of offset
-    movea.l   #high_score_1st_name,a0
+    lea       high_score_1st_name,a0
     moveq     #0,d0
     move.b    (new_high_score_entry_index),d0
     lsl.w     #4,d0                             | x16
     lea       (a0,d0.w),a0                      | ptr entry (name)
-    move.b    #10,(name_entry_char_cnt)
-    move.b    #0x80,(countdown_timer_1)
+    move.b    #10,(name_entry_char_cnt)         | 10 chars for name entry
+    move.b    #0x80,(countdown_timer_1)         | init timer
     move.w    d1,(name_entry_curr_char_screen_offset)
     move.l    a0,(name_entry_ptr_curr_char)
     jsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #P1_inputs,a0
+    lea       P1_inputs,a0
     * looks like bit 4 is a debounced version of bit 5
     * = at least that's the way to get input to work
     btst.b    #4,(a0)                           | Button 1?        
-    beq       name_entry_append_char            | yes, go
-    jsr       check_lowercase
+    beq.b     name_entry_append_char            | yes, go
+    bsr       check_lowercase
     move.w    (name_entry_curr_char_screen_offset),d0
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_char
     move.b    (countup_timer_1),d0
     move      d0,d1                             | copy
-    and.w     #7,d1
-    bne       9f
-    and.w     #0x1f,d0
-    bne       1f
-    subq.b    #1,(countdown_timer_1)
-    beq       name_entry_finished
-1:  movea.l   #P1_inputs,a0
-    move.b    (a0),d0
+    and.w     #7,d1                             | timer expired?
+    bne.b     9f                                | no, skip
+    and.w     #0x1f,d0                          | expired?
+    bne.b     1f                                | no, continue
+    subq.b    #1,(countdown_timer_1)            | expired?
+    beq.b     name_entry_finished               | yes, exit
+1:  lea       P1_inputs,a0
+    move.b    (a0),d0                           | get input
     and.b     #0x0f,d0                          | joystick only
     cmp.b     #2,d0                             | right?
-    beq       name_entry_inc_char               | yes, go
+    beq.b     name_entry_inc_char               | yes, go
     cmp.b     #6,d0                             | left?
-    bne       9f                                | no, exit
+    bne.b     9f                                | no, exit
 name_entry_dec_char: | $123D
     movea.l   (name_entry_ptr_curr_char),a0
-    move.b    (a0),d0
-    subq.b    #1,d0
-    cmp.b     #9,d0
-    bne       2f
-    move.b    #0x24,d0
-2:  move.b    d0,(a0)
+    move.b    (a0),d0                           | char
+    subq.b    #1,d0                             | dec
+    cmp.b     #9,d0                             | before 'A'?
+    bne.b     2f                                | no, skip
+    move.b    #0x24,d0                          | char=' '
+2:  move.b    d0,(a0)                           | save char
 9:  rts
 
 name_entry_append_char: | $124A
     jsr       check_lowercase
-    move.b    d1,(a0)+
-    move.l    a0,(name_entry_ptr_curr_char)
+    move.b    d1,(a0)+                          | store new char
+    move.l    a0,(name_entry_ptr_curr_char)     | save ptr
     move.w    (name_entry_curr_char_screen_offset),d0
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_char
     move.w    d0,(name_entry_curr_char_screen_offset)
-    subq.b    #1,(name_entry_char_cnt)
-    bne       9f
+    subq.b    #1,(name_entry_char_cnt)          | last char?
+    bne.b     9f                                | no, skip
     
 name_entry_finished: | $1262
+    * some writs to $A00X addresses, sound???
     bra       game_over
 
 9:  rts
 
 name_entry_inc_char: | $1272
     movea.l   (name_entry_ptr_curr_char),a0
-    move.b    (a0),d0
-    addq.b    #1,d0
-    cmp.b     #0x25,d0
-    bne       1f
-    move.b    #0x0a,d0
-1:  move.b    d0,(a0)
+    move.b    (a0),d0                           | char
+    addq.b    #1,d0                             | inc
+    cmp.b     #0x25,d0                          | after <space>?
+    bne.b     1f                                | no, skip
+    move.b    #0x0a,d0                          | char='A'
+1:  move.b    d0,(a0)                           | save char
 9:  rts
 
 * returns character in d1
 check_lowercase: | $127F
-    move.b    (dswb),d1
+    move.b    (dswb),d1                         | inputs
     moveq     #0,d0
-    lsr.b     #1,d1                             | b2?
-    bcs       1f                                | no, skip
-    move.b    #0x2c,d0
+    lsr.b     #1,d1                             | B2?
+    bcs.b     1f                                | no, skip
+    move.b    #0x2c,d0                          | modififier for lowercase
 1:  movea.l   (name_entry_ptr_curr_char),a0
-    move.b    (a0),d1
-    add.b     d0,d1
+    move.b    (a0),d1                           | get char
+    add.b     d0,d1                             | add modifier
     rts
 
 display_high_score_entry_screen: | $12A1
     move.w    #0x1509,d0                        | screen col,row
     lea       strCONGRATULATIONS,a0
     moveq     #BANK_FG_VIDEORAM,d2
-    move.w    #16,d7                            | string length
+    moveq     #16,d7                            | string length
     jsr       display_string
     move.w    #0x160C,d0                        | screen col,row
     lea       strENTER_YOUR_INITIAL,a0
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     jsr       display_string
     moveq     #BANK_FG_COLORRAM,d2
     move.w    #0x1509,d0                        | screen col,row
-    move.w    #0x1a,d1                          | attr
-    move.w    #16,d7                            | string length
+    moveq     #0x1a,d1                          | attr
+    moveq     #16,d7                            | string length
     jsr       display_char_B_times
     move.w    #0x160C,d0                        | screen col,row
-    move.w    #18,d7                            | string length
+    moveq     #18,d7                            | string length
     bra       display_char_B_times
 
 strCONGRATULATIONS: | $12CD
@@ -1613,12 +1620,12 @@ strENTER_YOUR_INITIAL: | $12DD
 display_high_score_text: | $12EF
     move.w    #0x1200,d0                        | screen col,row
     lea       strHIGH_SCORE,a0
-    move.w    #10,d7                            | string length
+    moveq     #10,d7                            | string length
     moveq     #BANK_FG_VIDEORAM,d2
     jsr       display_string
     move.w    #0x1200,d0                        | screen col,row
-    move.w    #10,d7                            | string length
-    move.w    #0x1f,d1                          | attr
+    moveq     #10,d7                            | string length
+    moveq     #0x1f,d1                          | attr
     moveq     #BANK_FG_COLORRAM,d2
     jsr       display_char_B_times
     rts
@@ -1630,7 +1637,18 @@ set_score_to_9999990: | $1309
 1:  move.b    #0x99,-(a1)
     dbf       d7,1b
     rts
-        
+
+* *** MOVED UP TO FOLLOW add_to_score
+*check_1_2_for_new_high_score_and_update: | $1311
+*check_for_new_high_score_and_update: | $131A
+*check_new_high_score: | $131F
+*update_high_score: | $1329
+*check_for_extra_solvalou: | $133A
+*award_extra_solvalou: | $1396
+*update_next_bonus_life_Ks: | $13A3
+
+* *** protection_check: | $13A9-$13E7
+       
     .align 4
 bonus_tbl_ptrs: | $13FB
     .long bonus_tbl_5
@@ -1659,33 +1677,33 @@ bonus_tbl_123:
     
 * d0=offset (MSB=31-col,LSB=row), d2=bank
 display_string: | $141F
-    subq.w    #1,d7
+    subq.w    #1,d7                             | adjust (optimise?)
     moveq     #0,d1
-1:  move.b    (a0)+,d1
+1:  move.b    (a0)+,d1                          | character
     jsr       display_char
     dbf       d7,1b   
     rts
 
 display_player_scores: | $1427
     moveq     #BANK_FG_VIDEORAM,d2
-    move.w    #0x1B01,d0                        | screen col,row
-    move.w    #0x0801,d3
-    tst.b     (curr_player)
-    beq       1f
-    exg       d0,d3
-1:  move.w    d3,-(a7)
+    move.w    #0x1B01,d0                        | screen col,row P1
+    move.w    #0x0801,d3                        | screen col,row P2
+    tst.b     (curr_player)                     | P1?
+    beq.b     1f                                | yes, skip
+    exg       d0,d3                             | use P2 offset
+1:  move.w    d3,-(a7)                          | save other offset
     lea       curr_player_score_msb,a0
     jsr       display_score
-    move.w    (a7)+,d0
-    tst.b     (two_player_game)
-    beq       loc_1459
+    move.w    (a7)+,d0                          | restore other offset
+    tst.b     (two_player_game)                 | 2P game?
+    beq       display_7_spaces                  | no, skip
     lea       other_player_score_msb,a0
     * fall thru to display score
 
 * a0=score(ptr MSB)
 display_score: | $1447
-    move.w    #3-1,d7                           | bytes in score
-    move.w    #5,d6                             | pad bytes
+    moveq     #3-1,d7                           | bytes in score
+    moveq     #5,d6                             | pad bytes
     jsr       display_bcd_value
     clr.b     d1
 * fall thru to display a trailing zero
@@ -1695,15 +1713,24 @@ display_score: | $1447
 display_char: | $144F
     movem.l   d0/d2/a0,-(a7)
     jsr       calc_screen_addr
+    *** lookup osd routine based on bank
+    *** - can this be optimised?
     movea.l   (osd_w_video_bank_tbl,pc,d2.w),a0
     jsr       (a0)
     movem.l   (a7)+,d0/d2/a0
     sub.w     #0x0100,d0                        | next column
     rts
 
-loc_1459:
-    move.w    #0x24,d1
-    move.w    #7,d7
+    .align 4
+osd_w_video_bank_tbl:
+    .long     osd_w_fg_colorram
+    .long     osd_w_bg_colorram
+    .long     osd_w_fg_videoram
+    .long     osd_w_bg_videoram
+
+display_7_spaces:
+    moveq     #0x24,d1                          | ' '
+    moveq     #7,d7
     * fall thru to display 7 blanks
 
 * d0=offset (MSB=31-col,LSB=row) d1=char, d2=bank, d7=B
@@ -1713,29 +1740,21 @@ display_char_B_times: | $145D
     dbf       d7,1b
     rts
     
-    .align 4
-osd_w_video_bank_tbl:
-    .long     osd_w_fg_colorram
-    .long     osd_w_bg_colorram
-    .long     osd_w_fg_videoram
-    .long     osd_w_bg_videoram
-
 display_high_score: | $1463
-    move.w    #BANK_FG_VIDEORAM,d2
+    moveq     #BANK_FG_VIDEORAM,d2
     move.w    #0x1101,d0                        | col,row
-    movea.l   #high_score_msb,a0
+    lea       high_score_msb,a0
     bra       display_score
-    rts
 
 * d7=bytes, d6=pads
 display_bcd_value: | $146D
     moveq     #0,d1
     move.b    (a0),d1                           | byte
     lsr.b     #4,d1                             | high nibble
-    bne       1f
-    move.b    #0x24,d1                          | space
+    bne.b     1f
+    moveq     #0x24,d1                          | space
     subq.b    #1,d6                             | dec pads
-    bpl       2f
+    bpl.b     2f
     moveq     #0,d1                             | 0
 1:  moveq     #0,d6                             | clear pad bytes
 2:  move.l    d6,-(a7)
@@ -1743,17 +1762,16 @@ display_bcd_value: | $146D
     move.l    (a7)+,d6
     move.b    (a0),d1                           | byte
     and.b     #0x0f,d1                          | low nibble
-    bne       3f
-    move.b    #0x24,d1                          | space
+    bne.b     3f
+    moveq     #0x24,d1                          | space
     subq.b    #1,d6                             | dec pad bytes
-    bpl       4f
+    bpl.b     4f
     moveq     #0,d1                             | 0
 3:  moveq     #0,d6                             | clear pad bytes
 4:  move.l    d6,-(a7)
     jsr       display_char
     move.l    (a7)+,d6
-    *suba.l   #1,a0
-    adda.l    #1,a0                             | we've reversed order
+    addq.l    #1,a0                             | we've reversed order
     dbf       d7,display_bcd_value
     rts
 
@@ -1774,25 +1792,26 @@ main_fn_1__handle_solvalou: | $14BB
     jsr       save_PC_to_fn_tbl_and_ret
     tst.b     (scroll_disabled)
     bne       9f
-    movea.l   #obj_tbl+_OBJSIZE*0x22,a5         | crosshairs
+    lea       obj_tbl+_OBJSIZE*0x22,a5         | crosshairs
     move.w    #0x0280,(_STATE,a5)
     move.w    #0x1420,(_CODE,a5)
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a5         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a5         | solvalou
     move.w    #0x0200,(_STATE,a5)
     move.w    #0x5001,(_CODE,a5)
     move.w    #0x2500,(_X,a5)
     move.w    #0x0F00,(_Y,a5)
     jsr       save_PC_to_fn_tbl_and_ret
     tst.b     (scroll_disabled)
-    bne       main_fn_1__handle_solvalou
+    bne.b     main_fn_1__handle_solvalou
     tst.w     (attract_mode_stage)
-    bne       update_solvalou
+    bne.b     update_solvalou
     ** TBD SOUND
+    nop
 
 update_solvalou: | $14F7
     jsr       handle_solvalou_inputs
-    jsr       handle_solvalou_sprite_XY
-    jsr       handle_crosshairs
+    jsr       update_solvalou_sprite_XY
+    jsr       handle_crosshairs                 | colour and position
     jsr       check_solvalou_hit
     * player hit
 .ifeq OPT_INVINCIBLE
@@ -1800,46 +1819,48 @@ update_solvalou: | $14F7
 .else
     rts
 .endif  
+    * solvalou hit/dead
     ** TBD SOUND
-    tst.b     (attract_mode_stage)
-    bne       explode_solvalou
+    tst.w     (attract_mode_stage)
+    bne.b     explode_solvalou
     * there was some 06XX stuff here
+    nop
     
 explode_solvalou: | $151C
     move.b    #1,(solvalou_exploding)
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a5         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a5          | solvalou
     clr.b     (_TIMER,a5)
     clr.b     (_TIMER1,a5)
     move.b    #0xc0,(_CODE,a5)
     move.b    #0x30,(_COLOUR,a5)
     jsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a5         | solvalou
-    tst.b     (scroll_disabled)
-    bne       main_fn_1__handle_solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a5          | solvalou
+    tst.b     (scroll_disabled)                 | disabled?
+    bne       main_fn_1__handle_solvalou        | yes, exit
     move.b    (_TIMER,a5),d0
-    addq.b    #1,d0    
-    and.w     #7,d0
+    addq.b    #1,d0                             | inc timer    
+    and.w     #7,d0                             | expired?
     move.b    d0,(_TIMER,a5)
-    bne       animate_solvalou_explosion
+    bne.b     animate_solvalou_explosion        | no, go
     move.b    (_TIMER1,a5),d0
-    addq.b    #1,d0
+    addq.b    #1,d0                             | inc timer1
     move.b    d0,(_TIMER1,a5)
-    cmp.b     #7,d0
-    beq       finish_solvalou_exploding
-    cmp.b     #2,d0
-    bne       1f
+    cmp.b     #7,d0                             | expired?
+    beq.b     finish_solvalou_exploding         | yes, go
+    cmp.b     #2,d0                             | time to adjust sprite size?
+    bne.b     1f                                | no, skip
     jsr       adj_for_small_explosion_frame
 1:  cmp.b     #4,d0
-    bne       2f
+    bne.b     2f
     jsr       adj_for_big_explosion_frame
 2:  cmp.b     #6,d0
-    bne       3f
+    bne.b     3f
     jsr       adj_for_small_explosion_frame
-3:  add.b     #0x30,d0
+3:  add.b     #0x30,d0                          | calc colour
     move.b    d0,(_COLOUR,a5)
     
 animate_solvalou_explosion: | $155E
-    movea.l   #solvalou_explosion_tbl,a0
+    lea       solvalou_explosion_tbl,a0
     moveq     #0,d0
     move.b    (_TIMER1,a5),d0
     lsl.w     #1,d0
@@ -1854,9 +1875,9 @@ finish_solvalou_exploding: | $1574
     move.b    #32,(_TIMER,a5)
     clr.b     (_STATE,a5)
     jsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a5         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a5          | solvalou
     subq.b    #1,(_TIMER,a5)
-    bne       9f
+    bne.b     9f
     addq.b    #1,(solvalou_number)
     move.b    #1,(scroll_disabled)
     clr.b     (solvalou_exploding)
@@ -1884,18 +1905,18 @@ adj_for_big_explosion_frame: | $15B1
     addq.b    #1,(_X,a5)                        | MSB
     rts
 
-handle_solvalou_sprite_XY: | $15C1
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a5         | solvalou
+update_solvalou_sprite_XY: | $15C1
+    lea       obj_tbl+_OBJSIZE*0x23,a5         | solvalou
     move.w    (_X,a5),d0
     move.b    (_dX,a5),d1
     ext.w     d1
     lsl.w     #1,d1
     add.w     d1,d0
     cmp.w     #144*32,d0                        | too small?
-    bcc       1f                                | no, skip
+    bcc.b     1f                                | no, skip
     move.w    #144*32,d0                        | set to 144
 1:  cmp.w     #304*32,d0                        | too big?
-    bcs       2f                                | no, skip
+    bcs.b     2f                                | no, skip
     move.w    #304*32,d0                        | set to 304
 2:  move.w    d0,(_X,a5)
     move.w    (_Y,a5),d0
@@ -1904,26 +1925,26 @@ handle_solvalou_sprite_XY: | $15C1
     lsl.w     #1,d1
     add.w     d1,d0
     cmp.w     #16*32,d0                         | too small?
-    bcc       3f                                | no, skip
+    bcc.b     3f                                | no, skip
     move.w    #16*32,d0                         | set to 16
 3:  cmp.w     #224*32,d0                        | too big?
-    bcs       4f                                | no, skip
+    bcs.b     4f                                | no, skip
     move.w    #224*32,d0                        | set to 224
 4:  move.w    d0,(_Y,a5)        
     rts
 
 handle_solvalou_inputs: | $15FE
-    tst.w     (attract_mode_stage)
-    bne       gen_rnd_dir
-    movea.l   #P1_inputs,a0
+    tst.w     (attract_mode_stage)              | attract mode?
+    bne.b     gen_rnd_dir                       | yes, go
+    lea       P1_inputs,a0
     moveq     #0,d1
     move.b    (curr_player),d1
     move.b    (a0,d1.w),d0                      | read inputs
     and.w     #0x0f,d0                          | joystick only
 set_solvalou_dXdY:
-    movea.l   #dir_delta_tbl,a1
-    lsl.w     #1,d0                             | entry offset
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a5
+    lea       dir_delta_tbl,a1
+    add.w     d0,d0                             | entry offset
+    lea       obj_tbl+_OBJSIZE*0x23,a5
     move.b    (a1,d0.w),(_dX,a5)
     move.b    (1,a1,d0.w),(_dY,a5)
     rts
@@ -1931,14 +1952,17 @@ set_solvalou_dXdY:
 gen_rnd_dir: | $1622
     move.b    (countup_timer_1),d0
     and.b     #0x0f,d0
-    beq       1f
+    beq.b     1f
     rts
 1:  jsr       pseudo_random_gen
     and.b     #0x0f,d0
     cmp.b     #9,d0
-    bcc       1b
-    bra       set_solvalou_dXdY
+    bcc.b     1b
+    bra.b     set_solvalou_dXdY
 
+* input read from 51xx/60xx hardware
+* - only returns 9 directions (0-8)
+* - dir=8 results in no movement
 dir_delta_tbl: | $1633
     .byte 0xF0, 0                               | U
     .byte 0xF0, 0xF0                            | U+R
@@ -1954,24 +1978,24 @@ check_solvalou_hit: | $1645
     move.b    (sprite_shadow_msb+2*0x23+0),d3   | solvalou spriteY
     move.b    (sprite_shadow_msb+2*0x23+1),d4   | solvalou spriteX
     
-    movea.l   #obj_tbl+_OBJSIZE*0x27,a1         | 1st bullet
-    movea.l   #sprite_shadow_msb+2*0x27,a3
+    lea       obj_tbl+_OBJSIZE*0x27,a1          | 1st bullet
+    lea       sprite_shadow_msb+2*0x27,a3       | 1st object sprite coords
     moveq     #25-1,d7                          | 19 bullets + 6 flying enemies
 check_bullets_and_flying: | $1655
     jsr       check_bullet_or_flying_hit_solvalou
-    bcs       9f
+    bcs.b     9f
     adda.l    #_OBJSIZE,a1                      | next object
-    adda.l    #2,a3
+    addq.l    #2,a3                             | next sprite coords
     dbf       d7,check_bullets_and_flying
     
-    movea.l   #obj_tbl+_OBJSIZE*0x10,a1         | 1st bacura
-    movea.l   #sprite_shadow_msb+2*0x10,a3
+    lea       obj_tbl+_OBJSIZE*0x10,a1          | 1st bacura object
+    lea       sprite_shadow_msb+2*0x10,a3       | 1st bacura sprite coords
     moveq     #16-1,d7                          | 16 bacura
 check_bacura: | $1665
     jsr       check_bacura_hit_solvalou
-    bcs       9f
+    bcs.b     9f
     adda.l    #_OBJSIZE,a1                      | next object
-    adda.l    #2,a3
+    addq.l    #2,a3                             | next sprite coords
     dbf       d7,check_bacura
 9:  rts
 
@@ -1982,7 +2006,7 @@ check_bullet_or_flying_hit_solvalou: | $1670
     sub.b     (0,a3),d0                         | sub object spriteY
     subq.b    #8,d0
     add.b     #16,d0
-    bcc       9f
+    bcc.b     9f
     move.b    (1,a3),d0                         | object spriteX
     sub.b     d4,d0                             | sub solvalou spriteX
     subq.b    #4,d0
@@ -1995,12 +2019,12 @@ loc_1693: | $1693
 
 check_bacura_hit_solvalou: | $1695
     cmp.b     #2,(_STATE,a1)                    | active?
-    bne       loc_1693                          | no, exit
+    bne.b     loc_1693                          | no, exit
     move.b    d3,d0                             | solvalou spriteY
     sub.b     (0,a3),d0                         | sub object spriteY
     sub.b     #28,d0
     add.b     #40,d0
-    bcc       9f
+    bcc.b     9f
     move.b    (1,a3),d0                         | object spriteX
     sub.b     d4,d0                             | sub solvalou spriteX
     subq.b    #8,d0
