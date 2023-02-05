@@ -15,7 +15,7 @@ import collections
 
 block_dict = {}
 
-BG_NB_PLANES = 7
+BG_NB_PLANES = 4
 STD_MIRROR_LIST = ("standard","mirror")
 
 # where tile & sprite CLUT used configuration logs are fetch from
@@ -28,6 +28,12 @@ STD_MIRROR_LIST = ("standard","mirror")
 # configuration is missing
 
 winuae_dir = r"C:\Users\Public\Documents\Amiga Files\WinUAE"
+
+def dump_json(data,outname):
+    with open(outname,"w") as f:
+        if isinstance(data,dict):
+            data = {str(k):v for k,v in data.items()}
+        json.dump(data,f,indent=2)
 
 def load_names(json_file):
     rval = {}
@@ -100,7 +106,7 @@ def get_used_bg_cluts():
                     clut_index |= (idx>>2) & 0xF
                     clut_index |= (idx&0x3) << 5
                     rval[tile_index].add(clut_index)
-                    print("found: tile_index: {}, clut_index: {}".format(tile_index,clut_index))
+                    #print("found: tile_index: {}, clut_index: {}".format(tile_index,clut_index))
             row_index += 64
 
         save_json_tile_file(bg_json_base,rval,copy_rval)
@@ -128,10 +134,25 @@ def get_used_sprite_cluts():
 
     return rval
 
+def remap_colors(tile_clut,color_dict):
+    # remap colors can fail to fetch color because quantization only considered
+    # used CLUTs, not ALL cluts, but we need to keep the indices of the global CLUT
+    return [[color_dict.get(c,(0,0,0)) for c in clut] for clut in tile_clut]
+
+def get_reduced_palette(reduced_color_dict):
+    # we don't care about the keys here
+    # sort unique values which ensures that 0,0,0 comes first :)
+    lst = sorted(set(reduced_color_dict.values()))
+    nb_colors = 1<<BG_NB_PLANES
+    if len(lst)<nb_colors:
+        lst += [(0,0,0)]*(nb_colors-len(lst))
+    return lst
+
+# ATM all colors are considered the same weight
 # should rather 1) create a big pic with all sprites & all cluts
 # 2) apply quantize on that image
-def quantize_palette(tile_clut):
-    rgb_configs = set(tile_clut)  # 75 unique colors now
+def quantize_palette_16(rgb_tuples,img_type):
+    rgb_configs = set(rgb_tuples)
     # remove 0, we don't want it quantized
     black = (0,0,0)
     white = (255,255,255)
@@ -142,18 +163,19 @@ def quantize_palette(tile_clut):
     # now compose an image with the colors
     clut_img = Image.new("RGB",(len(rgb_configs),1))
     for i,rgb in enumerate(rgb_configs):
-        rgb_value = (rgb[0]<<16)+(rgb[1]<<8)+rgb[2]
-        clut_img.putpixel((i,0),rgb_value)
+        #rgb_value = (rgb[0]<<16)+(rgb[1]<<8)+rgb[2]
+        clut_img.putpixel((i,0),rgb)
 
-    reduced_colors_clut_img = clut_img.quantize(colors=15,dither=0).convert('RGB')
+    reduced_colors_clut_img = clut_img.quantize(colors=14,dither=0).convert('RGB')
 
     # get the reduced palette
     reduced_palette = [reduced_colors_clut_img.getpixel((i,0)) for i,_ in enumerate(rgb_configs)]
     # apply rounding now
     # reduced_palette = bitplanelib.palette_round(reduced_palette,0xF0)
     #print(len(set(reduced_palette))) # should still be 15
-    # now create a dictionary
+    # now create a dictionary by associating the original & reduced colors
     rval = dict(zip(rgb_configs,reduced_palette))
+
     # add black back
     rval[black] = black
     rval[white] = white
@@ -162,9 +184,9 @@ def quantize_palette(tile_clut):
         s = clut_img.size
         ns = (s[0]*30,s[1]*30)
         clut_img = clut_img.resize(ns,resample=0)
-        clut_img.save("colors_not_quantized.png")
+        clut_img.save("{}_colors_not_quantized.png".format(img_type))
         reduced_colors_clut_img = reduced_colors_clut_img.resize(ns,resample=0)
-        reduced_colors_clut_img.save("colors_quantized.png")
+        reduced_colors_clut_img.save("{}_colors_quantized.png".format(img_type))
 
     # return it
     return rval
@@ -224,6 +246,8 @@ for n,mask in (("bg_tile_clut",0xFFFF),("sprite_clut",0x7F)):
 bg_tile_clut = block_dict["bg_tile_clut"]["data"]
 sprite_tile_clut = block_dict["sprite_clut"]["data"]
 
+
+
 dump_graphics = True
 dump_pngs = False
 
@@ -237,7 +261,7 @@ if dump_pngs:
     for d in ["bg","fg","sprite"]:
         mkdir(os.path.join(dump_root,d))
 
-def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_dict,img_type,tile_clut):
+def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_dict,img_type,tile_clut,global_palette):
     for tile_index,cluts in tile_clut_dict.items():
         # select the used tile
         pic = pics[tile_index]
@@ -249,7 +273,7 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
             if all(x==(0,0,0) for x in current_palette):
                 row[clut_index] = 0
             else:
-                d = generate_tile(pic,side,current_palette,palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
+                d = generate_tile(pic,side,current_palette,global_palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
                 # put dict in each slot
                 row[clut_index] = d
                 if dump_pngs:
@@ -381,10 +405,14 @@ def dump_asm_bytes(block,f):
             c = 0
     f.write("\n")
 
+def clut_dict_to_rgb(tile_clut,used_cluts):
+    cluts = (tile_clut[idx] for s in used_cluts.values() for idx in s)
+    # flatten rgb
+    return {x for c in cluts for x in c}
+
+
 if dump_graphics:
 # temp add all white for foreground
-    bitplanelib.palette_dump(palette+[(255,)*3]*128,os.path.join(src_dir,"palette.68k"),
-                            bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
 
     raw_blocks = {}
 
@@ -414,31 +442,53 @@ if dump_graphics:
     bg_matrix = raw_blocks[table] = [[None]*128 for _ in range(512)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
 
+    used_bg_cluts = get_used_bg_cluts()
+    bg_used_colors = clut_dict_to_rgb(bg_tile_clut,used_bg_cluts)
+    bg_quantized_rgb = quantize_palette_16(bg_used_colors,table)
+    bg_tile_clut = remap_colors(bg_tile_clut,bg_quantized_rgb)
+    partial_palette_bg = get_reduced_palette(bg_quantized_rgb)
+
     populate_tile_matrix(
     matrix = bg_matrix,
     side=8,
     pics = bg_data["data"],
-    tile_clut_dict = get_used_bg_cluts(),
+    tile_clut_dict = used_bg_cluts,
     is_sprite = False,
     image_names_dict = {},
-    img_type = "bg",
-    tile_clut = bg_tile_clut)
+    img_type = table,
+    tile_clut = bg_tile_clut,
+    global_palette = partial_palette_bg)
 
+    # same for sprites
 
     table = "sprite"
     raw_pic_data = block_dict[table]
+
+    used_sprite_cluts = get_used_sprite_cluts()
+    sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
+    sprite_quantized_rgb = quantize_palette_16(sprite_used_colors,table)
+
+    sprite_tile_clut = remap_colors(sprite_tile_clut,sprite_quantized_rgb)
+    partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)
+
+    # dump the (reduced) palette
 
     sprite_matrix = raw_blocks[table] = [[None]*128 for _ in range(320)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
     populate_tile_matrix(
     side = 16,
     pics = raw_pic_data["data"],
-    tile_clut_dict = get_used_sprite_cluts(),
+    tile_clut_dict = used_sprite_cluts,
     is_sprite = True,
     matrix = sprite_matrix,
     image_names_dict = sprite_names,
     img_type = "sprite",
-    tile_clut = sprite_tile_clut)
+    tile_clut = sprite_tile_clut,
+    global_palette = partial_palette_sprite)
+
+    # first sprites then background (bitplanes are configured accordingly)
+    bitplanelib.palette_dump(partial_palette_sprite+partial_palette_bg,os.path.join(src_dir,"palette.68k"),
+                            bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
 
 
     outfile = os.path.join(src_dir,"graphics.68k")

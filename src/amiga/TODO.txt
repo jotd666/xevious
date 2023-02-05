@@ -11,6 +11,7 @@ like when scroll offset = exactly 0)
 background restore not optimal at all
 if bob moves exactly like tiles don't redraw tiles, just blit bob
 dynamic copperlist not working for "namco" logo
+optim: do not sprite double draw if y>288 tile>36. Coded but still fg plane is destroyed 
 
 * can be worked on now:
 
@@ -19,4 +20,4 @@ sprites for ship, bomb sight and shots and bomb!: superimpose 2 sprites to get m
 compute 16-color palette for tiles, 16-color palette for sprites => create original RGB => reduced colors dictionary
 revert to AGA dual playfield, scratch FG tiles ATM, keep dynamic color
 for fg title tile flash
-optim: do not sprite double draw if y>288 tile>36. Coded but still fg plane is destroyed 
+bg colors completely wrong (tiles): playfield banks???
