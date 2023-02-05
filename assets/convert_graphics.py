@@ -486,8 +486,11 @@ if dump_graphics:
     tile_clut = sprite_tile_clut,
     global_palette = partial_palette_sprite)
 
-    # first sprites then background (bitplanes are configured accordingly)
-    bitplanelib.palette_dump(partial_palette_sprite+partial_palette_bg,os.path.join(src_dir,"palette.68k"),
+    # first background then sprites (bitplanes are configured accordingly)
+    # also sprites are mainly bobs but to get the chance to use real HW sprites
+    # the palette must be in 16-32 not in 0-16
+
+    bitplanelib.palette_dump(partial_palette_bg+partial_palette_sprite,os.path.join(src_dir,"palette.68k"),
                             bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
 
 

@@ -17,6 +17,7 @@ OPT_ENABLE_LOGGING = 1
 
 _custom = 0xDFF000
 
+BASE_BPLCON3_VALUE = (1<<12)|(1<<10)
 NB_PLAYFIELD_PLANES = 4
 TOTAL_NB_COLORS = 32   | 16+16
 NB_BYTES_PER_ROW = 40
@@ -103,7 +104,7 @@ mul\value\()_table:
 	move.w	d0,-(a7)
 	clr.w	d0
 loop\@:
-	move.w	#0,_custom+bplcon3	| really color 0
+	move.w	#BASE_BPLCON3_VALUE,_custom+bplcon3	| really color 0
 	move.w	d0,_custom+color
 	btst	#6,0xbfe001
 	beq.b	out\@
@@ -393,12 +394,13 @@ platform_init:
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
     #move.w #0x0210,bplcon0(a5)  
-    move.w #0x7600,bplcon0(a5) | 8 bitplanes, dual playfield
+    move.w #0x0610,bplcon0(a5) | 8 bitplanes, dual playfield
 	
     move.w #3,fmode(a5)  		| AGA fastest fetch mode
 	
     clr.w bplcon1(a5) 
-    clr.w bplcon2(a5)
+    move.w #0x0044,bplcon2(a5)	| 2nd playfield has priority, sprites have priority
+    move.w #BASE_BPLCON3_VALUE,bplcon3(a5)	| color bank offset for playfield 2
 	move.w	#-8,d0
     move.w d0,bpl1mod(a5) 
     move.w d0,bpl2mod(a5)
@@ -443,6 +445,7 @@ set_aga_color_registers:
     lsl.w   #8,d0
     lsl.w   #5,d0
 	or.w	d2,d0
+	or.w	#BASE_BPLCON3_VALUE,d0
     move.w  d0,bplcon3(a5)
     lea color(a5),a1
     * now set the colors for that bank
@@ -455,7 +458,7 @@ set_aga_color_registers:
     bne.b   1b
     
     * reset bank so copperlist can work on base ECS bank
-    move.w  #0,bplcon3(a5)
+    move.w  #BASE_BPLCON3_VALUE,bplcon3(a5)
     rts
 
 * 60Hz VBLANK interrupt
@@ -803,18 +806,6 @@ update_fg_tile:
 	.else
 	move.w	(a1,d2.w*2),d2
 	.endif
-	* update color for that row
-	lea	_fg_color_table,a1
-	.ifdef	NO68020
-	move.w	d1,d5
-	add.w	d5,d5
-	add.w	d5,d5
-	move.l	(a1,d5.w),a1
-	.else
-	move.l	(a1,d1.w*4),a1	
-	.endif
-	move.w	d2,(a1)			| color palette index
-	move.w	d2,(8,a1)		| color palette index
 
 	tst	d3
 	bne.b	4f
@@ -1030,7 +1021,7 @@ osd_update_32_sprite_hw:
 	move.w	(a0,d1.w),d1	| col offset
 	bne.b	7f
 	* sprite is not known with that CLUT configuration: blue flash
-	move.w	#0,bplcon3+_custom
+	move.w	#BASE_BPLCON3_VALUE,bplcon3+_custom
 	move.w	#0xF,color+_custom
 	tst.b	unknown_sprite_found
 	bne.b	2f
@@ -1562,22 +1553,6 @@ scb4_shadow:									ds.w 	128*2
 irq_cnt:											ds.w		1
 		.data
 
-* 36 rows = 288 pixels
-* table of the colors for fg tiles in the copperlist
-_fg_color_table:
-	.set	fgrow_offset,2
-	.long	color_row_0+8+fgrow_offset
-	.rept	28
-	.long	color_row_1+8+fgrow_offset
-	.set	fgrow_offset,fgrow_offset+20
-	.endr
-	.long	color_row_30+6
-	.set	fgrow_offset,2
-	.rept	6
-	.long	color_row_30_plus+4+fgrow_offset
-	.set	fgrow_offset,fgrow_offset+20
-	.endr
-	
 
 		.bsschip
 bg_screen_data:
@@ -1601,13 +1576,13 @@ fg_screen_data:
 	
 copperlist:
 fg_bitplanes:
-	DECL_4_BITPLANES	0
-bg_bitplanes:
 	DECL_4_BITPLANES	4
+bg_bitplanes:
+	DECL_4_BITPLANES	0
 
 
    * reset color 0
-   dc.w	bplcon3,0
+	dc.w	bplcon3,BASE_BPLCON3_VALUE
 	dc.w color,0
 sprites:
 score_sprite_white:
@@ -1640,55 +1615,10 @@ end_color_copper:
    * proper sprite priority: above bitplanes
    *dc.w  0x0102,0x0000            ;  BPLCON1 := 0x0000
    *dc.w  0x0104,0x0024            ;  BPLCON2 := 
-   * dynamic colors for color 128 each 8 lines
-	.set    beampos,0x1C01
-	.set    testcol,0x0
-	.set	color_28,color+28*2
-color_row_0:
-	dc.w	bplcon3,4<<13	| color 128
-	dc.w	beampos,0xFFFE
-	dc.w	color,(testcol & 0x0FFF)
-	dc.w	bplcon3,5<<13	| color 188
-	dc.w	color_28,0xFFF
-	
-	.set	beampos,beampos+0x800
-	.set	testcol,testcol+0x011
-color_row_1:
-	.rept	28
-	dc.w	bplcon3,4<<13	| color 128
-	dc.w	beampos,0xFFFE
-	dc.w	color,(testcol & 0x0FFF)
-	dc.w	bplcon3,5<<13	| color 188
-	dc.w	color_28,0xFFF
-		
-	.set	beampos,beampos+0x800
-	.set	testcol,testcol+0x011
-	.endr
 	* pal limit
     dc.w  0xFFDF,0xFFFE           
     dc.w  0x0401,0xFFFE
 	
-color_row_30:
-	dc.w	bplcon3,4<<13	| color 128
-	dc.w	color,0xFFF
-	dc.w	bplcon3,5<<13	| color 188
-	dc.w	color_28,0xFFF
-    dc.w  0x0C01,0xFFFE           
-          
-	.set    testcol,0xF0
-	.set    beampos,0x1401
-color_row_30_plus:
-	.rept	(48/8)
-	dc.w	bplcon3,4<<13	| color 128
-	dc.w	color,(testcol & 0x0FFF)
-	dc.w	bplcon3,5<<13	| color 188
-	dc.w	color_28,0xFFF
-	dc.w	beampos,0xFFFE
-	.set	beampos,beampos+0x800
-	.set	testcol,testcol+0x022
-	.endr
-	dc.w	bplcon3,0  | reset ECS
-	dc.w	color,0xF00	| test
     dc.w	 intreq,0x8010
     dc.l    -2					
 	
