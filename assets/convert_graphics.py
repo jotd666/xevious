@@ -15,6 +15,9 @@ import collections
 
 block_dict = {}
 
+black = (0,0,0)
+white = (255,255,255)
+
 BG_NB_PLANES = 4
 STD_MIRROR_LIST = ("standard","mirror")
 
@@ -60,8 +63,7 @@ def load_binary_tile_file(infile):
         with open(infile,"rb") as f:
             contents = f.read()
     else:
-        # normal when rebuilding with a complete .json file
-        print("{} file not dumped")
+        print("{} log file was not dumped (normal when rebuilding with a complete .json file)".format(infile))
 
     return contents
 
@@ -137,7 +139,7 @@ def get_used_sprite_cluts():
 def remap_colors(tile_clut,color_dict):
     # remap colors can fail to fetch color because quantization only considered
     # used CLUTs, not ALL cluts, but we need to keep the indices of the global CLUT
-    return [[color_dict.get(c,(0,0,0)) for c in clut] for clut in tile_clut]
+    return [[color_dict.get(c,black) for c in clut] for clut in tile_clut]
 
 def get_reduced_palette(reduced_color_dict):
     # we don't care about the keys here
@@ -145,7 +147,7 @@ def get_reduced_palette(reduced_color_dict):
     lst = sorted(set(reduced_color_dict.values()))
     nb_colors = 1<<BG_NB_PLANES
     if len(lst)<nb_colors:
-        lst += [(0,0,0)]*(nb_colors-len(lst))
+        lst += [black]*(nb_colors-len(lst))
     return lst
 
 # ATM all colors are considered the same weight
@@ -154,8 +156,6 @@ def get_reduced_palette(reduced_color_dict):
 def quantize_palette_16(rgb_tuples,img_type):
     rgb_configs = set(rgb_tuples)
     # remove 0, we don't want it quantized
-    black = (0,0,0)
-    white = (255,255,255)
     rgb_configs.remove(black)
     rgb_configs.remove(white)
     rgb_configs = sorted(rgb_configs)
@@ -270,7 +270,7 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
         # generate the proper palette
         for clut_index in cluts:
             current_palette = tile_clut[clut_index]
-            if all(x==(0,0,0) for x in current_palette):
+            if all(x==black for x in current_palette):
                 row[clut_index] = 0
             else:
                 d = generate_tile(pic,side,current_palette,global_palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
@@ -419,7 +419,7 @@ if dump_graphics:
     # foreground data, simplest of all 3
     table = "fg_tile"
     fg_data = block_dict[table]
-    current_palette = [(0,0,0),(96, 96, 96)]
+    current_palette = [black,(96, 96, 96)]
 
     side = 8
     scale = 4
@@ -470,7 +470,10 @@ if dump_graphics:
 
     sprite_tile_clut = remap_colors(sprite_tile_clut,sprite_quantized_rgb)
     partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)
-
+    # pick a gray for the default fg tile color
+    gray = (0x8F,0x8F,0x79)
+    partial_palette_sprite.remove(gray)
+    partial_palette_sprite.insert(1,gray)
     # dump the (reduced) palette
 
     sprite_matrix = raw_blocks[table] = [[None]*128 for _ in range(320)]

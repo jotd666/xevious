@@ -1,5 +1,5 @@
 @echo off
 cd /D %~pd0
-wmake.py
+wmake.py -m makefile
 
 

@@ -3,8 +3,6 @@
 rip sounds
 sprite shadow management: complete?
 sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
-small scrolling issues? (planes don't all scroll on top sometimes?, 
-like when scroll offset = exactly 0)
 
 * not an issue if AGA DPF:
  
@@ -17,7 +15,10 @@ optim: do not sprite double draw if y>288 tile>36. Coded but still fg plane is d
 
 controls: bomb not working
 sprites for ship, bomb sight and shots and bomb!: superimpose 2 sprites to get more colors
-compute 16-color palette for tiles, 16-color palette for sprites => create original RGB => reduced colors dictionary
-revert to AGA dual playfield, scratch FG tiles ATM, keep dynamic color
-for fg title tile flash
-bg colors completely wrong (tiles): playfield banks???
+better 16-color palette for tiles, 16-color palette for sprites
+for fg title tile flash, try to get colored tiles
+update sprites in 2 passes: not ok unless we sort by sprite y max
+- 0-32: update high sprites,
+- 32-63 update low sprites
+small scrolling issues? (planes don't all scroll on top sometimes?, 
+like when scroll offset = exactly 0)

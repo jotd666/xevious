@@ -1,8 +1,11 @@
 import subprocess,os,struct,glob,tempfile
+import shutil
 
+sox = "sox"
+
+if not shutil.which("sox"):
+    raise Exception("sox command not in path, please install it")
 # BTW convert wav to mp3: ffmpeg -i input.wav -codec:a libmp3lame -b:a 330k output.mp3
-
-sox = r"k:\progs\sox-14-4-2\sox.exe"
 
 #wav_files = glob.glob("sounds/*.wav")
 

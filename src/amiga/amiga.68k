@@ -837,7 +837,7 @@ update_fg_tile:
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
 	move.w	d6,scroll_offset
-	move.w	d6,0x108	| temp
+
 	* add to planes offset & change copperlist
 	bra		set_bg_bitplanes
 
@@ -905,17 +905,19 @@ osd_update_32_sprite_hw:
 	cmp.b	#STATE_INACTIVE,(a5)
 	beq	3f
 	* erase previous sprite position
+	move.w	(4,a5),d1   | Y
+	sub.w	#4*8,d1
+	bmi.b		11f		| not visible
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
-	move.w	(4,a5),d1   | Y
-	moveq	#2,d2
+	
 	moveq	#NB_PLAYFIELD_PLANES-1,d3
 	lea		fg_screen_data,a1
 10:
 	bsr		clear_plane_any_blitter_16x16
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
 	dbf		d3,10b
-	
+11:
 	* convert sprite coords to foreground tile coords, then mark
 	* the dirty tiles
 	move.w	(6,a5),d0
@@ -1257,7 +1259,7 @@ clear_plane_any_blitter_16x16:
     movem.l d0-d6/a1/a5,-(a7)
     lea _custom,a5
     moveq.l #-1,d3
-	moveq	#2,d2
+	moveq	#4,d2
     move.w  #16,d4
     bsr clear_plane_any_blitter_internal
     movem.l (a7)+,d0-d6/a1/a5
