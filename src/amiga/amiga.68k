@@ -849,6 +849,13 @@ osd_update_sprite_shadow:
 	moveq			#64-1,d7
 1:
 	move.b	(_STATE,a5),d0
+	cmp.b	#STATE_INACTIVE,d0
+	bne.b	11f
+	move.b	#STATE_DO_NOT_UPDATE_SHADOW,(_STATE,a5)
+	clr.w	(_X,a5)
+	clr.w	(_Y,a5)
+	bra.b	3f
+11:
 	cmp.b	#STATE_DO_NOT_UPDATE_SHADOW,d0
 	beq.b	3f
 	move.b	d0,(a4)+

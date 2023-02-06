@@ -471,9 +471,9 @@ if dump_graphics:
     sprite_tile_clut = remap_colors(sprite_tile_clut,sprite_quantized_rgb)
     partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)
     # pick a gray for the default fg tile color
-    gray = (0x8F,0x8F,0x79)
-    partial_palette_sprite.remove(gray)
-    partial_palette_sprite.insert(1,gray)
+    #gray = (0x8F,0x8F,0x79)
+    #partial_palette_sprite.remove(gray)
+    #partial_palette_sprite.insert(1,gray)
     # dump the (reduced) palette
 
     sprite_matrix = raw_blocks[table] = [[None]*128 for _ in range(320)]

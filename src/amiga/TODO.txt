@@ -4,16 +4,8 @@ rip sounds
 sprite shadow management: complete?
 sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
 
-* not an issue if AGA DPF:
- 
-background restore not optimal at all
-if bob moves exactly like tiles don't redraw tiles, just blit bob
-dynamic copperlist not working for "namco" logo
-optim: do not sprite double draw if y>288 tile>36. Coded but still fg plane is destroyed 
-
 * can be worked on now:
 
-controls: bomb not working
 sprites for ship, bomb sight and shots and bomb!: superimpose 2 sprites to get more colors
 better 16-color palette for tiles, 16-color palette for sprites
 for fg title tile flash, try to get colored tiles
@@ -22,3 +14,5 @@ update sprites in 2 passes: not ok unless we sort by sprite y max
 - 32-63 update low sprites
 small scrolling issues? (planes don't all scroll on top sometimes?, 
 like when scroll offset = exactly 0)
+when killed, previous enemy sprites not reset?
+
