@@ -177,7 +177,7 @@ xevious_im1_irq: | $0038
     jsr       osd_debug_hook
     movem.l   (a7)+,d0-d7/a0-a6
     *** hack
-    jsr       xevious_nmi
+    bsr.b     xevious_nmi
     rts
 
 xevious_nmi: | $0066
@@ -200,7 +200,7 @@ update_sprite_hw_and_other_things: | $0096
     * copy sprites from shadow to OSD
     move.w    #0,d0                             | start at sprite 0
     jsr       osd_update_32_sprite_hw
-    jsr       read_dipswitches
+    bsr.b     read_dipswitches
     move.b    #1,(vb_semaphore_sub)
     move.b    #1,(vb_semaphore_main)
     rts
@@ -267,7 +267,7 @@ main_loop: | $0447
     jsr       osd_debug_hook
 
     jsr       osd_kick_wdog
-    bra       restart_main_loop
+    bra.b     restart_main_loop
 
     .align 4      
 main_fn_tbl_ROM: | $045B
@@ -1553,7 +1553,7 @@ name_entry_dec_char: | $123D
 9:  rts
 
 name_entry_append_char: | $124A
-    jsr       check_lowercase
+    bsr.b     check_lowercase
     move.b    d1,(a0)+                          | store new char
     move.l    a0,(name_entry_ptr_curr_char)     | save ptr
     move.w    (name_entry_curr_char_screen_offset),d0
@@ -1693,7 +1693,7 @@ display_player_scores: | $1427
     exg       d0,d3                             | use P2 offset
 1:  move.w    d3,-(a7)                          | save other offset
     lea       curr_player_score_msb,a0
-    jsr       display_score
+    bsr.b     display_score
     move.w    (a7)+,d0                          | restore other offset
     tst.b     (two_player_game)                 | 2P game?
     beq       display_7_spaces                  | no, skip
@@ -1704,7 +1704,7 @@ display_player_scores: | $1427
 display_score: | $1447
     moveq     #3-1,d7                           | bytes in score
     moveq     #5,d6                             | pad bytes
-    jsr       display_bcd_value
+    bsr.b     display_bcd_value
     clr.b     d1
 * fall thru to display a trailing zero
         
@@ -1736,7 +1736,7 @@ display_7_spaces:
 * d0=offset (MSB=31-col,LSB=row) d1=char, d2=bank, d7=B
 display_char_B_times: | $145D
     subq.w    #1,d7
-1:  jsr       display_char
+1:  bsr.w     display_char
     dbf       d7,1b
     rts
     
@@ -1758,7 +1758,7 @@ display_bcd_value: | $146D
     moveq     #0,d1                             | 0
 1:  moveq     #0,d6                             | clear pad bytes
 2:  move.l    d6,-(a7)
-    jsr       display_char
+    bsr.w     display_char
     move.l    (a7)+,d6
     move.b    (a0),d1                           | byte
     and.b     #0x0f,d1                          | low nibble
@@ -1769,7 +1769,7 @@ display_bcd_value: | $146D
     moveq     #0,d1                             | 0
 3:  moveq     #0,d6                             | clear pad bytes
 4:  move.l    d6,-(a7)
-    jsr       display_char
+    bsr.w     display_char
     move.l    (a7)+,d6
     addq.l    #1,a0                             | we've reversed order
     dbf       d7,display_bcd_value
@@ -1849,13 +1849,13 @@ explode_solvalou: | $151C
     beq.b     finish_solvalou_exploding         | yes, go
     cmp.b     #2,d0                             | time to adjust sprite size?
     bne.b     1f                                | no, skip
-    jsr       adj_for_small_explosion_frame
+    bsr.w     adj_for_small_explosion_frame
 1:  cmp.b     #4,d0
     bne.b     2f
-    jsr       adj_for_big_explosion_frame
+    bsr.w     adj_for_big_explosion_frame
 2:  cmp.b     #6,d0
     bne.b     3f
-    jsr       adj_for_small_explosion_frame
+    bsr.w     adj_for_small_explosion_frame
 3:  add.b     #0x30,d0                          | calc colour
     move.b    d0,(_COLOUR,a5)
     
@@ -1982,9 +1982,9 @@ check_solvalou_hit: | $1645
     lea       sprite_shadow_msb+2*0x27,a3       | 1st object sprite coords
     moveq     #25-1,d7                          | 19 bullets + 6 flying enemies
 check_bullets_and_flying: | $1655
-    jsr       check_bullet_or_flying_hit_solvalou
+    bsr.b     check_bullet_or_flying_hit_solvalou
     bcs.b     9f
-    adda.l    #_OBJSIZE,a1                      | next object
+    lea       (_OBJSIZE,a1),a1                  | next object
     addq.l    #2,a3                             | next sprite coords
     dbf       d7,check_bullets_and_flying
     
@@ -1992,16 +1992,16 @@ check_bullets_and_flying: | $1655
     lea       sprite_shadow_msb+2*0x10,a3       | 1st bacura sprite coords
     moveq     #16-1,d7                          | 16 bacura
 check_bacura: | $1665
-    jsr       check_bacura_hit_solvalou
+    bsr.b     check_bacura_hit_solvalou
     bcs.b     9f
-    adda.l    #_OBJSIZE,a1                      | next object
+    lea       (_OBJSIZE,a1),a1                  | next object
     addq.l    #2,a3                             | next sprite coords
     dbf       d7,check_bacura
 9:  rts
 
 check_bullet_or_flying_hit_solvalou: | $1670
     cmp.b     #2,(_STATE,a1)                    | active?
-    bne       loc_1693                          | no, exit
+    bne.b     loc_1693                          | no, exit
     move.b    d3,d0                             | solvalou spriteY
     sub.b     (0,a3),d0                         | sub object spriteY
     subq.b    #8,d0
@@ -2032,33 +2032,33 @@ check_bacura_hit_solvalou: | $1695
 9:  rts
     
 handle_crosshairs: | $16B8
-    movea.l   #obj_tbl+_OBJSIZE*0x21,a5         | bomb
+    lea       obj_tbl+_OBJSIZE*0x21,a5          | bomb
     move.b    (_STATE,a5),d0
     cmp.b     #2,d0                             | active?
-    beq       1f                                | yes, skip
+    beq.b     1f                                | yes, skip
     moveq     #1,d2
 1:  add.b     #31,d2                            | save colour
     moveq     #0,d7
     move.b    (countup_timer_1),d1
     and.b     #4,d1                             | time to check bombed objects?
-    beq       update_crosshair                  | no, skip
+    beq.b     update_crosshair                  | no, skip
     move.b    (sprite_shadow_msb+2*0x22+0),d3   | crosshairs spriteY
     move.b    (sprite_shadow_msb+2*0x22+1),d4   | crosshairs spriteX
-    movea.l   #sprite_shadow_msb+2*0x02,a3
-    movea.l   #obj_tbl+_OBJSIZE*0x02,a5         | ground_based objects
-    moveq     #14-1,d7                          | 14 object to check
-2:  jsr       check_targeted_ground_object
-    bcs       set_active_crosshair_colour
-    adda.l    #2,a3
-    adda.l    #_OBJSIZE,a5
-    dbf       d7,2b
+    lea       sprite_shadow_msb+2*0x02,a3
+    lea       obj_tbl+_OBJSIZE*0x02,a5          | ground_based objects
+    moveq     #14-1,d7                          | 14 objects to check
+2:  bsr.b     check_targeted_ground_object
+    bcs.b     set_active_crosshair_colour
+    addq.l    #2,a3
+    lea       (_OBJSIZE,a5),a5                  | next object
+    dbf       d7,2b                             | loop thru all objects
     moveq     #0,d7                             | to match Z80 exit condition
     
 update_crosshair: | $16E8
-    movea.l   #obj_tbl+_OBJSIZE*0x22,a5         | crosshairs
+    lea       obj_tbl+_OBJSIZE*0x22,a5          | crosshairs
     add.b     d7,d2                             | calc colour
     move.b    d2,(_COLOUR,a5)   
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a4         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a4          | solvalou
     move.w    (_X,a4),d0
     add.w     #0xf400,d0
     move.w    d0,(_X,a5)                        | crosshair spriteX
@@ -2067,7 +2067,7 @@ update_crosshair: | $16E8
 
 set_active_crosshair_colour: | $16FE
     moveq     #9,d7
-    bra       update_crosshair
+    bra.b     update_crosshair
 
 loc_1702:
     tst.b     d0                                | clear carry
@@ -2076,97 +2076,97 @@ loc_1702:
 * d3=crosshairs spriteY[7:0]??, d4=crosshairs spriteX[8:1]??
 * a3=sprite_shadow_msb (object) a5=obj_tbl(object)
 check_targeted_ground_object: | $1704
-    cmp.b     #2,(_STATE,a5)                    | active?
-    bne       loc_1702
+    cmp.b     #2,(_STATE,a5)                    | object active?
+    bne.b     loc_1702                          | no, return
     move.b    d3,d0                             | object spriteY shadow
     sub.b     (0,a3),d0                         | compare object spriteY
     sub.b     #0x0a,d0
-    add.b     #0x14,d0
-    bcc       9f
+    add.b     #0x14,d0                          | Y matches?
+    bcc.b     9f                                | no, exit
     move.b    (1,a3),d0                         | object spriteX shadow
     sub.b     d4,d0
     subq.b    #5,d0
-    add.b     #0x0a,d0
+    add.b     #0x0a,d0                          | C = matches
 9:  rts
     
 main_fn_30__handle_shooting: | $1727
     jsr       save_PC_to_fn_tbl_and_ret
-    tst.b     (scroll_disabled)
-    bne       9f
+    tst.b     (scroll_disabled)                 | disabled?
+    bne.w     9f                                | yes, return
     move.b    #0x14,(shot_timer_init_value)
     move.b    #0x01,(shot_timer)
     clr.b     (shot_flag)
 * insert function to handle 3 shots
-    movea.l   #main_fn_30_shot_fn,a0            | get handler address
+    lea       main_fn_30_shot_fn,a0             | get handler address
     move.l    a0,(main_30_fn_tbl)               | insert 1st slot
-    movea.l   #main_30_fn_tbl,a0                | get table address
+    lea       main_30_fn_tbl,a0                 | get table address
     lea       (4,a0),a1                         | 2nd slot address
     moveq     #2-1,d7                           | 2 copies to make
 1:  move.l    (a0)+,(a1)+                       | copy slot to next
-    dbf       d7,1b
+    dbf       d7,1b                             | loop thru all slots
     jsr       save_PC_to_fn_tbl_and_ret
-    tst.b     (scroll_disabled)
-    bne       main_fn_30__handle_shooting
+    tst.b     (scroll_disabled)                 | disabled?
+    bne.b     main_fn_30__handle_shooting       | yes, exit
     tst.b     (solvalou_exploding)
-    bne       2f
-    jsr       handle_shooting
+    bne.b     2f                                | yes, skip shooting
+    bsr.b     handle_shooting
 2:  movea.l   #main_30_fn_tbl,a6
-    movea.l   #obj_tbl+_OBJSIZE*0x24,a5
-    movea.l   #sprite_shadow_msb+2*0x24,a3
+    lea       obj_tbl+_OBJSIZE*0x24,a5          | 1st bullet object
+    lea       sprite_shadow_msb+2*0x24,a3
     moveq     #3-1,d7                           | 3 bullet objects
 3:  movea.l   (a6),a0
     movem.l   d7/a3/a4/a6,-(a7)
     jsr       (a0)                              | call handler
     movem.l   (a7)+,d7/a3/a4/a6
-    adda.l    #4,a6
-    adda.l    #_OBJSIZE,a5                      | next object
-    adda.l    #2,a3
-    dbf       d7,3b
+    lea       (4,a6),a6                         | next table entry
+    lea       (_OBJSIZE,a5),a5                  | next object
+    addq.l    #2,a3                             | next sprite shadow entry
+    dbf       d7,3b                             | loop thru all bullets
     clr.b     (shot_flag)
 9:  rts
 
 handle_shooting: | $1772
-    tst.b     (attract_mode_stage)
-    bne       gen_rnd_shot
-    movea.l   #P1_inputs,a1
-    btst.b    #5,(a1)
+    tst.b     (attract_mode_stage)              | attract mode?
+    bne.b     gen_rnd_shot                      | yes, go
+    lea       P1_inputs,a1
+    btst.b    #5,(a1)                           | Button 1?
 loc_1787:
-    movea.l   #shot_timer,a0
-    beq       process_button_1
+    lea       shot_timer,a0
+    beq.b     process_button_1                  | yes (active low), go
     move.b    #1,(a0)                           | reset shot timer
     rts
 
 process_button_1:
     subq.b    #1,(a0)                           | shot timer expired?
-    bne       9f
+    bne.b     9f                                | no, return
     move.b    (shot_timer_init_value),(a0)      | re-init shot timer
-    move.b    #1,(shot_flag)                    | shooting
+    move.b    #1,(shot_flag)                    | flag shooting
 9:  rts
 
 gen_rnd_shot: | $179B
     jsr       pseudo_random_gen
-    and.b     #0x0f,d0
-    bra       loc_1787
+    and.b     #0x0f,d0                          | 1/16 chance of firing
+    bra.b     loc_1787                          | continue
         
 main_fn_30_shot_fn: | $17A2
     jsr       save_PC_to_fn_tbl_and_ret
     move.b    (shot_flag),d0
-    subq.b    #1,d0
-    bne       9f
+    subq.b    #1,d0                             | shooting?
+    bne.w     9f                                | no, return
     move.b    d0,(shot_flag)                    | clr.b?
 * init shot
     move.b    #2,(_STATE,a5)
     move.b    #2,(_EXTRA,a5)                    | temp state
     move.w    #0xffa0,(_dX,a5)
     * (TBD) start shot sound
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a0         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a0          | solvalou
     move.w    (_X,a0),(_X,a5)                   | copy spriteX to shot
     move.w    (_Y,a0),(_Y,a5)                   | copy spriteY to shot
     jsr       save_PC_to_fn_tbl_and_ret
 * update shot
     jsr       check_flying_enemies_shot
     move.b    (countup_timer_1),d0
-    move.b    d0,d1
+    move.b    d0,d1                             | save a copy
     and.b     #1,d1
     lsl.b     #3,d1                             | toggle flip
     add.b     #0x80,d1                          | bank=1    
@@ -2181,13 +2181,13 @@ main_fn_30_shot_fn: | $17A2
     add.b     #0x16,d0
     move.b    d0,(_CODE,a5)
     cmp.b     #3,(_STATE,a5)                    | destroyed?
-    beq       shot_destroyed                    | yes, go
-    jsr       move_shot
+    beq.b     shot_destroyed                    | yes, go
+    bsr.b     move_shot
     cmp.w     #0x2800,d0                        | (MSB=40) off-screen?
-    bcs       9f                                | no, return
+    bcs.b     9f                                | no, return
 loc_1809:
     clr.b     (_STATE,a5)
-    bra       main_fn_30_shot_fn
+    bra.w     main_fn_30_shot_fn
 9:  rts
 
 * this only happens when the shot hits a bacura
@@ -2376,21 +2376,21 @@ check_shot_bacura: | $19CB
     sub.b     (0,a3),d0                         | bacura spriteY
     sub.b     #24,d0
     add.b     #32,d0
-    bcc       9f
+    bcc.b     9f
     move.b    (1,a3),d0                         | bacura spriteX[8:1]
     sub.b     d4,d0                             | solvalou spriteX[8:1]
     subq.b    #8,d0
-    add.b     #16,d0
+    add.b     #16,d0                            | C = match
 9:  rts
             
 handle_bombed_obj_and_award_points: | $19EE
     movem.l   a0/a5,-(a7)
     move.b    (sprite_shadow_msb+2*0x20+0),d3   | bomb target spriteY
     move.b    (sprite_shadow_msb+2*0x20+1),d4   | bomb target spriteX
-    movea.l   #obj_tbl,a5
-    movea.l   #sprite_shadow_msb,a3
-    moveq     #16-1,d7
-1:  jsr       check_object_on_target            | on target?
+    lea       obj_tbl,a5
+    lea       sprite_shadow_msb,a3
+    moveq     #16-1,d7                          | 16 objects to check
+1:  bsr.b     check_object_on_target            | on target?
     bcc       loc_1A2C                          | no, skip  
     move.b    #3,(_STATE,a5)                    | state=hit
     tst.b     (attract_mode_stage)
