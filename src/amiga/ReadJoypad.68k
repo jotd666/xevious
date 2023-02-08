@@ -93,8 +93,8 @@ _detect_controller_types:
 		lea	0xDFF000,a0
 		lea	0xBFE001,a1
 		
-		bset	d3,ciaddra(a1)	|set bit to out at ciapra
-		bclr	d3,ciapra(a1)	|clr bit to in at ciapra
+		bset	d3,CIADDRA(a1)	|set bit to out at CIAPRA
+		bclr	d3,CIAPRA(a1)	|clr bit to in at CIAPRA
 
 		move.w	d5,potgo(a0)
 
@@ -102,19 +102,19 @@ _detect_controller_types:
 		moveq	#10-1,d1	| read 9 times instead of 7. Only 2 last reads interest us
 		bra.b	.gamecont4
 
-.gamecont3:	tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
-.gamecont4:	tst.b	ciapra(a1)	| wepl timing fix
-		tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
+.gamecont3:	tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
+.gamecont4:	tst.b	CIAPRA(a1)	| wepl timing fix
+		tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
 
 		move.w	potinp(a0),d2
 
-		bset	d3,ciapra(a1)
-		bclr	d3,ciapra(a1)
+		bset	d3,CIAPRA(a1)
+		bclr	d3,CIAPRA(a1)
 	
 		btst	d4,d2
 		bne.b	.gamecont5
@@ -123,10 +123,10 @@ _detect_controller_types:
 
 .gamecont5:	dbf	d1,.gamecont3
 
-		bclr	d3,ciaddra(a1)		|set bit to in at ciapra
+		bclr	d3,CIADDRA(a1)		|set bit to in at CIAPRA
 		move.w	#POTGO_RESET,potgo(a0)	|changed from ffff to ff00, according to robinsonb5@eab
 		
-		or.b	#0xC0,ciapra(a1)	|reset port direction
+		or.b	#0xC0,CIAPRA(a1)	|reset port direction
 * test only last bits
 		and.w	#03,D0
 		
@@ -211,7 +211,7 @@ _read_joystick:
 		seq	d7
 		add.w	d7,d7
 
-		btst	d3,ciapra(a1)	|check button red (normal fire1)
+		btst	d3,CIAPRA(a1)	|check button red (normal fire1)
 		seq	d7
 		add.w	d7,d7
 
@@ -223,29 +223,29 @@ _read_joystick:
 
 		moveq	#0,d0
 		tst.b	d2
-		beq.b	.read_third_button
+		beq.w	.read_third_button
 		
-		bset	d3,ciaddra(a1)	|set bit to out at ciapra
-		bclr	d3,ciapra(a1)	|clr bit to in at ciapra
+		bset	d3,CIADDRA(a1)	|set bit to out at CIAPRA
+		bclr	d3,CIAPRA(a1)	|clr bit to in at CIAPRA
 
 		move.w	d5,potgo(a0)
 
 		moveq	#8-1,d1
 		bra.b	.gamecont41
 
-.gamecont31:	tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
-.gamecont41:	tst.b	ciapra(a1)	| wepl timing fix
-		tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
-		tst.b	ciapra(a1)
+.gamecont31:	tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
+.gamecont41:	tst.b	CIAPRA(a1)	| wepl timing fix
+		tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
+		tst.b	CIAPRA(a1)
 
 		move.w	potinp(a0),d2
 
-		bset	d3,ciapra(a1)
-		bclr	d3,ciapra(a1)
+		bset	d3,CIAPRA(a1)
+		bclr	d3,CIAPRA(a1)
 	
 		btst	d4,d2
 		bne.b	.gamecont51
@@ -254,7 +254,7 @@ _read_joystick:
 
 .gamecont51:	dbf	d1,.gamecont31
 
-		bclr	d3,ciaddra(a1)		|set bit to in at ciapra
+		bclr	d3,CIADDRA(a1)		|set bit to in at CIAPRA
 .no_further_button_test:
 		move.w	#POTGO_RESET,potgo(a0)	|changed from ffff, according to robinsonb5@eab
 
@@ -263,7 +263,7 @@ _read_joystick:
 		or.l	d7,d0
 
     
-		or.b	#0xC0,ciapra(a1)	|reset port direction
+		or.b	#0xC0,CIAPRA(a1)	|reset port direction
 
 		movem.l	(a7)+,d1-d7/a0-a1
 

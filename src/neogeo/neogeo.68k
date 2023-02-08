@@ -879,7 +879,7 @@ update_sprite_shadow: | $0332
     move.w    d0,(0,a1)                         | SCB1 code (sprite0,tile0)
     bra.b     2f    
 4:  * size=0x03 (2x2)
-    * cab be X/Y flipped
+    * can be X/Y flipped
     eor.b     d4,d0                             | adjust starting code for flip
     move.w    d0,(12,a1)                        | SCB1 code (sprite1,tile1)
     eor.b     #1,d0
@@ -896,7 +896,11 @@ update_sprite_shadow: | $0332
     ** SCB3
     move.w    (_Y,a5),d0                        | spriteY
     lsr.w     #5,d0                             | back to original
-    move.b    d0,(a2)+                          | store Y[7:0] for hit-box calcs
+    *** THIS IS MANDATORY IN EVERY PORT
+    move.b    #0xef,d1                          | arcade adjustment
+    sub.b     d0,d1                             | arcade adjustment
+    move.b    d1,(a2)+                          | store Y[7:0] for hit-box calcs
+    *** END OF MANDATORY
     btst      #8,d0
     beq.b     3f
     and.w     #0xff00,d0                        | max=256
@@ -915,8 +919,11 @@ update_sprite_shadow: | $0332
     move.w    (_X,a5),d0                        | spriteX
     lsr.w     #5,d0                             | back to original
     move.w    d0,d1
+    *** THIS IS MANDATORY IN EVERY PORT
+    addq.b    #8,d1    
     lsr.w     #1,d1
     move.b    d1,(a2)+                          | store X[8:1] for hit-box calcs
+    *** END OF MANDATORY
     cmp.w     #0x0200,d0                        | too big?
     bcs.b     5f
     clr.w     d0
