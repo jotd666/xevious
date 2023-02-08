@@ -1,7 +1,19 @@
 import os,re,bitplanelib,ast,json
 from PIL import Image,ImageOps
 
+import gen_color_dict
+
 import collections
+
+title_tiles = {240, 241, 242, 243, 244, 245, 246, 247, 248,
+249, 256, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425,
+426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437,
+438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449,
+ 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461,
+ 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473,
+ 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485,
+ 486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497,
+ 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511}
 
 # this script uses the original graphics.c with palette & cluts
 # and generates the bitmaps for the amiga version
@@ -136,10 +148,11 @@ def get_used_sprite_cluts():
 
     return rval
 
-def remap_colors(tile_clut,color_dict):
+def remap_colors(tile_clut,color_dict,mask = 0xFF):
     # remap colors can fail to fetch color because quantization only considered
     # used CLUTs, not ALL cluts, but we need to keep the indices of the global CLUT
-    return [[color_dict.get(c,black) for c in clut] for clut in tile_clut]
+
+    return [[color_dict.get(tuple(x & mask for x in c),black) for c in clut] for clut in tile_clut]
 
 def get_reduced_palette(reduced_color_dict):
     # we don't care about the keys here
@@ -249,7 +262,7 @@ sprite_tile_clut = block_dict["sprite_clut"]["data"]
 
 
 dump_graphics = True
-dump_pngs = False
+dump_pngs = True
 
 def mkdir(d):
     if not os.path.exists(d):
@@ -258,7 +271,7 @@ def mkdir(d):
 if dump_pngs:
     dump_root = "dumps"
     mkdir(dump_root)
-    for d in ["bg","fg","sprite"]:
+    for d in ["bg_tile","fg_tile","sprite"]:
         mkdir(os.path.join(dump_root,d))
 
 def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_dict,img_type,tile_clut,global_palette):
@@ -273,11 +286,15 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
             if all(x==black for x in current_palette):
                 row[clut_index] = 0
             else:
-                d = generate_tile(pic,side,current_palette,global_palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
-                # put dict in each slot
-                row[clut_index] = d
-                if dump_pngs:
-                    ImageOps.scale(d["png"],scale,0).save("dumps/{}/{}_{:02}_{}.png".format(img_type,image_names_dict.get(tile_index,"img"),tile_index,clut_index))
+                used_palette = global_palette if is_sprite or tile_index not in title_tiles else title_tile_palette
+                try:
+                    d = generate_tile(pic,side,current_palette,used_palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
+                    # put dict in each slot
+                    row[clut_index] = d
+                    if dump_pngs:
+                        ImageOps.scale(d["png"],scale,0).save("dumps/{}/{}_{:02}_{}.png".format(img_type,image_names_dict.get(tile_index,"img"),tile_index,clut_index))
+                except bitplanelib.BitplaneException as e:
+                    print("{}:{}: {}".format(tile_index,clut_index,e))
 
 def write_tiles(t,matrix,f,is_bob):
     # background tiles/sprites: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
@@ -436,6 +453,10 @@ if dump_graphics:
     # the only way to know which CLUTs are used is to run the game and log them... We can't generate all pics, that
     # would take too much memory (512*64 pics of 16 color 8x8 tiles!!)
 
+    ##reduced_color_dict = gen_color_dict.doit()
+    title_tile_palette = sorted(gen_color_dict.get_colors("bg_data_title.png"))
+    title_tile_palette += [black]*(16-len(title_tile_palette))
+
     table = "bg_tile"
     bg_data = block_dict[table]
 
@@ -444,9 +465,15 @@ if dump_graphics:
 
     used_bg_cluts = get_used_bg_cluts()
     bg_used_colors = clut_dict_to_rgb(bg_tile_clut,used_bg_cluts)
-    bg_quantized_rgb = quantize_palette_16(bg_used_colors,table)
-    bg_tile_clut = remap_colors(bg_tile_clut,bg_quantized_rgb)
+    # with reduced colors, finds nothing...
+    bg_quantized_rgb =  quantize_palette_16(bg_used_colors,table)  #reduced_color_dict["map_tiles"]
+    # less accurate
+    mask = 0xFF
+    bg_quantized_rgb = {tuple(x & mask for x in k):v for k,v in bg_quantized_rgb.items()}
+    bg_tile_clut = remap_colors(bg_tile_clut,bg_quantized_rgb,mask)
     partial_palette_bg = get_reduced_palette(bg_quantized_rgb)
+    print(bg_tile_clut)
+    # should be no all 32,64,0
 
     populate_tile_matrix(
     matrix = bg_matrix,
@@ -466,7 +493,7 @@ if dump_graphics:
 
     used_sprite_cluts = get_used_sprite_cluts()
     sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
-    sprite_quantized_rgb = quantize_palette_16(sprite_used_colors,table)
+    sprite_quantized_rgb = quantize_palette_16(sprite_used_colors,table) #reduced_color_dict["sprites"]
 
     sprite_tile_clut = remap_colors(sprite_tile_clut,sprite_quantized_rgb)
     partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)
@@ -494,6 +521,8 @@ if dump_graphics:
     # the palette must be in 16-32 not in 0-16
 
     bitplanelib.palette_dump(partial_palette_bg+partial_palette_sprite,os.path.join(src_dir,"palette.68k"),
+                            bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
+    bitplanelib.palette_dump(title_tile_palette,os.path.join(src_dir,"title_palette.68k"),
                             bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
 
 

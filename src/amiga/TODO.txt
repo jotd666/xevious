@@ -1,18 +1,18 @@
 * to see with Mark:
 
-rip sounds
-sprite shadow management: complete?
-sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
+- sprite shadow management: complete?
+- sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
+- better 16-color palette for tiles, 16-color palette for sprites
+- when killed, previous enemy sprites not reset?
 
-* can be worked on now:
+* can be worked on my own:
 
-sprites for ship, bomb sight and shots and bomb!: superimpose 2 sprites to get more colors
-better 16-color palette for tiles, 16-color palette for sprites
-for fg title tile flash, try to get colored tiles
-update sprites in 2 passes: not ok unless we sort by sprite y max
-- 0-32: update high sprites,
-- 32-63 update low sprites
-small scrolling issues? (planes don't all scroll on top sometimes?, 
-like when scroll offset = exactly 0)
-when killed, previous enemy sprites not reset?
+- sprites for ship, bomb sight and shots and bomb!: superimpose 2 sprites to get more colors
+- for fg title tile flash, try to get colored tiles
+- update sprites in 2 passes: not ok unless we sort by sprite y max
+   -> 0-32: update high sprites,
+   -> 32-63 update low sprites
+- small scrolling issues? (planes don't all scroll on top sometimes?, 
+  like when scroll offset = exactly 0)
+- rip sounds
 

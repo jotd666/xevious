@@ -24,6 +24,7 @@ def dump_png(bg_data):
         color_data = f.read(0x800)
         tile_data = f.read(0x800)
 
+    used_tiles = set()
     row = 0
     col = 0
     scale = 4
@@ -39,6 +40,7 @@ def dump_png(bg_data):
             clut_index = 1<<4
         clut_index |= ((idx & 0x3F)>>2)
         clut_index |= (idx&0x3) << 5
+        used_tiles.add(tile_index)
         img = "img_{:02d}_{}.png".format(tile_index,clut_index)
         img = os.path.join(dump_dir,img)
 
@@ -56,7 +58,10 @@ def dump_png(bg_data):
             row += 1
 
     outimg.save(os.path.join("dumps","{}.png".format(os.path.basename(bg_data))))
+    return used_tiles
 
-dump_png("bg_data_scroll")
-dump_png("bg_data_title")
+ut = dump_png("bg_data_scroll")
+
+ut = dump_png("bg_data_title")
+print(ut)
 

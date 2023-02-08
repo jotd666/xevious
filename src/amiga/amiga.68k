@@ -429,9 +429,43 @@ platform_init:
 	
     rts
 
+load_ingame_tile_palette:
+	lea		palette,a0
+	clr.w	d0
+	bsr		load_first_16_colors
+	add.w	#32,a0	| skip 16 colors
+	move.w	#0x200,d0
+	bsr		load_first_16_colors
+	rts
+	
+load_title_tile_palette:
+	lea		title_palette,a0
+	clr.w	d0
+	bsr		load_first_16_colors
+	move.w	#0x200,d0
+	bsr		load_first_16_colors
+	rts
+	
+* D0: LOCT 0/0x200
+* A0: out updated by 32
+load_first_16_colors:
+	movem.l	d0-d1/a1,-(a7)
+	lea		_custom,a5
+    or.w  #BASE_BPLCON3_VALUE,d0
+	move.w	d0,bplcon3(a5)
+	move.w	#15,d0
+	lea		color(a5),a1
+1:
+	move.w	(a0)+,(a1)+
+	dbf		d0,1b
+	move.w	#BASE_BPLCON3_VALUE,bplcon3(a5)
+	movem.l	(a7)+,d0-d1/a1
+	rts
+	
 * < a0: source palette
 * < d0: LOCT mask 0 or 0x200
 set_aga_color_registers:
+	lea		_custom,a5
 	move.w	d0,d2
     moveq	#0,d7
     move.w  #TOTAL_NB_COLORS,d1    | number of colors: here only 32, bank system is not used
@@ -557,6 +591,24 @@ osd_w_bg_videoram:
 * d1: tile code (0-256 but extends to 512 with bit 0 of attribute)
 * d2: attribute (0-255, color is in bits 0-5, X/Y flip in 6:7)
 update_bg_tile:
+	* first check if we must toggle lower 16 palette between title
+	* and in-game
+	lea		bg_videoram,a0
+	cmp.b	#0xCD,(0x60E,a0)
+	beq.b	2f
+	* in-game
+	tst.b	ingame_palette_loaded
+	bne.b	3f
+	bsr		load_ingame_tile_palette
+	st.b	ingame_palette_loaded
+	bra.b	3f
+2:
+	* title
+	tst.b	ingame_palette_loaded
+	beq.b	3f
+	bsr		load_title_tile_palette
+	clr.b	ingame_palette_loaded	
+3:	
 	* discard everything not in column range
 	move.w	d0,d3
 	lsr.w	#6,d3
@@ -1514,6 +1566,9 @@ unknown_tile_found:
 	dc.b	0
 unknown_sprite_found:
 	dc.b	0
+ingame_palette_loaded:
+	dc.b	0
+	dc.b	0
 	
 scroll_offset:
 	dc.w	0
@@ -1542,6 +1597,8 @@ _end_of_ng_code:
 	.align 2
 palette:
 	.include "palette.68k"
+title_palette:
+	.include "title_palette.68k"
 
 		.bss
 
