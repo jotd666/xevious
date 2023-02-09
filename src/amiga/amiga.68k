@@ -860,6 +860,18 @@ update_fg_tile:
 	.else
 	move.w	(a1,d2.w*2),d2
 	.endif
+	* update color for that row
+	lea	_fg_color_table,a1
+	.ifdef	NO68020
+	move.w	d1,d5
+	add.w	d5,d5
+	add.w	d5,d5
+	move.l	(a1,d5.w),a1
+	.else
+	move.l	(a1,d1.w*4),a1	
+	.endif
+	move.w	d2,(a1)			| color palette index
+	move.w	d2,(8,a1)		| color palette index
 
 	tst	d3
 	bne.b	4f
@@ -1626,6 +1638,21 @@ scb4_shadow:									ds.w 	128*2
 irq_cnt:											ds.w		1
 		.data
 
+* 36 rows = 288 pixels
+* table of the colors for fg tiles in the copperlist
+_fg_color_table:
+	.set	fgrow_offset,2
+	.long	color_row_0+4+fgrow_offset
+	.rept	28
+	.long	color_row_1+4+fgrow_offset
+	.set	fgrow_offset,fgrow_offset+8
+	.endr
+	.long	color_row_30+2
+	.set	fgrow_offset,2
+	.rept	6
+	.long	color_row_30_plus+fgrow_offset
+	.set	fgrow_offset,fgrow_offset+8
+	.endr
 
 		.bsschip
 bg_screen_data:
@@ -1688,10 +1715,39 @@ end_color_copper:
    * proper sprite priority: above bitplanes
    *dc.w  0x0102,0x0000            ;  BPLCON1 := 0x0000
    *dc.w  0x0104,0x0024            ;  BPLCON2 := 
+   * dynamic colors for fg tile color each 8 lines
+	.set    beampos,0x1C01
+	.set    fgcol,color+17*2
+	.set    testcol,0x0
+color_row_0:
+	dc.w	beampos,0xFFFE
+	dc.w	fgcol,(testcol & 0x0FFF)
+	.set	beampos,beampos+0x800
+	.set	testcol,testcol+0x011
+color_row_1:
+	.rept	28
+	dc.w	beampos,0xFFFE
+	dc.w	fgcol,(testcol & 0x0FFF)
+	.set	beampos,beampos+0x800
+	.set	testcol,testcol+0x011
+	.endr
 	* pal limit
     dc.w  0xFFDF,0xFFFE           
     dc.w  0x0401,0xFFFE
 	
+color_row_30:
+	dc.w	fgcol,0xFFF
+    dc.w  0x0C01,0xFFFE           
+	.set    testcol,0xF0
+	.set    beampos,0x1401
+color_row_30_plus:
+	.rept	(48/8)
+	dc.w	fgcol,(testcol & 0x0FFF)
+	dc.w	beampos,0xFFFE
+	.set	beampos,beampos+0x800
+	.set	testcol,testcol+0x022
+	.endr
+	dc.w	fgcol,0xF00	| test
     dc.w	 intreq,0x8010
     dc.l    -2					
 	

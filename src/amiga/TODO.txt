@@ -16,4 +16,6 @@
 - rip sounds
 - better 16-color palette for sprites
 - when killed, previous enemy sprites not reset? (see Mark mail)
-- Xevious title colors
+- crosshairs CLUTs look wrong
+- trashed gfx when dropping bomb (snoop?)
+
