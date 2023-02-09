@@ -309,6 +309,12 @@ main_fn_0__main_thread: | $049B
     jsr       clear_fg_to_transparent
     jsr       clear_bg_to_black
     jsr       init_high_score_table
+    
+    * added for 68K transcode
+    lea       high_score_1st_msb,a0
+    lea       RAM_high_score,a1
+    jsr       osd_read_high_scores
+    
     * don't need to worry about cocktail mode
     move.b    #1,(scroll_disabled)
     move.w    #0xfff8,(scroll_delta)
@@ -1564,7 +1570,13 @@ name_entry_append_char: | $124A
     bne.b     9f                                | no, skip
     
 name_entry_finished: | $1262
-    * some writs to $A00X addresses, sound???
+    * some writes to $A00X addresses, sound???
+    
+    * added for 68K transcode
+    lea       high_score_1st_msb,a0
+    lea       RAM_high_score,a1
+    jsr       osd_write_high_scores
+    
     bra       game_over
 
 9:  rts
@@ -2185,7 +2197,7 @@ main_fn_30_shot_fn: | $17A2
     bsr.b     move_shot
     cmp.w     #0x2800,d0                        | (MSB=40) off-screen?
     bcs.b     9f                                | no, return
-loc_1809:
+delete_shot:
     clr.b     (_STATE,a5)
     bra.w     main_fn_30_shot_fn
 9:  rts
@@ -2199,15 +2211,15 @@ shot_destroyed: | $180D
     addq.b    #1,(_TIMER,a5)
     move.b    (_TIMER,a5),d0
     cmp.b     #8,d0                             | time to deactivate?
-    beq       loc_1809                          | yes, go
+    beq.b     delete_shot                       | yes, go
     move.b    d0,d1
     lsr.b     #1,d1
     and.b     #3,d1
-    add.b     #0x18,d1
+    add.b     #0x18,d1                          | generate sprite code
     move.b    d1,(_CODE,a5)
-    and.b     #1,d0
+    and.b     #1,d0                             | toggle yflip
     lsl.b     #3,d0
-    add.b     #0x80,d0
+    add.b     #0x80,d0                          | bank=1
     move.b    d0,(_ATTR,a5)                     | bank,yflip
     
 move_shot: | $184B
@@ -2219,31 +2231,31 @@ move_shot: | $184B
     
 gen_random_bomb_press: | $185B
     jsr       pseudo_random_gen
-    bne       9f
-    bra       init_bombing
+    bne.b     9f
+    bra.b     init_bombing
 9:  rts
 
 main_fn_31__handle_bombing: | $1862
     jsr       save_PC_to_fn_tbl_and_ret
-    tst.b     (scroll_disabled)
-    bne       9f
-    tst.b     (solvalou_exploding)
-    bne       9f
+    tst.b     (scroll_disabled)                 | disabled?
+    bne.w     9f                                | yes, return
+    tst.b     (solvalou_exploding)              | exploding?
+    bne.w     9f                                | yes, return
     tst.b     (attract_mode_stage)              | in attract mode?
-    bne       gen_random_bomb_press             | yes, go
+    bne.b     gen_random_bomb_press             | yes, go
 * read BUTTON2 from h/w
     btst.b    #0,(dswb)                         | bomb pressed?
-    bne       9f                                | no, return
+    bne.w     9f                                | no, return
     jsr       save_PC_to_fn_tbl_and_ret
 
 init_bombing: | $188C
-    movea.l   #obj_tbl+_OBJSIZE*0x20,a0         | bomb target object
+    lea       obj_tbl+_OBJSIZE*0x20,a0          | bomb target object
     cmp.b     #1,(_STATE,a0)                    | idle?
-    bne       9f                                | no, return
+    bne.w     9f                                | no, return
     jsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a2         | solvalou object
-    movea.l   #obj_tbl+_OBJSIZE*0x21,a1         | bomb object
-    movea.l   #obj_tbl+_OBJSIZE*0x20,a0         | bomb target object
+    lea       obj_tbl+_OBJSIZE*0x23,a2          | solvalou object
+    lea       obj_tbl+_OBJSIZE*0x21,a1          | bomb object
+    lea       obj_tbl+_OBJSIZE*0x20,a0          | bomb target object
     move.w    (_X,a2),d0                        | solvalou spriteX
     move.w    d0,(_X,a1)                        | copy to bomb
     add.w     #0xf400,d0                        | adjust for bomb target
@@ -2262,42 +2274,42 @@ init_bombing: | $188C
     move.w    #0x1422,(_CODE,a0)                | bomb target code, colour
     jsr       save_PC_to_fn_tbl_and_ret
 * bomb active here
-    movea.l   #obj_tbl+_OBJSIZE*0x21,a1         | bomb object
+    lea       obj_tbl+_OBJSIZE*0x21,a1          | bomb object
     addq.b    #1,(_TIMER,a1)                    | inc timer
     move.b    (_TIMER,a1),d0
     and.b     #7,d0                             | time to animate?
-    bne       1f                                | no, skip
+    bne.b     1f                                | no, skip
     move.b    (_TIMER1,a1),d0
     cmp.b     #2,d0                             | time to animate?
-    beq       1f                                | no, skip
+    beq.b     1f                                | no, skip
     addq.b    #1,d0                             | inc timer
     move.b    d0,(_TIMER1,a1)                   | update timer
     addq.b    #1,(_CODE,a1)                     | animate sprite
 1:  move.b    (_TIMER,a1),d0
     lsr.b     #2,d0
     and.b     #3,d0
-    add.b     #0x25,d0
+    add.b     #0x25,d0                          | generate colour
     move.b    d0,(_COLOUR,a1)                   | bomb colour
     subq.w    #2,(_dX,a1)
     move.w    (_dX,a1),d0
     lsl.w     #1,d0                             | x2
     add.w     d0,(_X,a1)                        | add new dX
-    movea.l   #obj_tbl+_OBJSIZE*0x20,a0         | bomb target
+    lea       obj_tbl+_OBJSIZE*0x20,a0          | bomb target
     move.w    (scroll_delta),d0
     neg.w     d0
     lsl.w     #1,d0
     add.w     d0,(_X,a0)                        | scroll bomb target
-    jsr       check_bomb_finished
-    bcs       9f
-    bra       main_fn_31__handle_bombing
+    bsr.b     check_bomb_finished
+    bcs.b     9f
+    bra.w     main_fn_31__handle_bombing
 9:  rts
 
 check_bomb_finished: | $190B
-    movea.l   #obj_tbl+_OBJSIZE*0x20,a0         | bomb target
-    movea.l   #obj_tbl+_OBJSIZE*0x21,a1         | bomb object
+    lea       obj_tbl+_OBJSIZE*0x20,a0          | bomb target
+    lea       obj_tbl+_OBJSIZE*0x21,a1          | bomb object
     move.w    (_X,a0),d0
     sub.w     (_X,a1),d0                        | same?
-    bcs       9f                                | no, return
+    bcs.b     9f                                | no, return
     * (TBD) stop bomb sound
     jsr       handle_bombed_obj_and_award_points
     clr.b     (_STATE,a1)                       | bomb object
@@ -2308,43 +2320,43 @@ check_flying_enemies_shot: | $1928
     move.b    (0,a3),d3                         | shot spriteY
     move.b    (1,a3),d4                         | shot spriteX
     
-    movea.l   #obj_tbl+_OBJSIZE*0x3a,a1         | 1st flying enemy
-    movea.l   #sprite_shadow_msb+2*0x3a,a3
+    lea       obj_tbl+_OBJSIZE*0x3a,a1          | 1st flying enemy
+    lea       sprite_shadow_msb+2*0x3a,a3
     moveq     #6-1,d7                           | 6 enemies to check
-1:  jsr       check_shot_hit_flying_enemy
-    bcc       loc_1972
+1:  bsr.b     check_shot_hit_flying_enemy
+    bcc.b     loc_1972
     move.b    #3,(_STATE,a1)                    | enemy hit
     clr.b     (_EXTRA,a5)                       | flag shot to be destroyed
-    tst.b     (attract_mode_stage)
-    bne       loc_1972
+    tst.b     (attract_mode_stage)              | attract mode?
+    bne       loc_1972                          | yes, skip
     moveq     #0,d0
     move.b    (_PTS,a1),d0                      | enemy points
-    movea.l   #object_value_tbl,a0
-    lea       (a0,d0.w),a0
-    *** optimise what gets pushed!
-    movem.l   d0-d7/a0-a6,-(a7) 
+    lea       object_value_tbl,a0
+    lea       (a0,d0.w),a0                      | address of points value
+    *** do we really need to push a3?
+    movem.l   d7/a1/a3,-(a7) 
     jsr       add_to_score
-    movem.l   (a7)+,d0-d7/a0-a6
+    movem.l   (a7)+,d7/a1/a3
     ** TBD sound  
     
 loc_1972: | 1972
-    adda.l    #_OBJSIZE,a1                      | next enemy
-    adda.l    #2,a3
+    lea       (_OBJSIZE,a1),a1                  | next enemy
+    addq.l    #2,a3
     dbf       d7,1b
     
     move.b    (_EXTRA,a5),(_STATE,a5)           | update shot state
 
-    movea.l   #obj_tbl+_OBJSIZE*0x10,a1         | 1st bacura
-    movea.l   #sprite_shadow_msb+2*0x10,a3
+    lea       obj_tbl+_OBJSIZE*0x10,a1          | 1st bacura
+    lea       sprite_shadow_msb+2*0x10,a3
     moveq     #16-1,d7                          | 16 bacura to check
-2:  jsr       check_shot_bacura
-    bcs       unactivate_shot
-    adda.l    #_OBJSIZE,a1
-    adda.l    #2,a3
+2:  bsr.b     check_shot_hit_bacura
+    bcs.b     deactivate_shot
+    lea       (_OBJSIZE,a1),a1                  | next bacura
+    addq.l    #2,a3
     dbf       d7,2b
     rts
 
-unactivate_shot: | $1997
+deactivate_shot: | $1997
     move.b    #3,(_STATE,a5)
     ** TBD sound
     rts
@@ -2353,61 +2365,60 @@ unactivate_shot: | $1997
 * a1=enemy object a3=enemy sprite_shadow_msb
 check_shot_hit_flying_enemy: | $19A6
     cmp.b     #2,(_STATE,a1)                    | active?
-    bne       loc_19C9                          | no, go
-    move.b    d3,d0
-    sub.b     (0,a3),d0
+    bne.b     loc_19C9                          | no, go
+    move.b    d3,d0                             | shot sprite Y
+    sub.b     (0,a3),d0                         | compare to enemy sprite Y
     sub.b     #16,d0
-    add.b     #32,d0
-    bcc       9f
-    move.b    (1,a3),d0
-    sub.b     d4,d0
+    add.b     #32,d0                            | hit?
+    bcc.b     9f                                | no, exit
+    move.b    (1,a3),d0                         | enemy sprite X
+    sub.b     d4,d0                             | compare to shot sprite X
     subq.b    #8,d0
-    add.b     #16,d0
+    add.b     #16,d0                            | C = hit
 9:  rts
 
 loc_19C9: | $19C9
     tst.b     d0                                | clear carry
     rts
 
-check_shot_bacura: | $19CB
+check_shot_hit_bacura: | $19CB
     cmp.b     #2,(_STATE,a1)                    | active?
     bne       loc_19C9                          | no, go
     move.b    d3,d0                             | solvalou spriteY
-    sub.b     (0,a3),d0                         | bacura spriteY
+    sub.b     (0,a3),d0                         | compare to bacura spriteY
     sub.b     #24,d0
-    add.b     #32,d0
-    bcc.b     9f
+    add.b     #32,d0                            | hit?
+    bcc.b     9f                                | no, return
     move.b    (1,a3),d0                         | bacura spriteX[8:1]
     sub.b     d4,d0                             | solvalou spriteX[8:1]
     subq.b    #8,d0
-    add.b     #16,d0                            | C = match
+    add.b     #16,d0                            | C = hit
 9:  rts
             
 handle_bombed_obj_and_award_points: | $19EE
-    movem.l   a0/a5,-(a7)
+    movem.l   a0/a1/a3,-(a7)
     move.b    (sprite_shadow_msb+2*0x20+0),d3   | bomb target spriteY
     move.b    (sprite_shadow_msb+2*0x20+1),d4   | bomb target spriteX
-    lea       obj_tbl,a5
+    lea       obj_tbl,a1
     lea       sprite_shadow_msb,a3
     moveq     #16-1,d7                          | 16 objects to check
 1:  bsr.b     check_object_on_target            | on target?
-    bcc       loc_1A2C                          | no, skip  
-    move.b    #3,(_STATE,a5)                    | state=hit
-    tst.b     (attract_mode_stage)
-    bne       loc_1A2C
+    bcc.b     loc_1A2C                          | no, skip  
+    move.b    #3,(_STATE,a1)                    | state=hit
+    tst.b     (attract_mode_stage)              | attract mode?
+    bne       loc_1A2C                          | no, skip
     moveq     #0,d0
-    move.b    (_PTS,a5),d0
-    movea.l   #object_value_tbl,a0
+    move.b    (_PTS,a1),d0
+    lea       object_value_tbl,a0
     lea       (a0,d0.w),a0                      | get entry for points
-    *** optimise what gets pushed!
-    movem.l   d0-d7/a0-a6,-(a7) 
+    movem.l   d3/d4/d7/a0/a1/a3,-(a7) 
     jsr       add_to_score
-    movem.l   (a7)+,d0-d7/a0-a6
+    movem.l   (a7)+,d3/d4/d7/a0/a1/a3
 loc_1A2C:
-    adda.l    #_OBJSIZE,a5
-    adda.l    #2,a3
+    lea       (_OBJSIZE,a1),a1                  | next enemy
+    addq.l    #2,a3
     dbf       d7,1b
-    movem.l   (a7)+,a0/a5
+    movem.l   (a7)+,a0/a1/a3
     rts
 
 loc_1A34:
@@ -2415,17 +2426,17 @@ loc_1A34:
     rts
     
 check_object_on_target: | $1A3D
-    cmp.b     #2,(_STATE,a5)                    | active?
-    bne       loc_1A34
+    cmp.b     #2,(_STATE,a1)                    | active?
+    bne.b     loc_1A34                          | no, return
     move.b    d3,d0                             | bomb target spriteY
     sub.b     (0,a3),d0                         | compare object spriteY
     sub.b     #10,d0
-    add.b     #20,d0
-    bcc       9f
+    add.b     #20,d0                            | hit?
+    bcc.b     9f                                | no, return
     move.b    (1,a3),d0                         | bomb target spriteX
     sub.b     d4,d0                             | compare object spriteX
     subq.b    #5,d0
-    add.b     #10,d0
+    add.b     #10,d0                            | C = hit
 9:  rts
     
 * Barra (pyrmaid) 100 pts

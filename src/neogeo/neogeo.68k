@@ -37,6 +37,8 @@
     .global osd_read_p2_inputs
     .global osd_read_coin
     .global osd_read_start
+    .global osd_read_high_scores
+    .global osd_write_high_scores
     .global osd_debug_hook
 
 * debugging only
@@ -184,8 +186,8 @@ _vblank:
 .gamemode:
     movem.l d0-d7/a0-a6,-(a7)
     KICK_WDOG
-    jsr     BIOSF_SYSTEM_IO
     jsr     xevious_im1_irq
+    jsr     BIOSF_SYSTEM_IO
 .nothing:
     movem.l (a7)+,d0-d7/a0-a6
     move.w  #4,REG_IRQACK
@@ -1102,6 +1104,24 @@ osd_read_start:
     and.b     #2,d6                             | P2 only
     or.b      d6,d0                             | bit0=P1, bit1=P2
 9:  rts
+
+***
+*** high score format
+*** - high score table (a0) $50 bytes
+***   - 5 entries
+***     - 3 bytes BCD score (MSB-LSB)
+***     - 10 bytes name (xevious encoded)
+***     - 3 bytes filler ($00)
+*** - high score (a1) $3 bytes
+***   - 3 bytes BCD score (MSB-LSB)
+***   - (no need to save this explicitly)
+***
+
+osd_read_high_scores:
+    rts
+    
+osd_write_high_scores:
+    rts
 
 * d0=backdropcolour
 osd_debug_hook:
