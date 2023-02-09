@@ -141,6 +141,8 @@ out\@:
 		.global osd_read_dipswitches
 		.global osd_read_p1_inputs
 		.global osd_read_p2_inputs
+		.global osd_read_high_scores
+		.global osd_write_high_scores
 		.global osd_read_coin
 		.global osd_read_start
 
@@ -1307,6 +1309,11 @@ osd_no_yel:
 	tst.b	d0
 9:	rts
 		
+osd_read_high_scores:
+	rts
+osd_write_high_scores:
+	rts
+	
 * what: clears a plane of any width (using blitter), 16 height
 * args:
 * < A1: dest

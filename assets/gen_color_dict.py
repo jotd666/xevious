@@ -1,5 +1,4 @@
-from PIL import Image,ImageOps
-import itertools
+from PIL import Image
 import ast
 
 original_palette = set(ast.literal_eval("""{
@@ -135,6 +134,7 @@ original_palette = set(ast.literal_eval("""{
 """.replace("}",")").replace("{","(")))
 
 
+
 def get_color_dict(orig,reduced):
     return {orig.getpixel((x,y)):reduced.getpixel((x,y))
               for y in range(orig.size[1]) for x in range(orig.size[0])}
@@ -144,33 +144,58 @@ def get_colors(pic):
         pic = Image.open(pic).convert('RGB')
     return {pic.getpixel((x,y)) for y in range(pic.size[1]) for x in range(pic.size[0])}
 
+def closest_color(c1,colorlist):
+    closest = None
+    min_dist = (255*255)*3
+    # not sure this is the best: compute square distance in RGB diff
+    for c in colorlist:
+        dist = sum((x1-x2)*(x1-x2) for x1,x2 in zip(c,c1))
+        if dist < min_dist:
+            min_dist = dist
+            closest = c
+    return closest
+
 def doit(dump_pics=False):
-    original = Image.open("original_assets.png").convert('RGB')
+    # those are the colors (24) in the map
+    # (not including the 5 other colors for the XEVIOUS title)
+    reduced = dict()
+    reduced[(000,000,000)] = 448
+    reduced[(98,98,98)] = 5620
+    reduced[(174,174,174)] = 8344
+    reduced[(31,112,255)] = 283158
+    reduced[(81,67,255)] = 1647
+    reduced[(210,210,210)] = 11648
+    reduced[(67,143,31)] = 792116
+    reduced[(67,98,000)] = 35825
+    reduced[(157,157,67)] = 284825
+    reduced[(98,45,31)] = 21232
+    reduced[(81,81,31)] = 908
+    reduced[(112,143,45)] = 17272
+    reduced[(81,143,157)] = 884
+    reduced[(31,31,000)] = 11748
+    reduced[(31,67,000)] = 140375
+    reduced[(31,98,000)] = 3436
+    reduced[(45,112,14)] = 275955
+    reduced[(81,157,210)] = 364
+    reduced[(157,157,112)] = 290
+    reduced[(174,143,67)] = 146808
+    reduced[(143,98,31)] = 5082
+    reduced[(112,98,000)] = 1106
+    reduced[(112,112,112)] = 46562
+    reduced[(45,112,188)] = 1499
 
-    tiles = Image.new("RGB",(1024,original.size[1]))
-    tiles.paste(original)
-    reduced_tiles = tiles.quantize(colors=16,dither=0).convert('RGB')
-    sprites = Image.new("RGB",(original.size[0]-1024,original.size[1]))
-    sprites.paste(original,(-1024,0))
+    # 2000: get 16 colors total
+    less_than_1000 = {k for k,v in reduced.items() if v < 2000}
+    # compute reduced palette, removing the colors that don't happen too much
+    reduced_palette = {k for k,v in reduced.items() if k not in less_than_1000}
+    # compute replacement colors for the non frequent colors
+    replacement_dict = {k:closest_color(k,reduced_palette) for k in less_than_1000}
+    # merge dicts to create 24 entry RGB keys that map to 16 total RGB values
+    color_dict = {k:replacement_dict.get(k,k) for k in reduced}
 
-    # replace tsak green background by black
-    for x in range(sprites.size[0]):
-        for y in range(sprites.size[1]):
-            p = sprites.getpixel((x,y))
-            if p == (48, 112, 16):
-                sprites.putpixel((x,y),(0,0,0))
 
-    reduced_sprites = sprites.quantize(colors=16,dither=0).convert('RGB')
-
-    if dump_pics:
-        reduced_sprites.save("dumps/sprites_16.png")
-        reduced_tiles.save("dumps/tiles_16.png")
-
-    sd = get_color_dict(sprites,reduced_sprites)
-
-    # now create a dict with 2 palettes
-    return {"map_tiles":get_color_dict(tiles,reduced_tiles),
-            "sprites":sd}
+    return {"map_tiles":color_dict,
+            "sprites":None}
 
 if __name__ == "__main__":
     color_dict = doit()

@@ -453,7 +453,7 @@ if dump_graphics:
     # the only way to know which CLUTs are used is to run the game and log them... We can't generate all pics, that
     # would take too much memory (512*64 pics of 16 color 8x8 tiles!!)
 
-    ##reduced_color_dict = gen_color_dict.doit()
+    reduced_color_dict = gen_color_dict.doit()
     title_tile_palette = sorted(gen_color_dict.get_colors("bg_data_title.png"))
     title_tile_palette += [black]*(16-len(title_tile_palette))
 
@@ -466,7 +466,7 @@ if dump_graphics:
     used_bg_cluts = get_used_bg_cluts()
     bg_used_colors = clut_dict_to_rgb(bg_tile_clut,used_bg_cluts)
     # with reduced colors, finds nothing...
-    bg_quantized_rgb =  quantize_palette_16(bg_used_colors,table)  #reduced_color_dict["map_tiles"]
+    bg_quantized_rgb =  reduced_color_dict["map_tiles"]  # quantize_palette_16(bg_used_colors,table)
     # less accurate
     mask = 0xFF
     bg_quantized_rgb = {tuple(x & mask for x in k):v for k,v in bg_quantized_rgb.items()}
