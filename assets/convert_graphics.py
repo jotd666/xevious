@@ -159,8 +159,7 @@ def get_reduced_palette(reduced_color_dict):
     # sort unique values which ensures that 0,0,0 comes first :)
     lst = sorted(set(reduced_color_dict.values()))
     nb_colors = 1<<BG_NB_PLANES
-    if len(lst)<nb_colors:
-        lst += [black]*(nb_colors-len(lst))
+    lst += [black]*(nb_colors-len(lst))
     return lst
 
 # ATM all colors are considered the same weight
@@ -454,8 +453,6 @@ if dump_graphics:
     # would take too much memory (512*64 pics of 16 color 8x8 tiles!!)
 
     reduced_color_dict = gen_color_dict.doit()
-    title_tile_palette = sorted(gen_color_dict.get_colors("bg_data_title.png"))
-    title_tile_palette += [black]*(16-len(title_tile_palette))
 
     table = "bg_tile"
     bg_data = block_dict[table]
@@ -464,15 +461,12 @@ if dump_graphics:
     # compute the RGB configuration used for each used tile. Generate a lookup table with
 
     used_bg_cluts = get_used_bg_cluts()
-    bg_used_colors = clut_dict_to_rgb(bg_tile_clut,used_bg_cluts)
-    # with reduced colors, finds nothing...
-    bg_quantized_rgb =  reduced_color_dict["map_tiles"]  # quantize_palette_16(bg_used_colors,table)
-    # less accurate
-    mask = 0xFF
-    bg_quantized_rgb = {tuple(x & mask for x in k):v for k,v in bg_quantized_rgb.items()}
-    bg_tile_clut = remap_colors(bg_tile_clut,bg_quantized_rgb,mask)
-    partial_palette_bg = get_reduced_palette(bg_quantized_rgb)
-    print(bg_tile_clut)
+    #bg_used_colors = clut_dict_to_rgb(bg_tile_clut,used_bg_cluts)
+    tilemap_quantized_rgb =  reduced_color_dict["map_tiles"]  # quantize_palette_16(bg_used_colors,table)
+
+    bg_tile_clut = remap_colors(bg_tile_clut,tilemap_quantized_rgb | reduced_color_dict["title_tiles"])
+    partial_palette_bg = get_reduced_palette(tilemap_quantized_rgb)
+    title_tile_palette = get_reduced_palette(reduced_color_dict["title_tiles"])
     # should be no all 32,64,0
 
     populate_tile_matrix(

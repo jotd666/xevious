@@ -133,7 +133,7 @@ original_palette = set(ast.literal_eval("""{
 }
 """.replace("}",")").replace("{","(")))
 
-
+black = (0,0,0)
 
 def get_color_dict(orig,reduced):
     return {orig.getpixel((x,y)):reduced.getpixel((x,y))
@@ -193,8 +193,12 @@ def doit(dump_pics=False):
     # merge dicts to create 24 entry RGB keys that map to 16 total RGB values
     color_dict = {k:replacement_dict.get(k,k) for k in reduced}
 
-
+    # title
+    title_tile_palette = sorted(get_colors("bg_data_title.png"))
+    title_tile_palette += [black]*(16-len(title_tile_palette))
+    print(title_tile_palette)
     return {"map_tiles":color_dict,
+            "title_tiles":dict(zip(title_tile_palette,title_tile_palette)),
             "sprites":None}
 
 if __name__ == "__main__":
