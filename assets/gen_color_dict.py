@@ -196,7 +196,7 @@ def doit(dump_pics=False):
     # title
     title_tile_palette = sorted(get_colors("bg_data_title.png"))
     title_tile_palette += [black]*(16-len(title_tile_palette))
-    print(title_tile_palette)
+
     return {"map_tiles":color_dict,
             "title_tiles":dict(zip(title_tile_palette,title_tile_palette)),
             "sprites":None}

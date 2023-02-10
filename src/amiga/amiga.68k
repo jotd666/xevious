@@ -28,7 +28,7 @@ BG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_PLAYFIELD_LINES*2
 BG_SCREEN_SIZE =  BG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 * non-scrollable planes
 FG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_LINES
-FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
+FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES+16*NB_BYTES_PER_ROW
 
 	bra	_user
 
@@ -681,16 +681,16 @@ update_bg_tile:
 7:
 	move.w	(a0),a0
 	move.w	d0,d1
-	subq.w	#4,d1
+	subq.w	#2,d1
 	bmi		update_bg_tile_out
 
-	moveq	#NB_PLAYFIELD_PLANES-1,d3	| 7 planes (AGA)
+	moveq	#NB_PLAYFIELD_PLANES-1,d3
 
-	and.w	#0x3F,d1		| row
+	;;and.w	#0x3F,d1		| row
 	cmp.w	#36,d1
 	bcc.w	bg_no_mirror
 	* convert coords to address with proper shift vs foreground
-	GET_XY_ADDRESS		bg_screen_data+NB_BYTES_PER_ROW*12
+	GET_XY_ADDRESS		bg_screen_data-NB_BYTES_PER_ROW*4
 	* duplicate display (scrolling)
 	lea		(BG_SCREEN_PLANE_SIZE/2,a1),a2
 
@@ -761,7 +761,7 @@ update_bg_tile_out:
 	* 64 rows for the mirror, only 36 are enough
 bg_no_mirror:
 	* convert coords to address with proper shift vs foreground
-	GET_XY_ADDRESS		bg_screen_data+NB_BYTES_PER_ROW*12
+	GET_XY_ADDRESS		bg_screen_data-NB_BYTES_PER_ROW*4
 
 	cmp.w	#1,a0
 	beq		8f		| blank (optim)
@@ -903,7 +903,6 @@ update_fg_tile:
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
 	move.w	d6,scroll_offset
-
 	* add to planes offset & change copperlist
 	bra		set_bg_bitplanes
 
@@ -962,6 +961,7 @@ osd_update_sprite_shadow:
 	
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
+	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
 	lea		previous_sprite_state(pc),a5
 	move.w	d0,d1
@@ -1117,7 +1117,6 @@ osd_update_32_sprite_hw:
 	move.w	(6,a4),d0
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
-
 	bsr	blit_16x16_bob
 2:
 	lea		(8,a4),a4		| next sprite
@@ -1138,7 +1137,7 @@ osd_update_32_sprite_hw:
 	move.l	(a4)+,(a5)+
 	move.l	(a4)+,(a5)+
 	dbf		d0,3b
-	
+	.endif  | OPT_DISABLE_SPRITES
 	rts
 zzz:
 			blitz
@@ -1655,8 +1654,12 @@ _fg_color_table:
 	.endr
 
 		.bsschip
+	; some space to write tiles slightly outside screen
+	; (scrolling requires it so it's seamless)
+	ds.b	NB_BYTES_PER_ROW*12
 bg_screen_data:
 	ds.b	BG_SCREEN_SIZE
+	ds.b	NB_BYTES_PER_ROW*12*3
 fg_screen_data:
 	ds.b	FG_SCREEN_SIZE
 	

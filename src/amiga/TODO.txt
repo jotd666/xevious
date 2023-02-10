@@ -7,15 +7,24 @@
 * can be worked on my own:
 
 - sprites for ship, bomb sight and shots and bomb!: superimpose 2 sprites to get more colors
-- for fg title tile flash, try to get colored tiles
+- colored "hiscore" & "namco" 
 - update sprites in 2 passes: not ok unless we sort by sprite y max
    -> 0-32: update high sprites,
    -> 32-63 update low sprites
-- small scrolling issues? (planes don't all scroll on top sometimes?, 
-  like when scroll offset = exactly 0)
 - rip sounds
 - better 16-color palette for sprites
-- when killed, previous enemy sprites not reset? (see Mark mail)
 - crosshairs CLUTs look wrong
 - trashed gfx when dropping bomb (snoop?)
+- without whdload: screen garbled
+- when killed, previous enemy sprites not reset? (see Mark mail)
+"Yes, you need to deactivate/hide/remove sprites with STATE=0 in the
+osd_update_sprite_shadow routine. I think on Xevious hardware that was
+simply done by setting X=0 & Y=0. On the Neo Geo that (sort of) hides
+them behind the display masking sprites, but doesn't deactivate them, so
+I have to do that (as well).
 
+On the Amiga because you don't have hardware sprite registers (for the
+most part) you'd have to either explicitly remove them in there, or -
+better yet - remove them during osd_update_32_sprite_hw after flagging
+them somehow in the update routine (maybe don't update the state until
+here)."
