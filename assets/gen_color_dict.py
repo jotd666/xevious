@@ -1,7 +1,7 @@
 from PIL import Image
 import ast
 
-original_palette = set(ast.literal_eval("""{
+original_palette = ast.literal_eval("""[
   { 0x00, 0x00, 0x00 },
   { 0x62, 0x62, 0x62 },
   { 0x2D, 0x8F, 0xFF },
@@ -130,8 +130,8 @@ original_palette = set(ast.literal_eval("""{
   { 0xFF, 0xFF, 0xAE },
   { 0xFF, 0xAE, 0x62 },
   { 0x00, 0x00, 0x00 },
-}
-""".replace("}",")").replace("{","(")))
+]
+""".replace("}",")").replace("{","("))
 
 black = (0,0,0)
 

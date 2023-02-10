@@ -1,19 +1,19 @@
 * to see with Mark:
 
 - sprite shadow management: complete?
-- sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
-  specially end bosses
 
 * can be worked on my own:
 
-- sprites for ship, bomb sight and shots and bomb!: superimpose 2 sprites to get more colors
+- sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
+- fg tile refresh
+- sprites for big mothership (allows to use alternate brown/gold colors)
 - colored "hiscore" & "namco" 
 - update sprites in 2 passes: not ok unless we sort by sprite y max
    -> 0-32: update high sprites,
    -> 32-63 update low sprites
 - rip sounds
-- better 16-color palette for sprites
-- crosshairs CLUTs look wrong
+- save/load hiscore
+- crosshairs CLUTs too many cluts, wrong cluts
 - trashed gfx when dropping bomb (snoop?)
 - without whdload: screen garbled
 - when killed, previous enemy sprites not reset? (see Mark mail)

@@ -462,7 +462,7 @@ if dump_graphics:
 
     used_bg_cluts = get_used_bg_cluts()
     #bg_used_colors = clut_dict_to_rgb(bg_tile_clut,used_bg_cluts)
-    tilemap_quantized_rgb =  reduced_color_dict["map_tiles"]  # quantize_palette_16(bg_used_colors,table)
+    tilemap_quantized_rgb =  reduced_color_dict["map_tiles"]
 
     bg_tile_clut = remap_colors(bg_tile_clut,tilemap_quantized_rgb | reduced_color_dict["title_tiles"])
     partial_palette_bg = get_reduced_palette(tilemap_quantized_rgb)
@@ -487,7 +487,14 @@ if dump_graphics:
 
     used_sprite_cluts = get_used_sprite_cluts()
     sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
+
+    # what would be tremendous would be to remove mothership colors from palette, then use 2 AGA sprites
+    # (with another palette, of course) to display it
+    #bitplanelib.palette_dump(sprite_used_colors,"sprites.png",bitplanelib.PALETTE_FORMAT_PNG)
+    to_remove = {(174,143,67):(98,)*3,(98,98,67):(98,)*3,(143,143,98):(143,)*3,(174,174,143):(174,)*3,(210,210,174):(210,)*3}
+    sprite_used_colors = [x for x in sprite_used_colors if x not in to_remove]
     sprite_quantized_rgb = quantize_palette_16(sprite_used_colors,table) #reduced_color_dict["sprites"]
+
 
     sprite_tile_clut = remap_colors(sprite_tile_clut,sprite_quantized_rgb)
     partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)
@@ -514,6 +521,8 @@ if dump_graphics:
     # also sprites are mainly bobs but to get the chance to use real HW sprites
     # the palette must be in 16-32 not in 0-16
 
+    bitplanelib.palette_dump(gen_color_dict.original_palette,os.path.join(src_dir,"original_palette.68k"),
+                            bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
     bitplanelib.palette_dump(partial_palette_bg+partial_palette_sprite,os.path.join(src_dir,"palette.68k"),
                             bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
     bitplanelib.palette_dump(title_tile_palette,os.path.join(src_dir,"title_palette.68k"),

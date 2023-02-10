@@ -27,8 +27,8 @@ NB_PLAYFIELD_LINES = 512
 BG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_PLAYFIELD_LINES*2
 BG_SCREEN_SIZE =  BG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 * non-scrollable planes
-FG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_LINES
-FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES+16*NB_BYTES_PER_ROW
+FG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*(NB_LINES+16)
+FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 
 	bra	_user
 
@@ -853,7 +853,7 @@ update_fg_tile:
 	and.w	#0x3,d5		| keep 5:4
 	lsl.w	#4,d5		| at proper position
 	or.w	d5,d2		| combine
-	lea		palette(pc),a1
+	lea		original_palette(pc),a1	| original palette (upper nibble)
 	.ifdef	NO68020
 	add.w	d2,d2
 	move.w	(a1,d2.w),d2
@@ -871,7 +871,6 @@ update_fg_tile:
 	move.l	(a1,d1.w*4),a1	
 	.endif
 	move.w	d2,(a1)			| color palette index
-	move.w	d2,(8,a1)		| color palette index
 
 	tst	d3
 	bne.b	4f
@@ -1046,7 +1045,7 @@ osd_update_32_sprite_hw:
 	move.w	(4,a4),d1
 	sub.w	#4*8,d1
 	bmi		2f		| not visible
-	cmp.w	#64*8,d1
+	cmp.w	#NB_LINES-15,d1
 	bcc.w	2f		| too low
 
 	move.w	d1,d3			| save y
@@ -1617,6 +1616,8 @@ palette:
 	.include "palette.68k"
 title_palette:
 	.include "title_palette.68k"
+original_palette:
+	.include "original_palette.68k"
 
 		.bss
 
@@ -1654,8 +1655,8 @@ _fg_color_table:
 	.endr
 
 		.bsschip
-	; some space to write tiles slightly outside screen
-	; (scrolling requires it so it's seamless)
+	* some space to write tiles slightly outside screen
+	* (scrolling requires it so it's seamless)
 	ds.b	NB_BYTES_PER_ROW*12
 bg_screen_data:
 	ds.b	BG_SCREEN_SIZE
