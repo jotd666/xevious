@@ -5,12 +5,13 @@
 * can be worked on my own:
 
 - sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
-- fg tile refresh
+- fg tile refresh not right
+- bg partially destroyed (by fg sprite clear probably)
 - sprites for big mothership (allows to use alternate brown/gold colors)
 - colored "hiscore" & "namco" 
 - double buffering on sprite layer to avoid flicker
 - rip sounds
 - save/load hiscore
-- crosshairs CLUTs too many cluts, wrong cluts
+- crosshairs CLUTs too many cluts (all cluts are used!)
 - trashed gfx when dropping bomb (snoop?)
 - without whdload: screen garbled

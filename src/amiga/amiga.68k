@@ -19,6 +19,7 @@ _custom = 0xDFF000
 
 BASE_BPLCON3_VALUE = (1<<12)|(1<<10)
 NB_PLAYFIELD_PLANES = 4
+FG_DIRTY_TILES_SIZE = 40*32
 TOTAL_NB_COLORS = 32   | 16+16
 NB_BYTES_PER_ROW = 40
 NB_LINES = 288
@@ -73,33 +74,16 @@ mul\value\()_table:
 	add.w	d0,a1
 .endm
 
-* damn, there's a 2-pixel shift between foreground layer
-* and background layer, forcing us to write tile data on 2 bytes!!
-* fortunately, there's only 1 plane to process that way
-.macro	SET_FG_BYTE
-	move.b	(offset+1,a1),d1
-	move.b	(a0)+,d0
-	bclr	#6,d1
-	btst	#0,d0
-	beq.b	1f
-	bset	#6,d1
-1:
-	bclr	#7,d1
-	btst	#1,d0
-	beq.b	1f
-	bset	#7,d1
-1:
-	move.b	d1,(offset+1,a1)
-	move.b	(offset,a1),d1
-	and.b	#0xC0,d1
-	lsr.b	#2,d0
-	or.b	d0,d1
-	move.b	d1,(offset,a1)
-	.endm
 	
 * the non shifted version is just so simple...
-.macro	SET_FG_BYTE_SHIFT
+* huge thanks to dual playfield and bplcon1 x-shift!
+.macro	SET_FG_BYTE
 	move.b	(a0)+,(offset,a1)
+	.endm
+.macro	OR_FG_BYTE
+	move.b	(offset,a1),d0
+	or.b	(a0)+,d0
+	move.b	d0,(offset,a1)
 	.endm
 	
 
@@ -403,7 +387,9 @@ platform_init:
 	
     move.w #3,fmode(a5)  		| AGA fastest fetch mode
 	
-    clr.w bplcon1(a5) 
+	* there's a 2-pixel shift between foreground layer
+    * and background layer, forcing us to write tile data on 2 bytes!!
+    move.w #2<<4,bplcon1(a5)    | foreground tiles shifted by 2 pixels
     move.w #0x0044,bplcon2(a5)	| 2nd playfield has priority, sprites have priority
     move.w #BASE_BPLCON3_VALUE,bplcon3(a5)	| color bank offset for playfield 2
 	move.w	#-8,d0
@@ -523,7 +509,7 @@ osd_w_fg_colorram:
 	move.b	d1,d2
 	move.b	(a1,d0.w),d1	| fetch tile from character grid
 	* now update tile to reflect the color change
-	moveq	#0,d3
+	moveq	#FG_TILE_DRAW_COLOR,d3
 	bsr	update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a1
    .endif | OPT_DISABLE_FG_LAYER
@@ -554,7 +540,7 @@ osd_w_fg_videoram:
 	lea		fg_videoram,a2
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
-	moveq	#1,d3
+	moveq	#FG_TILE_DRAW_FULL,d3
 	bsr		update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a2
     .endif | OPT_DISABLE_FG_LAYER
@@ -818,11 +804,17 @@ bg_no_mirror:
     dbf d3,8b
 9:
 	rts
-			
+		
+FG_TILE_DRAW_COLOR = 0
+FG_TILE_DRAW_FULL = 1
+FG_TILE_DRAW_OR = 2
+
 * d0: offset
 * d1: tile code
 * d2: attribute
-* d3: needs to redraw tile
+* d3: draw mode (see FG_TILE_DRAW... above)
+* most other registers are killed
+
 update_fg_tile:
 	moveq	#0,d4
 	lea		_fg_tile,a0
@@ -882,7 +874,8 @@ update_fg_tile:
 	rts
 4:
 	GET_XY_ADDRESS	fg_screen_data
-	
+	cmp.w	#FG_TILE_DRAW_FULL,d3
+	bne.w	5f
 	
 	* draw
 	btst	#7,d4
@@ -897,6 +890,24 @@ update_fg_tile:
 	.set	offset,NB_BYTES_PER_ROW*7
 	.rept		8
 	SET_FG_BYTE
+	.set	offset,offset-NB_BYTES_PER_ROW
+	.endr
+3:
+	rts
+5:
+	* draw
+	btst	#7,d4
+	bne	2f
+	.set	offset,0
+	.rept		8
+	OR_FG_BYTE
+	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
+	rts
+2:
+	.set	offset,NB_BYTES_PER_ROW*7
+	.rept		8
+	OR_FG_BYTE
 	.set	offset,offset-NB_BYTES_PER_ROW
 	.endr
 3:
@@ -952,17 +963,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-.macro   UPDATE_FG_TILE_OFFSET	xoff,yoff
-	movem.l	d0/d4/a1/a2,-(a7)
-	add.w	#\yoff-(\xoff<<6),d0
-	move.b	(a1,d0.w),d2
-	move.b	(a2,d0.w),d1
-	*clr.b	d2
-	*clr.b	d1		| temp
-	**bsr	update_bg_tile
-	movem.l	(a7)+,d0/d4/a1/a2
-	.endm
-	
+
 
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
@@ -1022,24 +1023,21 @@ osd_update_32_sprite_hw:
 	* offset = (32-x)<<6 + y
 	lsl.w	#6,d0
 	add.w	d1,d0	| should do it
+	bclr	#0,d0	| even
+	addq	#2,d0
 	
-	* suboptimal but works ATM
-	UPDATE_FG_TILE_OFFSET	0,0
-	UPDATE_FG_TILE_OFFSET	0,1
-	UPDATE_FG_TILE_OFFSET	0,2
-	UPDATE_FG_TILE_OFFSET	0,3
-	UPDATE_FG_TILE_OFFSET	1,0
-	UPDATE_FG_TILE_OFFSET	1,1
-	UPDATE_FG_TILE_OFFSET	1,2
-	UPDATE_FG_TILE_OFFSET	1,3
-	UPDATE_FG_TILE_OFFSET	2,0
-	UPDATE_FG_TILE_OFFSET	2,1
-	UPDATE_FG_TILE_OFFSET	2,2
-	UPDATE_FG_TILE_OFFSET	2,3
-	UPDATE_FG_TILE_OFFSET	3,0
-	UPDATE_FG_TILE_OFFSET	3,1
-	UPDATE_FG_TILE_OFFSET	3,2
-	UPDATE_FG_TILE_OFFSET	3,3
+	* mark a 4x4 square as dirty
+	lea	fg_dirty_tiles,a0
+	move.l	#-1,d1
+	move.l	#1<<6,d2
+	move.l	d1,(a0,d0.w)	| 4 in a column (Y)
+	sub.l	d2,d0		| increase X
+	move.l	d1,(a0,d0.w)
+	sub.l	d2,d0		| increase X
+	move.l	d1,(a0,d0.w)
+	sub.l	d2,d0		| increase X
+	move.l	d1,(a0,d0.w)
+
 
 3:
 	lea		(8,a5),a5
@@ -1159,6 +1157,34 @@ osd_update_32_sprite_hw:
 	move.l	(a4)+,(a5)+
 	move.l	(a4)+,(a5)+
 	dbf		d0,3b
+
+	* in the end, redraw dirty foreground tiles
+	lea		fg_dirty_tiles,a2
+	move.l	a2,a3	| keep base
+	move.w	#FG_DIRTY_TILES_SIZE-1,d4
+	lea		fg_colorram,a4
+	lea		fg_videoram,a5
+	moveq	#FG_TILE_DRAW_OR,d3
+4:
+	tst.b	(a2)+
+	dbne	d4,4b
+	tst		d4
+	bmi.b	5f
+	* found a dirty tile
+	clr.b	(-1,a2)		| clean
+	move.l	a2,d0
+	sub.l	a3,d0
+	subq.l	#1,d0
+	move.b	(a5,d0.w),d1	| fetch tile from character grid
+	move.b	(a4,d0.w),d2	| fetch tile from color grid
+	**move.b	#17,d1
+	* now update tile to reflect the color change
+	movem.l	d3-d4/a2-a5,-(a7)
+	bsr	update_fg_tile
+	movem.l	(a7)+,d3-d4/a2-a5
+	bra.b	4b
+5:
+
 	.endif  | OPT_DISABLE_SPRITES
 	rts
 zzz:
@@ -1649,6 +1675,11 @@ original_palette:
 		.bss
 
 		.align 4
+	ds.b	96		| safety/margin
+fg_dirty_tiles:
+	ds.b	FG_DIRTY_TILES_SIZE
+	ds.b	96		| safety/margin
+	
 	.ifne	OPT_ENABLE_LOGGING
 bg_tile_log:
 	ds.b	0x200*64    | there are 128 CLUTs but 1 bit is decided by tile code
