@@ -30,6 +30,9 @@ BG_SCREEN_SIZE =  BG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 FG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*(NB_LINES+16)
 FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 
+NB_SPRITES_TO_UPDATE = 64
+NB_SPRITES_TOTAL = 64
+
 	bra	_user
 
 | write current PC value to some address
@@ -910,14 +913,16 @@ osd_update_scroll_hw:
 osd_update_sprite_shadow:
 	lea       sprite_shadow_msb,a2
 	lea		current_sprite_state(pc),a4
-	moveq			#64-1,d7
+	moveq			#NB_SPRITES_TOTAL-1,d7
 1:
 	move.b	(_STATE,a5),d0
 	cmp.b	#STATE_INACTIVE,d0
 	bne.b	11f
+	* deactivate
 	move.b	#STATE_DO_NOT_UPDATE_SHADOW,(_STATE,a5)
 	clr.w	(_X,a5)
 	clr.w	(_Y,a5)
+	move.b	d0,(a4)	| inactive
 	bra.b	3f
 11:
 	cmp.b	#STATE_DO_NOT_UPDATE_SHADOW,d0
@@ -958,21 +963,25 @@ osd_update_sprite_shadow:
 	movem.l	(a7)+,d0/d4/a1/a2
 	.endm
 	
+
 * d0 = base sprite number (0/32)
 osd_update_32_sprite_hw:
+	move.w	d0,d7
+	move.w	#0,min_sprite_y
+	move.w	#NB_LINES/2+16,max_sprite_y
+	tst.w	d0
+	beq.b	0f
+	move.w	#NB_LINES/2-16,min_sprite_y
+	move.w	#NB_LINES,max_sprite_y
+0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
 	lea		previous_sprite_state(pc),a5
-	move.w	d0,d1
-	beq.b	1f
-	lsl.w	#3,d1		| times 8 (size of the "previous" struct)
-	add.w	d1,a4		| add second half offset
-	add.w	d1,a5		| add second half offset
-1:
+
 	* first restore all background tiles behind the previous
 	* positions of the previously active objects
-	movem.l	d0-d5/a0-a2/a5,-(a7)
-	move.w	#31,d4			| 32 sprites
+	movem.l	d2-d5/a0-a2/a5,-(a7)
+	move.w	#NB_SPRITES_TO_UPDATE-1,d4			| 32 sprites
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
 	beq	3f
@@ -980,6 +989,10 @@ osd_update_32_sprite_hw:
 	move.w	(4,a5),d1   | Y
 	sub.w	#4*8,d1
 	bmi.b		11f		| not visible
+	cmp.w	min_sprite_y(pc),d1
+	bcs.b	11f
+	cmp.w	max_sprite_y(pc),d1
+	bcc.b	11f
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
 	
@@ -1031,13 +1044,13 @@ osd_update_32_sprite_hw:
 3:
 	lea		(8,a5),a5
 	dbf		d4,2b
-	movem.l	(a7)+,d0-d5/a0-a2/a5
+	movem.l	(a7)+,d2-d5/a0-a2/a5
 
 
 	* then update the active sprites
 	lea		sprite_picbase,a3
 	move.l	a4,-(a7)
-	move.w	#31,d4			| 32 sprites
+	move.w	#NB_SPRITES_TO_UPDATE-1,d4			| 32 sprites
 	| sprite loop
 4:
 	cmp.b	#STATE_INACTIVE,(a4)
@@ -1047,6 +1060,10 @@ osd_update_32_sprite_hw:
 	bmi		2f		| not visible
 	cmp.w	#NB_LINES-15,d1
 	bcc.w	2f		| too low
+	cmp.w	min_sprite_y(pc),d1
+	bcs.w	2f
+	cmp.w	max_sprite_y(pc),d1
+	bcc.w	2f
 
 	move.w	d1,d3			| save y
 	clr.w	d0
@@ -1130,7 +1147,13 @@ osd_update_32_sprite_hw:
 	
 	* then back up current object state (X,Y,STATE) for next update
 	move.l	(a7)+,a4
-	move.w	#31,d0	| 32*8 bytes
+	move.w	#NB_SPRITES_TOTAL/2-1,d0	| 32*8 bytes
+	* d7 is 0 or 32
+	tst.w	d7
+	beq.b	3f
+	* second half of sprite data (*8 bytes, /2)
+	lea		(NB_SPRITES_TOTAL*4,a4),a4
+	lea		(NB_SPRITES_TOTAL*4,a5),a5
 3:
 	* copy one sprite backup structure (8 bytes) 32 times
 	move.l	(a4)+,(a5)+
@@ -1142,6 +1165,10 @@ zzz:
 			blitz
 			rts
 			
+min_sprite_y:
+	dc.w	0
+max_sprite_y:
+	dc.w	0
 	
 *P1 B2 = DSWB bit 0
 *P2 B2 = DWSB bit 4
@@ -1575,9 +1602,9 @@ wait_blit:
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512
 	
 current_sprite_state:
-	ds.b	8*64
+	ds.b	8*NB_SPRITES_TOTAL
 previous_sprite_state:
-	ds.b	8*64
+	ds.b	8*NB_SPRITES_TOTAL
 	
 unknown_tile_found:
 	dc.b	0
