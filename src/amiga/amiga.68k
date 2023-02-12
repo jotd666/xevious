@@ -34,6 +34,8 @@ FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 NB_SPRITES_TO_UPDATE = 64
 NB_SPRITES_TOTAL = 64
 
+BLANK_FG_TILE_ID = 0x24
+
 	bra	_user
 
 | write current PC value to some address
@@ -54,6 +56,12 @@ mul\value\()_table:
 	.endr
 .endm
 
+* internal macro
+.macro GXY_PREP
+
+	
+	.endm
+	
 .macro GET_XY_ADDRESS  base_address
 	* multiply D1 by 240
 	lea		mulNB_BYTES_PER_ROW_table(pc),a1
@@ -63,15 +71,17 @@ mul\value\()_table:
 	.else
 	move.w	(a1,d1.w*2),d1
 	.endif
-	lea		\base_address,a1
+	and.l	#0xFFFF,d1
+	and.l	#0xFFFF,d0
+	
 	lsl.w	#3,d1
-	* add y offset to screen data
-	add.w	d1,a1
-	* add x offset to screen data
 	lsr.w	#6,d0
 	neg.w	d0
 	add.w	#32,d0	| mirror
-	add.w	d0,a1
+	* add y offset to screen data	
+	add.w	d1,d0	
+	* add x offset to screen data
+	lea		(\base_address,d0.w),a1
 .endm
 
 	
@@ -79,6 +89,9 @@ mul\value\()_table:
 * huge thanks to dual playfield and bplcon1 x-shift!
 .macro	SET_FG_BYTE
 	move.b	(a0)+,(offset,a1)
+	.endm
+.macro	CLR_FG_BYTE
+	clr.b	(offset,a1)
 	.endm
 .macro	OR_FG_BYTE
 	move.b	(offset,a1),d0
@@ -388,12 +401,13 @@ platform_init:
     move.w #3,fmode(a5)  		| AGA fastest fetch mode
 	
 	* there's a 2-pixel shift between foreground layer
-    * and background layer, forcing us to write tile data on 2 bytes!!
+    * and background layer, can be seen in the title
+	* screen with XEVIOUS bg/fg tiles
     move.w #2<<4,bplcon1(a5)    | foreground tiles shifted by 2 pixels
     move.w #0x0044,bplcon2(a5)	| 2nd playfield has priority, sprites have priority
     move.w #BASE_BPLCON3_VALUE,bplcon3(a5)	| color bank offset for playfield 2
 	move.w	#-8,d0
-    move.w d0,bpl1mod(a5) 
+    move.w d0,bpl1mod(a5)
     move.w d0,bpl2mod(a5)
 
 	bsr		create_direction_table
@@ -808,6 +822,7 @@ bg_no_mirror:
 FG_TILE_DRAW_COLOR = 0
 FG_TILE_DRAW_FULL = 1
 FG_TILE_DRAW_OR = 2
+FG_TILE_CLEAR = 3
 
 * d0: offset
 * d1: tile code
@@ -824,7 +839,12 @@ update_fg_tile:
 	cmp.w	#17,d1		| "H" tile
 	bne.b	0f
 	cmp.w	#0x504,d0	| HISCORE pos
-	seq		d4
+	bne.b	0f
+	moveq	#1,d4
+0:
+	cmp.w	#BLANK_FG_TILE_ID,d1
+	bne		0f
+	move.w	#FG_TILE_CLEAR,d3
 0:
 	lsl.w	#4,d1			| *16 (each tile+mirror tile has 8+8 bytes)
 	btst	#6,d2			| X-flip?
@@ -873,7 +893,8 @@ update_fg_tile:
 	* (saves cycles)
 	rts
 4:
-	GET_XY_ADDRESS	fg_screen_data
+	move.l		fg_screen_pointer,a2
+	GET_XY_ADDRESS	a2
 	cmp.w	#FG_TILE_DRAW_FULL,d3
 	bne.w	5f
 	
@@ -895,6 +916,8 @@ update_fg_tile:
 3:
 	rts
 5:
+	cmp.w	#FG_TILE_CLEAR,d3
+	beq	6f
 	* draw
 	btst	#7,d4
 	bne	2f
@@ -912,6 +935,16 @@ update_fg_tile:
 	.endr
 3:
 	rts
+6:
+	* clear
+
+	.set	offset,0
+	.rept		8
+	CLR_FG_BYTE
+	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
+	rts
+
 	
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
@@ -966,11 +999,21 @@ osd_update_sprite_shadow:
 
 
 * d0 = base sprite number (0/32)
-osd_update_32_sprite_hw:
+osd_update_32_sprite_hw:	
 	move.w	d0,d7
+	* toggle fg planes (double buffering)
+	lea		fg_screen_pointer(pc),a0
+	lea		fg_screen_data_1,a1
+	cmp.l	(a0),a1
+	bne.b	1f
+	lea		fg_screen_data_1,a1
+1:
+	move.l	a1,(a0)
+	bsr		set_fg_bitplanes
+	
 	move.w	#0,min_sprite_y
 	move.w	#NB_LINES/2+16,max_sprite_y
-	tst.w	d0
+	tst.w	d7
 	beq.b	0f
 	move.w	#NB_LINES/2-16,min_sprite_y
 	move.w	#NB_LINES,max_sprite_y
@@ -998,7 +1041,7 @@ osd_update_32_sprite_hw:
 	subq.w	#8,d0		| sprite X offset
 	
 	moveq	#NB_PLAYFIELD_PLANES-1,d3
-	lea		fg_screen_data,a1
+	move.l		fg_screen_pointer(pc),a1
 10:
 	bsr		clear_plane_any_blitter_16x16
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
@@ -1176,6 +1219,8 @@ osd_update_32_sprite_hw:
 	sub.l	a3,d0
 	subq.l	#1,d0
 	move.b	(a5,d0.w),d1	| fetch tile from character grid
+	cmp.b	#BLANK_FG_TILE_ID,d1
+	beq.b	4b				| no need to OR with blank tile
 	move.b	(a4,d0.w),d2	| fetch tile from color grid
 	**move.b	#17,d1
 	* now update tile to reflect the color change
@@ -1294,7 +1339,7 @@ set_bg_bitplanes:
     rts
 
 set_fg_bitplanes:
-    lea		fg_screen_data,a0
+    move.l		fg_screen_pointer(pc),a0
     moveq #NB_PLAYFIELD_PLANES-1,d1
 	move.l	a0,d0
     lea	fg_bitplanes+2,a0
@@ -1459,7 +1504,7 @@ clear_plane_any_blitter_internal:
 
 blit_16x16_bob:
 	movem.l	d2-d4/a0-a5,-(a7)
-	lea		fg_screen_data,a1
+	move.l		fg_screen_pointer(pc),a1
 	lea		blit_plane_cookie_cut_16x16(pc),a5
 	btst	#6,d2
 	beq.b	0f
@@ -1652,9 +1697,9 @@ _previous_joypad_state:
 		dc.l	0
 _gfxbase:
 	dc.l	0
+fg_screen_pointer:
+	dc.l	fg_screen_data_1
 	
-
-
 	.include	"sound_entries.68k"
 	
 *graphicsname:
@@ -1675,6 +1720,7 @@ original_palette:
 		.bss
 
 		.align 4
+	
 	ds.b	96		| safety/margin
 fg_dirty_tiles:
 	ds.b	FG_DIRTY_TILES_SIZE
@@ -1719,7 +1765,15 @@ _fg_color_table:
 bg_screen_data:
 	ds.b	BG_SCREEN_SIZE
 	ds.b	NB_BYTES_PER_ROW*12*3
-fg_screen_data:
+	.align 0x8		| 8 else fmode=3 makes display wrong
+fg_screen_data_1:
+	ds.b	FG_SCREEN_SIZE
+	
+	* small margin (I suspect that gas is buggy with ds directive)
+	* plus fg plane shifting can write one byte too far
+	ds.b	100
+	.align 0x8		| 8 else fmode=3 makes display wrong
+fg_screen_data_2:
 	ds.b	FG_SCREEN_SIZE
 	
 	* small margin (I suspect that gas is buggy with ds directive)

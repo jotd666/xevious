@@ -1,6 +1,7 @@
 * to see with Mark:
 
 - sprite shadow management: complete?
+- crosshairs CLUTs too many cluts (all cluts are used!)
 
 * can be worked on my own:
 
@@ -9,9 +10,8 @@
 - bg partially destroyed (by fg sprite clear probably)
 - sprites for big mothership (allows to use alternate brown/gold colors)
 - colored "hiscore" & "namco" 
-- double buffering on sprite layer to avoid flicker
+- double buffering (ATM disabled) on sprite layer to avoid flicker: in progress
 - rip sounds
 - save/load hiscore
-- crosshairs CLUTs too many cluts (all cluts are used!)
 - trashed gfx when dropping bomb (snoop?)
 - without whdload: screen garbled
