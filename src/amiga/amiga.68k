@@ -13,7 +13,7 @@ STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
 	
 OPT_ENABLE_LOGGING = 1
-OPT_ENABLE_DOUBLE_BUFFERING = 1
+OPT_ENABLE_DOUBLE_BUFFERING = 0
 
 _custom = 0xDFF000
 
@@ -63,7 +63,9 @@ mul\value\()_table:
 	
 	.endm
 	
-.macro GET_XY_ADDRESS  base_address
+* < D0,D1 as X,Y
+* > D0 as plane offset (D1 is destroyed)
+.macro GET_XY_OFFSET
 	* multiply D1 by 240
 	lea		mulNB_BYTES_PER_ROW_table(pc),a1
 	.ifdef	NO68020
@@ -81,6 +83,9 @@ mul\value\()_table:
 	add.w	#32,d0	| mirror
 	* add y offset to screen data	
 	add.w	d1,d0	
+	.endm
+.macro GET_XY_ADDRESS  base_address
+	GET_XY_OFFSET
 	* add x offset to screen data
 	lea		(\base_address,d0.w),a1
 .endm
@@ -89,12 +94,26 @@ mul\value\()_table:
 * the non shifted version is just so simple...
 * huge thanks to dual playfield and bplcon1 x-shift!
 .macro	SET_FG_BYTE
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	move.b	(a0)+,d0
+	move.b	d0,(offset,a1)
+	move.b	d0,(offset,a2)
+	.else
 	move.b	(a0)+,(offset,a1)
+	.endif
 	.endm
 .macro	CLR_FG_BYTE
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	clr.b	(offset,a2)
+	.endif
 	clr.b	(offset,a1)
 	.endm
 .macro	OR_FG_BYTE
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	move.b	(offset,a2),d0
+	or.b	(a0),d0
+	move.b	d0,(offset,a2)
+	.endif
 	move.b	(offset,a1),d0
 	or.b	(a0)+,d0
 	move.b	d0,(offset,a1)
@@ -556,10 +575,6 @@ osd_w_fg_videoram:
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
 	moveq	#FG_TILE_DRAW_FULL,d3
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	lea	fg_dirty_tiles,a0
-	move.b	#2,(a0,d0.w)
-	.endif
 	bsr		update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a2
     .endif | OPT_DISABLE_FG_LAYER
@@ -898,8 +913,11 @@ update_fg_tile:
 	* (saves cycles)
 	rts
 4:
-	move.l		fg_screen_pointer,a2
-	GET_XY_ADDRESS	a2
+	GET_XY_OFFSET
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	lea	(fg_screen_data_2,d0.w),a2
+	.endif
+	lea	(fg_screen_data_1,d0.w),a1
 	cmp.w	#FG_TILE_DRAW_FULL,d3
 	bne.w	5f
 	
@@ -1021,7 +1039,7 @@ osd_update_32_sprite_hw:
 	.endif
 	
 	
-	move.w	#0,min_sprite_y
+	clr.w	min_sprite_y
 	move.w	#NB_LINES/2+16,max_sprite_y
 	tst.w	d7
 	beq.b	0f
@@ -1038,7 +1056,7 @@ osd_update_32_sprite_hw:
 	move.w	#NB_SPRITES_TO_UPDATE-1,d4			| 32 sprites
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
-	beq	3f
+	beq.b	11f
 	* erase previous sprite position
 	move.w	(4,a5),d1   | Y
 	sub.w	#4*8,d1
@@ -1057,7 +1075,6 @@ osd_update_32_sprite_hw:
 	bsr		clear_plane_any_blitter_16x16
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
 	dbf		d3,10b
-11:
 	* convert sprite coords to foreground tile coords, then mark
 	* the dirty tiles
 	move.w	(6,a5),d0
@@ -1091,9 +1108,8 @@ osd_update_32_sprite_hw:
 	move.l	d1,(a0,d0.w)
 	sub.l	d2,d0		| increase X
 	move.l	d1,(a0,d0.w)
+11:
 
-
-3:
 	lea		(8,a5),a5
 	dbf		d4,2b
 	movem.l	(a7)+,d2-d5/a0-a2/a5
@@ -1218,18 +1234,11 @@ osd_update_32_sprite_hw:
 	move.w	#FG_DIRTY_TILES_SIZE-1,d4
 	lea		fg_colorram,a4
 	lea		fg_videoram,a5
+	moveq	#FG_TILE_DRAW_OR,d3
 4:
 	tst.b	(a2)+
 	dbne	d4,4b
-	bmi.b	5f
-	* positive: draw it, no or'ing
-	moveq	#FG_TILE_DRAW_FULL,d3
-	subq.b	#1,(-1,a2)		| clean
-	bra.b	6f
-5:
-	* negative: just or it (ignore if empty)
 	clr.b	(-1,a2)		| clean
-	moveq	#FG_TILE_DRAW_OR,d3
 6:	
 	tst		d4
 	bmi.b	5f
@@ -1239,11 +1248,8 @@ osd_update_32_sprite_hw:
 	sub.l	a3,d0
 	subq.l	#1,d0
 	move.b	(a5,d0.w),d1	| fetch tile from character grid
-	cmp.b	#FG_TILE_DRAW_FULL,d3
-	beq.b	61f			| draw: force
 	cmp.b	#BLANK_FG_TILE_ID,d1
 	beq.b	4b				| no need to OR with blank tile
-61:
 	move.b	(a4,d0.w),d2	| fetch tile from color grid
 	**move.b	#17,d1
 	* now update tile to reflect the color change
