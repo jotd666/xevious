@@ -25,6 +25,7 @@ FEATURES:
 - original dipswitch options supported (except cocktail cabinet mode)
 - all original graphics and colours reproduced perfectly on Neo Geo target
 - 1 or 2 players supported
+- high score load/save
 
 CREDITS:
 
