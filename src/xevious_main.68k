@@ -2045,8 +2045,8 @@ check_bacura_hit_solvalou: | $1695
     
 handle_crosshairs: | $16B8
     lea       obj_tbl+_OBJSIZE*0x21,a5          | bomb
-    move.b    (_STATE,a5),d0
-    cmp.b     #2,d0                             | active?
+    move.b    (_STATE,a5),d2
+    cmp.b     #2,d2                             | active?
     beq.b     1f                                | yes, skip
     moveq     #1,d2
 1:  add.b     #31,d2                            | save colour
