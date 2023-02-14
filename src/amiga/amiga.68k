@@ -381,11 +381,14 @@ _vblank:
     movem.l d0-d7/a0-a6,-(a7)
 	move.w	_custom+intreqr,d0
 	btst	#5,d0
-	beq.b	.no_vblank
+	beq.b	1f
 	moveq	#1,d0
 	jsr	_read_joystick
 	move.l	d0,_joypad_state
-	
+	move.w	#0x20,_custom+intreq	
+	bra.b	3f
+1:
+	* has to be copper
 	jsr		xevious_im1_irq
 	
     move.w  vbl_counter(pc),d0
@@ -397,10 +400,10 @@ _vblank:
     clr.w d0    
 .normal:
     move.w  d0,vbl_counter
-			
-.no_vblank:
+	move.w	#0x10,_custom+intreq		
+3:
     movem.l (a7)+,d0-d7/a0-a6
-	move.w	#0x70,_custom+intreq
+	
     rte
 
 osd_kick_wdog:
@@ -522,15 +525,15 @@ set_aga_color_registers:
 
 * 60Hz VBLANK interrupt
 osd_enable_vblank_interrupt:
-	move.w	#0xC020,_custom+intena
+	move.w	#0xC030,_custom+intena
 	rts
 
 osd_ack_vblank_interrupt:
-	move.w	#0x20,_custom+intreq
+	**move.w	#0x10,_custom+intreq
  	rts
 		
 osd_disable_vblank_interrupt:
-	move.w	#0x0020,_custom+intena
+	move.w	#0x0010,_custom+intena
 	rts
 		
 * d0=offset (preserved), d1=attribute (preserved)
@@ -1022,7 +1025,7 @@ osd_update_sprite_shadow:
 
 
 * d0 = base sprite number (0/32)
-osd_update_32_sprite_hw:	
+osd_update_32_sprite_hw:
 	move.w	d0,d7
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 	* change bitplanes to show previous planes
@@ -1038,6 +1041,9 @@ osd_update_32_sprite_hw:
 	move.l	a1,(a0)
 	.endif
 	
+	lsl.w	#8,d0
+	add.w	#0xc00,d0
+	move.w	d0,_custom+color
 	
 	clr.w	min_sprite_y
 	move.w	#NB_LINES/2+16,max_sprite_y
@@ -1068,7 +1074,7 @@ osd_update_32_sprite_hw:
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
 	
-	subq.w	#2,d1		| Y offset (empiric)
+	
 	moveq	#NB_PLAYFIELD_PLANES-1,d3
 	move.l		fg_screen_pointer(pc),a1
 10:
@@ -1260,6 +1266,8 @@ osd_update_32_sprite_hw:
 5:
 
 	.endif  | OPT_DISABLE_SPRITES
+	clr.w	_custom+color
+	
 	rts
 zzz:
 			blitz
@@ -1451,7 +1459,7 @@ osd_read_high_scores:
 osd_write_high_scores:
 	rts
 	
-* what: clears a plane of any width (using blitter), 16 height + 4 margin
+* what: clears a plane of any width (using blitter), 16 height
 * args:
 * < A1: dest
 * < D0: X (not necessarily multiple of 8)
@@ -1463,7 +1471,7 @@ clear_plane_any_blitter_16x16:
     lea _custom,a5
     moveq.l #-1,d3
 	moveq	#4,d2
-    move.w  #20,d4
+    move.w  #16,d4
     bsr clear_plane_any_blitter_internal
     movem.l (a7)+,d0-d6/a1/a5
     rts
@@ -1479,12 +1487,12 @@ clear_plane_any_blitter_16x16:
 clear_plane_any_blitter_internal:
     * pre-compute the maximum of shit here
     lea mulNB_BYTES_PER_ROW_table(pc),a2
-    add.w   d1,d1
-    beq.b   1f    | optim
-    move.w  (a2,d1.w),d1
     swap    d1
     clr.w   d1
     swap    d1
+    beq.b   1f    | optim
+    add.w   d1,d1
+    move.w  (a2,d1.w),d1
 1:
     move.l  #0x030A0000,d5   | minterm useC useD & rect clear (0xA) 
     move    d0,d6
@@ -1879,6 +1887,7 @@ color_row_1:
 	.set	beampos,beampos+0x800
 	.set	testcol,testcol+0x011
 	.endr
+    dc.w	 intreq,0x8010
 	* pal limit
     dc.w  0xFFDF,0xFFFE           
     dc.w  0x0401,0xFFFE
@@ -1896,7 +1905,6 @@ color_row_30_plus:
 	.set	testcol,testcol+0x022
 	.endr
 	dc.w	fgcol,0xF00	| test
-    dc.w	 intreq,0x8010
     dc.l    -2					
 	
 
