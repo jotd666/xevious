@@ -3538,8 +3538,8 @@ handle_15_Zakato: | $2684:
     bsr       init_teleport
     move.b    #27,(_PTS,a5)                     | 300 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       zakato_teleport
-    bcc       zakato_15_main
+    bsr       zakato_teleport                   | done teleporting?
+    bcc.b     zakato_15_main                    | yes, go
     bsr       scroll_sprite_X
     bra       add_obj_handler    
 
@@ -3547,37 +3547,38 @@ zakato_15_main: | $2695
     move.b    #0x11,(_CODE,a5)
     move.b    #0x80,(_ATTR,a5)                  | bank=1,size=1x1
     move.b    #2,(_STATE,a5)
-    movea.l   #angle_dX_dY_tbl,a2
+    lea       angle_dX_dY_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go   
-    move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | MSB
+    move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | Solvalou spriteY MSB
     sub.b     (_Y,a5),d0                        | MSB
     subq.b    #4,d0
-    addq.b    #8,d0
-    bcs       zakato_shoot
+    addq.b    #8,d0                             | close enough?
+    bcs.w     zakato_shoot                      | yes, go
     move.b    (pulsing_colour_2),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
 * Brag Zakato (Cracker) 600 pts
-handle_16_Brag_Zakato: | $26DF
+* explodes based on random timer
+handle_16_Brag_Zakato_rnd: | $26DF
     bsr       init_teleport
     move.b    #36,(_PTS,a5)                     | 600 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       zakato_teleport
-    bcc       brag_zakato_16_main
+    bsr       zakato_teleport                   | done teleporting?
+    bcc.b     brag_zakato_16_main               | yes, go
     bsr       scroll_sprite_X
     bra       add_obj_handler    
     
 brag_zakato_16_main: | $26F0
-    bsr       pseudo_random_gen
+    bsr       pseudo_random_gen                 | rnd shot timer
     and.w     #0x3f,d0
     addq.b    #1,d0
     move.b    d0,(_TIMER,a5)                    | init shot timer
     move.b    #0x12,(_CODE,a5)
-    movea.l   #angle_dX_dY_tbl,a2
+    lea       angle_dX_dY_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #2,(_STATE,a5)
     move.b    #0x80,(_ATTR,a5)                  | bank=1,size=1x1
@@ -3585,44 +3586,45 @@ brag_zakato_16_main: | $26F0
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go   
     subq.b    #1,(_TIMER,a5)                    | time to explode?
-    beq       brag_zakato_explode               | yes, go
+    beq.b     brag_zakato_explode               | yes, go
     move.b    (pulsing_colour_2),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
 * Brag Zakato (Cracker) 1,500 pts
-handle_17_Brag_Zakato: | $2736
+* explodes when it gets close to the Solvalou
+handle_17_Brag_Zakato_closeY: | $2736
     bsr       init_teleport
     move.b    #51,(_PTS,a5)                     | 1,500 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       zakato_teleport
-    bcc       brag_zakato_17_main
+    bsr       zakato_teleport                   | done teleporting?
+    bcc.b     brag_zakato_17_main               | yes, go
     bsr       scroll_sprite_X
     bra       add_obj_handler    
     
 brag_zakato_17_main: | $2747
     move.b    #0x12,(_CODE,a5)
-    movea.l   #angle_dX_dY_tbl,a2
+    lea       angle_dX_dY_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #2,(_STATE,a5)
     move.b    #0x80,(_ATTR,a5)                  | bank=1,size=1x1
     SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go   
-    move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | MSB
+    move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | solvalou spriteY MSB
     sub.b     (_Y,a5),d0                        | MSB
     subq.b    #4,d0
-    addq.b    #8,d0
-    bcs       brag_zakato_explode
+    addq.b    #8,d0                             | close enough?
+    bcs.b     brag_zakato_explode               | yes, go
     move.b    (pulsing_colour_2),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
 brag_zakato_explode: | $2791
-    move.b    #0xff,(_TIMER,a5)
-    move.b    #3,(_STATE,a5)                    | too late to destroy
-    bsr       brag_zakato_shoot
-    bra       zakato_explode_and_remove
+    move.b    #0xff,(_TIMER,a5)                 | init timer
+    move.b    #3,(_STATE,a5)                    | flag benign
+    bsr.w     brag_zakato_shoot
+    bra.w     zakato_explode_and_remove
         
 remove_zakato: | $279D
     clr.b     (_TYPE,a5)
@@ -3633,16 +3635,16 @@ zakato_explode: | $27A8
     addq.b    #1,(_TIMER,a5)
     move.b    (_TIMER,a5),d0
     cmp.b     #0x10,d0                          | time to expland sprite?
-    bne       1f                                | no, skip
+    bne.b     1f                                | no, skip
     subq.b    #1,(_X,a5)                        | MSB
     addq.b    #1,(_Y,a5)                        | MSB
 1:  move.l    d0,d1                             | copy
     lsr.b     #2,d0
     and.w     #7,d0
-    cmp.b     #5,d0                             | done?
-    bcc       9f                                | yes, exit
-    movea.l   #zakato_exploding_sprite_tbl,a0
-    lsl.w     #1,d0
+    cmp.b     #5,d0                             | done exploding?
+    bcc.b     9f                                | yes, exit
+    lea       zakato_exploding_sprite_tbl,a0
+    lsl.w     #1,d0                             | code entry offset
     move.b    (a0,d0.w),(_CODE,a5)
     lsl.b     #2,d1
     and.w     #0x0c,d1                          | xflip,yflip
@@ -3663,18 +3665,18 @@ zakato_teleport: | $27E7
     addq.b    #1,(_TIMER,a5)
     move.b    (_TIMER,a5),d0
     cmp.b     #8,d0
-    bne       zakato_teleport_sparkles
+    bne.b     zakato_teleport_sparkles
     addq.b    #1,(_X,a5)                        | MSB
     subq.b    #1,(_Y,a5)                        | MSB
     
 zakato_teleport_sparkles: | $27FB
-    move.b    d0,d1                             | copy
+    move.b    d0,d1                             | copy timer value
     lsr.b     #2,d0
     and.w     #7,d0
-    cmp.b     #5,d0
-    bcc       9f
-    movea.l   #zakato_teleport_sprite_tbl,a0
-    lsl.w     #1,d0
+    cmp.b     #5,d0                             | done animating sparkles?
+    bcc.b     9f                                | yes, go
+    lea       zakato_teleport_sprite_tbl,a0
+    lsl.w     #1,d0                             | code entry offset
     move.b    (a0,d0.w),(_CODE,a5)
     lsl.b     #2,d1
     and.w     #0x0c,d1                          | xflip,yflip
@@ -3723,13 +3725,13 @@ handle_18_Garu_Zakato: | $284C
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go   
     subq.b    #1,(_TIMER,a5)                    | time to explode?
-    beq       garu_zakato_explode               | yes, go
+    beq.b     garu_zakato_explode               | yes, go
     move.b    (pulsing_colour_2),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
 garu_zakato_explode: | $2897
-    bsr       init_garu_zakato_explosion
+    bsr.w     init_garu_zakato_explosion
     *** TBD sound
     clr.b     (_TYPE,a5)
     clr.b     (_STATE,a5)
@@ -3737,10 +3739,10 @@ garu_zakato_explode: | $2897
 
 animate_r_sheonite_1: | $28C0
     move.b    (pulsing_colour_1),(_COLOUR,a5)
-    movea.l   #r_sheonite_code_tbl_1,a0
+    lea       r_sheonite_code_tbl_1,a0
     move.b    (countup_timer_1),d0
     lsr.b     #1,d0
-    and.w     #3,d0
+    and.w     #3,d0                             | calc sprite code
     move.b    (a0,d0.w),(_CODE,a5)
     bra       move_object_dX_dY_2
 
@@ -3749,10 +3751,10 @@ r_sheonite_code_tbl_1: | $28D9
 
 handle_31_right_sheonite: | $28DD
     move.b    #3,(_STATE,a5)                    | indestructible
-    clr.b     (_ATTR,a5)                        | bank=0, size=0
+    clr.b     (_ATTR,a5)                        | bank=0, size=1x1
     move.b    #0x30,(_Y,a5)                     | MSB
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
     move.b    (_X,a1),d0                        | MSB
     subq.b    #2,d0
     sub.b     (_X,a5),d0                        | MSB
@@ -3760,35 +3762,35 @@ handle_31_right_sheonite: | $28DD
     subq.b    #2,d1
     sub.b     (_Y,a5),d1                        | MSB
     bsr       get_index_for_angle
-    movea.l   #angle_dX_dY_sheonite_tbl,a2
+    lea       angle_dX_dY_sheonite_tbl,a2
     bsr       get_dX_dY_and_cpy_to_obj
     move.b    (_X,a1),d0                        | solvalou X MSB
     subq.b    #2,d0
-    cmp.b     (_X,a5),d0
-    bne       animate_r_sheonite_1
+    cmp.b     (_X,a5),d0                        | close to Solvalou?
+    bne.b     animate_r_sheonite_1              | no, go
     SET_REENTRY_ADDR_HERE
     tst.b     (countup_timer_1)
-    bne       1f
+    bne.b     1f
     tst.b     (sheonite_end_flag)               | time to start retreating?
-    bne       animate_r_sheonite_2
-1:  bsr       set_r_sheonite_above_solvalou
-    movea.l   #r_sheonite_code_tbl_1,a0
+    bne.b     animate_r_sheonite_2              | no, go
+1:  bsr.w     set_r_sheonite_above_solvalou
+    lea       r_sheonite_code_tbl_1,a0
     move.b    (countup_timer_1),d0
     lsr.b     #1,d0
-    and.w     #3,d0
+    and.w     #3,d0                             | calc code
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     rts
 
 animate_r_sheonite_2: | $2950
     SET_REENTRY_ADDR_HERE
-    bsr       set_r_sheonite_above_solvalou
+    bsr.w     set_r_sheonite_above_solvalou
     move.b    (countup_timer_1),d0
     lsr.b     #2,d0
     and.w     #7,d0
-    cmp.b     #7,d0                             | still docking?
-    beq       r_sheonite_combining                | yes, go
-    movea.l   #r_sheonite_code_tbl_2,a0
+    cmp.b     #7,d0                               | still docking?
+    beq.b     r_sheonite_combining                | yes, go
+    lea       r_sheonite_code_tbl_2,a0
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     rts
@@ -3801,8 +3803,8 @@ r_sheonite_combining: | $297B
     move.b    #0xe0,(_TIMER,a5)                 | init timer
     SET_REENTRY_ADDR_HERE
     addq.b    #1,(_TIMER,a5)                    | time to retreat?
-    beq       r_sheonite_retreat                | yes, go
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
+    beq.b     r_sheonite_retreat                | yes, go
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
     moveq     #0,d0
     move.b    (_TIMER,a5),d0
     ext.w     d0
@@ -3816,7 +3818,7 @@ r_sheonite_combining: | $297B
     rts
 
 r_sheonite_retreat: | $29B1
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a1         | solvalou
     move.w    (_X,a1),d0
     sub.w     #0x0200,d0
     move.w    d0,(_X,a5)                        | set object spriteX
@@ -3825,31 +3827,31 @@ r_sheonite_retreat: | $29B1
     move.w    #0xFFA0,(_dX,a5)
     *** TBD sound
     SET_REENTRY_ADDR_HERE
-    movea.l   #r_sheonite_code_tbl_1,a0
+    lea       r_sheonite_code_tbl_1,a0
     move.b    (countup_timer_1),d0
     lsr.b     #1,d0
-    and.w     #3,d0
+    and.w     #3,d0                             | calc sprite code
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler    
 
 set_r_sheonite_above_solvalou: | $29F7
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
     move.w    (_X,a1),d0
-    sub.w     #0x0200,d0
+    sub.w     #0x0200,d0                        | calc obj X
     move.w    d0,(_X,a5)
     move.w    (_Y,a1),d0
-    sub.w     #0x0200,d0
+    sub.w     #0x0200,d0                        | calc obj Y
     move.w    d0,(_Y,a5)
     rts
 
 animate_l_sheonite_1: | $2A11
     move.b    (pulsing_colour_1),(_COLOUR,a5)
-    movea.l   #l_sheonite_code_tbl_1,a0
+    lea       l_sheonite_code_tbl_1,a0
     move.b    (countup_timer_1),d0
     lsr.b     #1,d0
-    and.w     #3,d0
+    and.w     #3,d0                             | calc sprite code
     move.b    (a0,d0.w),(_CODE,a5)
     bra       move_object_dX_dY_2
 
@@ -3860,47 +3862,47 @@ handle_32_left_sheonite: | $2A2E
     move.b    #3,(_STATE,a5)                    | indestructible
     clr.b     (_ATTR,a5)                        | bank=0, size=1x1
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
-    move.b    (_X,a1),d0                        | MSB
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
+    move.b    (_X,a1),d0                        | solvalou spriteX MSB
     subq.b    #2,d0
     sub.b     (_X,a5),d0                        | MSB
-    move.b    (_Y,a1),d1                        | MSB
+    move.b    (_Y,a1),d1                        | solvalou spriteY MSB
     addq.b    #2,d1
     sub.b     (_Y,a5),d1                        | MSB
     bsr       get_index_for_angle
-    movea.l   #angle_dX_dY_sheonite_tbl,a2
+    lea       angle_dX_dY_sheonite_tbl,a2
     bsr       get_dX_dY_and_cpy_to_obj
     move.b    (_X,a1),d0                        | solvalou X MSB
     subq.b    #2,d0
     cmp.b     (_X,a5),d0
-    bne       animate_l_sheonite_1
+    bne.b     animate_l_sheonite_1
     move.b    (_Y,a1),d0                        | solvalou Y MSB
     addq.b    #2,d0
     cmp.b     (_Y,a5),d0                        | MSB
-    bne       animate_l_sheonite_1
+    bne.b     animate_l_sheonite_1
     SET_REENTRY_ADDR_HERE
-    tst.b     (countup_timer_1)
-    bne       1f
-    tst.b     (sheonite_end_flag)
-    bne       animate_l_sheonite_2
-1:  bsr       set_l_sheonite_above_solvalou
-    movea.l   #l_sheonite_code_tbl_1,a0
+    tst.b     (countup_timer_1)                 | time to check retreat? 
+    bne.b     1f
+    tst.b     (sheonite_end_flag)               | time to retreat?
+    bne.b     animate_l_sheonite_2              | no, go
+1:  bsr.w     set_l_sheonite_above_solvalou
+    lea       l_sheonite_code_tbl_1,a0
     move.b    (countup_timer_1),d0
     lsr.b     #1,d0
-    and.w     #3,d0
+    and.w     #3,d0                             | calc sprite code
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     rts
 
 animate_l_sheonite_2: | $2A9D
     SET_REENTRY_ADDR_HERE
-    bsr       set_l_sheonite_above_solvalou
+    bsr.b     set_l_sheonite_above_solvalou
     move.b    (countup_timer_1),d0
     lsr.b     #2,d0
     and.w     #7,d0
-    cmp.b     #7,d0
-    beq       l_sheonite_combining
-    movea.l   #l_sheonite_code_tbl_2,a0
+    cmp.b     #7,d0                             | time to dock?
+    beq.b     l_sheonite_combining              | yes, go
+    lea       l_sheonite_code_tbl_2,a0
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     rts
@@ -3912,9 +3914,9 @@ l_sheonite_code_tbl_2: | $2AC1
 l_sheonite_combining: | $2AC8
     move.b    #0x20,(_TIMER,a5)                 | init timer
     SET_REENTRY_ADDR_HERE
-    subq.b    #1,(_TIMER,a5)
-    beq       l_sheonite_remove
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
+    subq.b    #1,(_TIMER,a5)                    | finished retreating?
+    beq.b     l_sheonite_remove                 | yes, go
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
     moveq     #0,d0
     move.b    (_TIMER,a5),d0
     lsl.w     #3,d0                             | x8
@@ -3934,10 +3936,10 @@ l_sheonite_remove: | $2AFE
 set_l_sheonite_above_solvalou: | $2B09
     movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
     move.w    (_X,a1),d0
-    sub.w     #0x0200,d0
+    sub.w     #0x0200,d0                        | calc object X
     move.w    d0,(_X,a5)
     move.w    (_Y,a1),d0
-    add.w     #0x0200,d0
+    add.w     #0x0200,d0                        | calc object Y
     move.w    d0,(_Y,a5)
     rts
 
@@ -5705,8 +5707,8 @@ obj_handler_tbl: | $3C83
     .long     handle_13_Zakato_closeY
     .long     handle_14_Zakato_fast
     .long     handle_15_Zakato
-    .long     handle_16_Brag_Zakato
-    .long     handle_17_Brag_Zakato
+    .long     handle_16_Brag_Zakato_rnd
+    .long     handle_17_Brag_Zakato_closeY
     .long     handle_18_Garu_Zakato
     .long     null_fn                           | NOT USED
     .long     null_fn                           | NOT USED
