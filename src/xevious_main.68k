@@ -2821,7 +2821,7 @@ handle_1D_Sol_Tower: | $1E61
     move.b    #54,(_PTS,a5)                     | 2,000 pts
     bsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       handle_sol_tower_rising           | yes, go
+    beq.b     handle_sol_tower_rising           | yes, go
     bsr       scroll_sprite_X
     bra       add_obj_handler
 
@@ -2833,11 +2833,11 @@ handle_sol_tower_rising: | $1E85
     lsr.b     #4,d0
     and.b     #7,d0
     cmp.b     #7,d0
-    beq       sol_tower_risen
+    beq.b     sol_tower_risen
     cmp.b     #4,d0
-    bne       1f
+    bne.b     1f
     move.b    #3,(_ATTR,a5)                     | size=2x2
-1:  movea.l   #sol_tower_animation_tbl,a0
+1:  lea       sol_tower_animation_tbl,a0
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       scroll_sprite_X
@@ -2873,11 +2873,11 @@ handle_09_Brag_Spario: | $1EF8
     bsr       save_PC_to_fn_tbl_and_ret
     move.b    #2,(_STATE,a5)                    | again?
     clr.w     d0                                | init ddX=0
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | Solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | Solvalou
     move.b    (_X,a1),d1                        | MSB
     cmp.b     (_X,a5),d1                        | MSB
-    bcs       brag_spario_ddX_sub_2
-    beq       brag_spario_update_ddX
+    bcs.b     brag_spario_ddX_sub_2
+    beq.b     brag_spario_update_ddX
     addq.w    #2,d0                             | ddX=2
     
 brag_spario_update_ddX: | $1F23
@@ -2886,8 +2886,8 @@ brag_spario_update_ddX: | $1F23
     clr.w     d0                                | init ddY=0
     move.b    (_Y,a1),d1                        | MSB
     cmp.b     (_Y,a5),d1                        | MSB
-    bcs       brag_spario_ddY_sub_2
-    beq       brag_spario_update_dY
+    bcs.b     brag_spario_ddY_sub_2
+    beq.b     brag_spario_update_dY
     addq.w    #2,d0                             | ddY=2
     
  brag_spario_update_dY: | $1F33
@@ -2904,11 +2904,11 @@ brag_spario_update_ddX: | $1F23
 
 brag_spario_ddX_sub_2: | $1F54
     subq.w    #2,d0
-    bra       brag_spario_update_ddX
+    bra.b     brag_spario_update_ddX
     
 brag_spario_ddY_sub_2: | $1F58
     subq.w    #2,d0
-    bra       brag_spario_update_dY
+    bra.b     brag_spario_update_dY
 
 handle_54_Bonus_Flag: | $1F5C
     move.b    #2,(_STATE,a5)
@@ -2918,10 +2918,10 @@ handle_54_Bonus_Flag: | $1F5C
     move.b    #48,(_PTS,a5)                     | 1,000 pts
     SET_REENTRY_ADDR_HERE
     .ifne OPT_REVEAL_BONUS_FLAG   
-    bra       reveal_bonus_flag
+    bra.b     reveal_bonus_flag
     .endif
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       reveal_bonus_flag                 | yes, go   
+    beq.b     reveal_bonus_flag                 | yes, go   
     bsr       scroll_sprite_X
     bra       add_obj_handler
 
@@ -2930,17 +2930,17 @@ reveal_bonus_flag: | $1F8D
     move.b    #0x0e,(_COLOUR,a5)
     move.b    #0x1f,(_CODE,a5)
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_flag_collected
-    bcs       score_bonus_flag
+    bsr.b     check_flag_collected
+    bcs.b     score_bonus_flag
     bsr       scroll_sprite_X
     bra       add_obj_handler
 
 score_bonus_flag: | $1FA8
-    btst.b    #1,(dswb)
-    bne       inc_num_solvalou
-    movea.l   #pts_10000,a0
+    btst.b    #1,(dswb)                         | awards bonus life?
+    bne       inc_num_solvalou                  | yes, go
+    lea       pts_10000,a0                      | 10,000 pts
     bsr       add_to_score
-    bra       remove_bonus_flag
+    bra.b     remove_bonus_flag
 
 inc_num_solvalou: | $1FB7
     addq.b    #1,(curr_player_solvalou_left)
@@ -2956,20 +2956,20 @@ check_flag_collected: | $1FD6
     move.b    (sprite_shadow_msb+2*0x23+0),d3   | solvolou spriteY
     sub.b     (sprite_shadow_msb+2*0x00+0),d3           
     sub.b     #0x0a,d3
-    add.b     #0x14,d3
-    bcc       9f
+    add.b     #0x14,d3                          | match?
+    bcc.b     9f                                | no, return
     move.b    (sprite_shadow_msb+2*0x23+1),d4   | solvalou spriteX[8:1]
     sub.b     (sprite_shadow_msb+2*0x00+1),d4
     subq.b    #5,d4
-    add.b     #0x0a,d4
+    add.b     #0x0a,d4                          | C = match
 9:  rts
 
 * Toroid (Fleet/Coin) 30 pts
 handle_0A_Toroid: | $2000
-    bsr       init_toroid
+    bsr.w     init_toroid
     bsr       save_PC_to_fn_tbl_and_ret
     bsr       is_close_to_solvalou_Y
-    bcs       toroid_toggle_dir
+    bcs       toroid_toggle_dir                 | yes, go
     
 handle_toroid:
     move.b    (pulsing_colour_1),(_COLOUR,a5)
@@ -2978,45 +2978,41 @@ handle_toroid:
 
 * Toroid (Fleet/Coin) 30 pts
 handle_0B_Toroid_shoots: | $2018
-    bsr       init_toroid
+    bsr.w     init_toroid
     bsr       save_PC_to_fn_tbl_and_ret
     bsr       is_close_to_solvalou_Y
-    bcs       init_toroid_shot
-    bra       handle_toroid
+    bcs.b     init_toroid_shot                  | yes, go
+    bra.b     handle_toroid
 
 * d0=spriteY (MSB)        
 toroid_toggle_dir:
     subq.b    #2,d0
-    bcs       toroid_pre_swing_left
-    
-toroid_pre_swing_right:
-    SET_REENTRY_ADDR_HERE
+    bcs.b     toroid_swing_left
     
 toroid_swing_right:
+    SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go
     addq.b    #1,(_TIMER,a5)                    | inc timer
     move.b    (_TIMER,a5),d0
     lsr.b     #1,d0
-    and.w     #7,d0
-    movea.l   #toroid_sprite_tbl,a0
+    and.w     #7,d0                             | calc sprite
+    lea       toroid_sprite_tbl,a0
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     subq.w    #1,(_dY,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
-toroid_pre_swing_left: | $205F
-    SET_REENTRY_ADDR_HERE
-    
 toroid_swing_left: | $205F
+    SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go
     addq.b    #1,(_TIMER,a5)                    | inc timer
     move.b    (_TIMER,a5),d0
     lsr.b     #1,d0
     and.w     #7,d0
-    addq.b    #8,d0
+    addq.b    #8,d0                             | calc sprite
     move.b    d0,(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     addq.w    #1,(_dY,a5)
@@ -3030,8 +3026,8 @@ init_toroid_shot: | $2092
     move.w    (a7)+,sr                          | restore C
     move.l    (a7)+,d0
     subq.b    #2,d0
-    bcs       toroid_pre_swing_left
-    bra       toroid_pre_swing_right
+    bcs.b     toroid_swing_left
+    bra.w     toroid_swing_right
 
 toroid_sprite_tbl: | $209F
     .byte 0xF, 0xE, 0xD, 0xC, 0xB, 0xA, 9, 8
@@ -3040,7 +3036,7 @@ init_toroid: | $20A7
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | bank=0, size=1x1
     bsr       gen_rnd_spriteY
-    movea.l   #angle_dX_dY_toroid_tbl,a2
+    lea       angle_dX_dY_toroid_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #6,(_PTS,a5)                      | 30 pts
     move.b    #8,(_CODE,a5)
@@ -3049,7 +3045,7 @@ init_toroid: | $20A7
 
 is_close_to_solvalou_Y: | $20CB
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       loc_20E2                          | yes, go
+    beq.b     loc_20E2                          | yes, go
     move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | solvalou spriteY MSB
     sub.b     (_Y,a5),d0
     subq.b    #2,d0
@@ -3057,7 +3053,7 @@ is_close_to_solvalou_Y: | $20CB
     rts
 
 loc_20E2: | $20E2
-    adda.l    #4,a7                             | bypass caller
+    lea       (4,a7),a7                         | bypass caller
     bra       flying_enemy_hit
             
 * Torkan (Scout Ship/Beetle) - 50 pts   
@@ -3065,7 +3061,7 @@ handle_0F_Torkan: | $20E7
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | size=1x1
     bsr       gen_random_Y_store_obj
-    movea.l   #angle_dX_dY_tbl,a2
+    lea       angle_dX_dY_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #9,(_PTS,a5)                      | 50 pts
     move.b    #0x10,(_CODE,a5)
@@ -3077,7 +3073,7 @@ handle_0F_Torkan: | $20E7
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go
     subq.b    #1,(_TIMER,a5)                    | time to shoot?
-    beq       torkan_shoot                      | yes, go
+    beq.b     torkan_shoot                      | yes, go
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       move_object_dX_dY   
     bra       add_obj_handler
@@ -3091,22 +3087,22 @@ torkan_shoot: | $2131
     move.b    (_TIMER,a5),d0
     lsr.b     #2,d0
     and.b     #0x0f,d0
-    cmp.b     #7,d0
-    beq       loc_2169
+    cmp.b     #7,d0                             | time to update dir?
+    beq.b     torkan_update_dir                 | yes, go
     add.b     #0x10,d0
     move.b    d0,(_CODE,a5)                     | animate sprite
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       scroll_sprite_X        
     bra       add_obj_handler
 
-loc_2169: | $2169
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
+torkan_update_dir: | $2169
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
     move.b    (_X,a1),d0                        | MSB
     sub.b     (_X,a5),d0                        | MSB
     move.b    (_Y,a1),d1                        | MSB
     sub.b     (_Y,a5),d1                        | MSB
     bsr       get_index_for_angle
-    movea.l   #angle_dX_dY_terrazi_torkan_tbl,a2
+    lea       angle_dX_dY_terrazi_torkan_tbl,a2
     add.b     #0x80,d2
     bsr       get_dX_dY_and_cpy_to_obj
     SET_REENTRY_ADDR_HERE
@@ -3117,21 +3113,22 @@ loc_2169: | $2169
     bra       add_obj_handler
 
 * Zoshi (Octopus) 100 pts
-handle_0E_Zoshi: | $21B1
+* appears from the bottom of the screen
+handle_0E_Zoshi_bottom: | $21B1
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | bank=0,size=1x1
-    move.b    #40,(_X,a5)
+    move.b    #40,(_X,a5)                       | MSB
     bsr       gen_rnd_spriteY
-    bra       zoshi_0D_init_cont
+    bra.b     zoshi_0D_init
 
 * Zoshi (Octopus) 100 pts
-handle_0D_Zoshi: | $21C4
+handle_0D_Zoshi_top: | $21C4
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | bank=0,size=1x1
     bsr       gen_random_Y_store_obj
     
-zoshi_0D_init_cont: | $21D3
-    movea.l   #angle_dX_dY_toroid_tbl,a2
+zoshi_0D_init: | $21D3
+    lea       angle_dX_dY_toroid_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #15,(_PTS,a5)                     | 100 pts
     move.b    (ffreq_mask_zoshi),(_FFREQ,a5)
@@ -3143,33 +3140,34 @@ zoshi_0D_init_cont: | $21D3
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go
     move.b    (countup_timer_1),d0
-    and.w     #7,d0
-    bne       zoshi_0D_main
+    and.w     #7,d0                             | time to dec shot timer?
+    bne.b     zoshi_0D_main                     | no, go
     subq.b    #1,(_TIMER,a5)                    | time to shoot?
-    bne       zoshi_0D_main                     | no, go
+    bne.b     zoshi_0D_main                     | no, go
     bsr       pseudo_random_gen                 | random shot timer
     and.b     (_FFREQ,a5),d0                    | scale with mask  
     addq.b    #1,d0
     move.b    d0,(_TIMER,a5)                    | re-init shot timer
-    movea.l   #angle_dX_dY_toroid_tbl,a2
+    lea       angle_dX_dY_toroid_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     bsr       init_new_bullet
     
 zoshi_0D_main: | $221E
     move.b    (countup_timer_1),d0
     and.w     #3,d0
-    add.b     #0x28,d0
+    add.b     #0x28,d0                          | calc sprite code
     move.b    d0,(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
 * Zoshi (Octopus) 70 pts
-handle_0C_Zoshi: | $2235
+* shoots in a random direction
+handle_0C_Zoshi_rnd: | $2235
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | bank=0, size=1x1
     bsr       gen_random_Y_store_obj
-    movea.l   #angle_dX_dY_toroid_tbl,a2
+    lea       angle_dX_dY_toroid_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #12,(_PTS,a5)                     | 70 pts
     move.b    (ffreq_mask_zoshi),(_FFREQ,a5)
@@ -3189,34 +3187,35 @@ handle_0C_Zoshi: | $2235
     and.b     (_FFREQ,a5),d0                    | scale with mask  
     addq.b    #1,d0
     move.b    d0,(_TIMER,a5)                    | re-init shot timer
-    bsr       pseudo_random_gen
-    movea.l   #angle_dX_dY_toroid_tbl,a2
+    bsr       pseudo_random_gen                 | rand shot direction
+    lea       angle_dX_dY_toroid_tbl,a2
     bsr       get_dX_dY_and_cpy_to_obj
     bsr       init_new_bullet
     
 zoshi_0C_main: | $2294
     move.b    (countup_timer_1),d0
     and.w     #3,d0
-    add.b     #0x28,d0
+    add.b     #0x28,d0                          | calc sprite code
     move.b    d0,(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
       
+* Jara (Spinner) 150 pts
 handle_56_Jara: | $22AC
-    bsr       jara_init
+    bsr.w     jara_init
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       jara_check_proximity              | close to solvalou?
-    bcs       jara_set_dir                      | yes, go
+    bsr.w     jara_check_proximity              | close to solvalou?
+    bcs.b     jara_set_dir                      | yes, go
     
-loc_22B5: | $22B5
+jara_set_clr_and_move: | $22B5
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       move_object_dX_dY    
     bra       add_obj_handler
 
 jara_set_dir: | $22C4
     subq.b    #6,d0
-    bcs       jara_moving_left
+    bcs.b     jara_moving_left
     
 jara_moving_right: | $22C8
     SET_REENTRY_ADDR_HERE
@@ -3225,12 +3224,12 @@ jara_moving_right: | $22C8
     addq.b    #1,(_TIMER,a5)
     move.b    (_TIMER,a5),d0
     lsr.b     #1,d0
-    and.w     #7,d0
+    and.w     #7,d0                             | calc sprite code
     cmp.b     #6,d0
-    bne       1f
+    bne.b     1f
     moveq     #0,d0
     move.b    d0,(_TIMER,a5)                    | reinit timer    
-1:  movea.l   #jara_56_sprite_tbl,a0
+1:  lea       jara_right_sprite_tbl,a0
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     subq.w    #1,(_dY,a5)
@@ -3238,20 +3237,20 @@ jara_moving_right: | $22C8
     bra       add_obj_handler
 
 * Jara (Spinner) 150 pts
-handle_55_Jara: | $2306
-    bsr       jara_init
+handle_55_Jara_shoots: | $2306
+    bsr.b     jara_init
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       jara_check_proximity              | close to solvalou?
-    bcs       jara_shoot                        | yes, go
-    bra       loc_22B5
+    bsr.w     jara_check_proximity              | close to solvalou?
+    bcs.b     jara_shoot                        | yes, go
+    bra.b     jara_set_clr_and_move
     
 jara_shoot: | $2311
     move.l    d0,-(a7)
     bsr       init_new_bullet
     move.l    (a7)+,d0
     subq.b    #6,d0
-    bcs       jara_moving_left
-    bra       jara_moving_right
+    bcs.b     jara_moving_left
+    bra.b     jara_moving_right
     
 jara_moving_left: | $231E
     SET_REENTRY_ADDR_HERE
@@ -3260,29 +3259,29 @@ jara_moving_left: | $231E
     addq.b    #1,(_TIMER,a5)
     move.b    (_TIMER,a5),d0
     lsr.b     #1,d0
-    and.w     #7,d0
+    and.w     #7,d0                             | calc sprite code
     cmp.b     #6,d0
-    bne       1f
+    bne.b     1f
     moveq     #0,d0
     move.b    d0,(_TIMER,a5)                    | re-init timer
-1:  movea.l   #jara_55_sprite_tbl,a0
+1:  lea       jara_left_sprite_tbl,a0
     move.b    (a0,d0.w),(_CODE,a5)
-    move.b    (pulsing_colour_1),(_CODE,a5)
+    move.b    (pulsing_colour_1),(_COLOUR,a5)
     addq.w    #1,(_dY,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
     
-jara_56_sprite_tbl: | $235C
+jara_right_sprite_tbl: | $235C
     .byte 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5
     
-jara_55_sprite_tbl: | $2362
+jara_left_sprite_tbl: | $2362
     .byte 0xA5, 0xA4, 0xA3, 0xA2, 0xA1, 0xA0
 
 jara_init: | $2368
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | bank=0, size=1x1
     bsr       gen_rnd_spriteY
-    movea.l   #angle_dX_dY_terrazi_torkan_tbl,a2
+    lea       angle_dX_dY_terrazi_torkan_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #18,(_PTS,a5)                     | 150 pts
     move.b    #0xa0,(_CODE,a5)
@@ -3291,15 +3290,15 @@ jara_init: | $2368
 
 jara_check_proximity: | $238C
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       jara_hit
+    beq.b     jara_hit                          | yes, go
     move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | solvalou spriteY MSB
     sub.b     (_Y,a5),d0                        | MSB
     subq.b    #6,d0
-    add.b     #0x0c,d0
+    add.b     #0x0c,d0                          | C = close
     rts
     
 jara_hit: | $23A3
-    adda.l    #4,a7                             | bypass caller
+    lea       (4,a7),a7                         | bypass caller
     bra       flying_enemy_hit
     
 * Kapi (Rhombus) 300 pts
@@ -3307,7 +3306,7 @@ handle_10_Kapi: | $23A8
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | size=1x1
     bsr       gen_random_Y_store_obj
-    movea.l   #angle_dX_dY_tbl,a2
+    lea       angle_dX_dY_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #27,(_PTS,a5)                     | 300 pts
     move.b    #0x20,(_CODE,a5)
@@ -3320,19 +3319,19 @@ handle_10_Kapi: | $23A8
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go
     subq.b    #1,(_TIMER,a5)                    | time to shoot?
-    beq       kapi_10_fire                      | yes, g0
+    beq.b     kapi_10_fire                      | yes, g0
     move.b    (pulsing_colour_1),(_COLOUR,a5)   
     bsr       move_object_dX_dY   
     bra       add_obj_handler
 
 kapi_10_fire: | $23F7
     clr.b     (_TIMER1,a5)
-    move.w    #1,d1
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a0
+    move.w    #1,d1                             | ddY=1
+    lea       obj_tbl+_OBJSIZE*0x23,a0
     move.b    (_Y,a0),d0                        | MSB
     cmp.b     (_Y,a5),d0                        | compare
-    bcs       1f
-    move.w     #-1,d1
+    bcs.b     1f                                | less, skip
+    move.w     #-1,d1                           | ddY=-1
 1:  move.w    d1,(_ddY,a5)
     move.b    #1,(_TIMER,a5)
     bsr       chk_timer_fire_bullet_reinit_timer
@@ -3344,13 +3343,13 @@ kapi_10_fire: | $23F7
     move.b    (_TIMER1,a5),d0
     lsr.b     #3,d0
     and.b     #7,d0
-    cmp.b     #7,d0
-    beq       loc_2455
-    add.b     #32,d0
+    cmp.b     #7,d0                             | time to animate sprite?
+    beq.b     loc_2455                          | no, go
+    add.b     #0x20,d0                          | calc sprite
     move.b    d0,(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     move.w    (_ddY,a5),d0
-    add.w     d0,(_dY,a5)
+    add.w     d0,(_dY,a5)                       | update dY
     subq.w    #2,(_dX,a5)
     bsr       move_object_dX_dY   
     bra       add_obj_handler
@@ -3358,11 +3357,11 @@ kapi_10_fire: | $23F7
 loc_2455: | $2455
     SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       flying_enemy_hit
+    beq       flying_enemy_hit                  | yes, go
     bsr       chk_timer_fire_bullet_reinit_timer
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     move.w    (_ddY,a5),d0
-    add.w     d0,(_dY,a5)
+    add.w     d0,(_dY,a5)                       | update dY
     subq.w    #2,(_dX,a5)
     bsr       move_object_dX_dY   
     bra       add_obj_handler
@@ -3372,10 +3371,10 @@ handle_11_Terrazi: | $2487
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | size=1x1
     bsr       gen_rnd_spriteY
-    movea.l   #angle_dX_dY_terrazi_torkan_tbl,a2
+    lea       angle_dX_dY_terrazi_torkan_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #39,(_PTS,a5)                     | 700 pts
-    move.b    #1,(_CODE,a5)
+    move.b    #0x01,(_CODE,a5)
     move.b    (ffreq_mask_terrazi),(_FFREQ,a5)
     bsr       pseudo_random_gen                 | random shot timer
     and.b     (_FFREQ,a5),d0                    | scale with mask
@@ -3383,22 +3382,22 @@ handle_11_Terrazi: | $2487
     bsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a0
-    move.b    (_Y,a0),d0                        | MSB
+    lea       obj_tbl+_OBJSIZE*0x23,a0          | solvalou
+    move.b    (_Y,a0),d0                        | solvalou spriteY MSB
     sub.b     (_Y,a5),d0                        | object
     subq.b    #4,d0
     addq.b    #8,d0                             | too close to fire?
-    bcs       terrazi_main_cont                 | yes, go
+    bcs.b     terrazi_main_cont                 | yes, go
     bsr       chk_timer_fire_bullet_reinit_timer
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
 terrazi_main_cont: | $24E2
-    moveq     #2,d1
-    subq.b    #4,d0
-    bcs       1f
-    move.w    #-2,d1
+    moveq     #2,d1                             | dY=2
+    subq.b    #4,d0                             | restore ydiff
+    bcs.b     1f                                | left/right
+    moveq     #-2,d1                            | dY=-2
 1:  move.w    d1,(_dY,a5)
     move.b    #0xff,(_TIMER,a5)                 | init timer
     SET_REENTRY_ADDR_HERE
@@ -3409,9 +3408,9 @@ terrazi_main_cont: | $24E2
     move.w    (_ddX,a5),d0
     lsr.b     #3,d0
     and.b     #7,d0
-    cmp.b     #7,d0
-    beq       terrazi_main_cont_2
-    addq.b    #1,d0
+    cmp.b     #7,d0                             | time to animate sprite?
+    beq.b     terrazi_main_cont_2               | no, go
+    addq.b    #1,d0                             | calc sprite code
     move.b    d0,(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     move.w    (_ddY,a5),d0
@@ -3433,14 +3432,15 @@ terrazi_main_cont_2: | $2535
     bra       add_obj_handler    
 
 * Zakato (Teleporter) 100 pts
-handle_12_Zakato: | $2567
+* shoots based on random timer (0-0xff)
+handle_12_Zakato_slow: | $2567
     bsr       init_teleport
     move.b    #15,(_PTS,a5)                     | 100 pts
     clr.w     (_dY,a5)
     move.w    #16,(_dX,a5)
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       zakato_teleport
-    bcc       zakato_12_main
+    bsr       zakato_teleport                   | done teleporting?
+    bcc.b     zakato_12_main                    | yes, go
     bsr       scroll_sprite_X
     bra       add_obj_handler    
 
@@ -3455,33 +3455,34 @@ zakato_12_main: | $257E
     SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go   
-    subq.b    #1,(_TIMER,a5)
-    beq       zakato_shoot
+    subq.b    #1,(_TIMER,a5)                    | time to shoot?
+    beq.b     zakato_shoot                      | yes, go
     move.b    (pulsing_colour_2),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
 zakato_shoot: | $25B9
-    move.b    #0xff,(_TIMER,a5)
-    move.b    #3,(_STATE,a5)                    | destroyed
+    move.b    #0xff,(_TIMER,a5)                 | re-init timer
+    move.b    #3,(_STATE,a5)                    | flag benign
     bsr       init_new_bullet
     
 zakato_explode_and_remove: | $25C2
     SET_REENTRY_ADDR_HERE
-    bsr       zakato_explode
-    bcc       remove_zakato
+    bsr       zakato_explode                    | done exploding?
+    bcc       remove_zakato                     | yes, go
     bsr       scroll_sprite_X
     bra       add_obj_handler    
 
 * Zakato (Teleporter) 200 pts
-handle_13_Zakato: | $25D7
+* shoots when Y coordinate close to Solvalou
+handle_13_Zakato_closeY: | $25D7
     bsr       init_teleport
     move.b    #21,(_PTS,a5)                     | 200 pts
     clr.b     (_dY,a5)                          | MSB
-    move.b    #16,(_dX,a5)                      | MSB
+    move.w    #16,(_dX,a5)
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       zakato_teleport
-    bcc       zakato_13_main
+    bsr       zakato_teleport                   | done teleporting?
+    bcc.b     zakato_13_main                    | yes, go
     bsr       scroll_sprite_X
     bra       add_obj_handler    
 
@@ -3492,22 +3493,23 @@ zakato_13_main: | $25EE
     SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       flying_enemy_hit                  | yes, go   
-    move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | MSB
+    move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | solovalou spriteY MSB
     sub.b     (_Y,a5),d0                        | MSB
     subq.b    #4,d0
-    addq.b    #8,d0
-    bcs       zakato_shoot
+    addq.b    #8,d0                             | close enough?
+    bcs.b     zakato_shoot                      | yes, go
     move.b    (pulsing_colour_2),(_COLOUR,a5)
     bsr       move_object_dX_dY
     bra       add_obj_handler
 
 * Zakato (Teleporter) 150 pts
-handle_14_Zakato: | $262E
+* shoots based on random timer (0-0x3f)
+handle_14_Zakato_fast: | $262E
     bsr       init_teleport
     move.b    #18,(_PTS,a5)                     | 150 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       zakato_teleport
-    bcc       zakato_14_main
+    bsr       zakato_teleport                   | done teleporting?
+    bcc.b     zakato_14_main                    | yes, go
     bsr       scroll_sprite_X
     bra       add_obj_handler    
 
@@ -3516,9 +3518,10 @@ zakato_14_main: | $263F
     and.w     #0x3f,d0
     addq.b    #1,d0
     move.b    d0,(_TIMER,a5)                    | init shot timer
+    move.b    #0x11,(_CODE,a5)
     move.b    #0x80,(_ATTR,a5)                  | bank=1,size=1x1
     move.b    #2,(_STATE,a5)
-    movea.l   #angle_dX_dY_tbl,a2
+    lea       angle_dX_dY_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
@@ -3530,6 +3533,7 @@ zakato_14_main: | $263F
     bra       add_obj_handler
 
 * Zakato (Teleporter) 300 pts
+* shoots continuously until too close to Solvalou
 handle_15_Zakato: | $2684:
     bsr       init_teleport
     move.b    #27,(_PTS,a5)                     | 300 pts
@@ -5691,15 +5695,15 @@ obj_handler_tbl: | $3C83
     .long     handle_09_Brag_Spario
     .long     handle_0A_Toroid
     .long     handle_0B_Toroid_shoots
-    .long     handle_0C_Zoshi
-    .long     handle_0D_Zoshi
-    .long     handle_0E_Zoshi
+    .long     handle_0C_Zoshi_rnd
+    .long     handle_0D_Zoshi_top
+    .long     handle_0E_Zoshi_bottom
     .long     handle_0F_Torkan
     .long     handle_10_Kapi
     .long     handle_11_Terrazi
-    .long     handle_12_Zakato
-    .long     handle_13_Zakato
-    .long     handle_14_Zakato
+    .long     handle_12_Zakato_slow
+    .long     handle_13_Zakato_closeY
+    .long     handle_14_Zakato_fast
     .long     handle_15_Zakato
     .long     handle_16_Brag_Zakato
     .long     handle_17_Brag_Zakato
@@ -5764,7 +5768,7 @@ obj_handler_tbl: | $3C83
     .long     handle_52_Andor_Genesis_obj_10
     .long     handle_53_Easter_Egg
     .long     handle_54_Bonus_Flag
-    .long     handle_55_Jara
+    .long     handle_55_Jara_shoots
     .long     handle_56_Jara
     .long     null_fn                           | NOT USED
 
