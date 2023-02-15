@@ -7,13 +7,12 @@
 - sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
 - fg tile refresh not right
 - sprites for big mothership (allows to use alternate brown/gold colors)
-- colored "hiscore" & "namco" 
+- colored "hiscore"
 - double buffering on sprite layer to avoid flicker: maybe not needed
 - rip sounds
 - save/load hiscore
 - without whdload: screen garbled
-
-- copper interrupt too soon, got to wait less maybe before
-  let PAL limit work
-- adjust erase (again!)
-- use cpu bitplane clear on odd planes (optim)
+- killed: last position of sprites isn't erased (discontinuous) for
+  ground objects
+- possible bug (freeze) when using clear_plane (cpu version)
+- optim: cookie cut with fixed 0 source if plane_pic_0 (saves bandwidth)

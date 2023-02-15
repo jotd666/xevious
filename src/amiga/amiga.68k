@@ -1041,9 +1041,9 @@ osd_update_32_sprite_hw:
 	move.l	a1,(a0)
 	.endif
 	
-	lsl.w	#8,d0
-	add.w	#0xc00,d0
-	move.w	d0,_custom+color
+	*lsl.w	#8,d0
+	*add.w	#0xc00,d0
+	*move.w	d0,_custom+color
 	
 	clr.w	min_sprite_y
 	move.w	#NB_LINES/2+16,max_sprite_y
@@ -1062,7 +1062,7 @@ osd_update_32_sprite_hw:
 	move.w	#NB_SPRITES_TO_UPDATE-1,d4			| 32 sprites
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
-	beq.b	11f
+	beq.w	11f
 	* erase previous sprite position
 	move.w	(4,a5),d1   | Y
 	sub.w	#4*8,d1
@@ -1074,13 +1074,19 @@ osd_update_32_sprite_hw:
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
 	
-	
-	moveq	#NB_PLAYFIELD_PLANES-1,d3
+	subq.w	#2,d1		| empiric
 	move.l		fg_screen_pointer(pc),a1
-10:
+    move.w  #18,d3	| height
+	move.w	#4,d2	| width
+	* alternate between blitter & cpu for parallel processing
+	* starts by cpu
+    bsr     clear_plane_any_cpu_any_height
+	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
 	bsr		clear_plane_any_blitter_16x16
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
-	dbf		d3,10b
+    bsr     clear_plane_any_cpu_any_height
+	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
+	bsr		clear_plane_any_blitter_16x16
 	* convert sprite coords to foreground tile coords, then mark
 	* the dirty tiles
 	move.w	(6,a5),d0
@@ -1266,7 +1272,7 @@ osd_update_32_sprite_hw:
 5:
 
 	.endif  | OPT_DISABLE_SPRITES
-	clr.w	_custom+color
+	*clr.w	_custom+color
 	
 	rts
 zzz:
@@ -1471,7 +1477,7 @@ clear_plane_any_blitter_16x16:
     lea _custom,a5
     moveq.l #-1,d3
 	moveq	#4,d2
-    move.w  #16,d4
+    move.w  #18,d4	| add 2
     bsr clear_plane_any_blitter_internal
     movem.l (a7)+,d0-d6/a1/a5
     rts
@@ -1530,7 +1536,76 @@ clear_plane_any_blitter_internal:
 	move.w  d4,bltsize(a5)	|rectangle size, starts blit
     rts
 
+* what: clears a plane of any width (not using blitter, no shifting, start is multiple of 8), 16 height
+* args:
+* < A1: dest (must be even)
+* < D0: X (multiple of 8)
+* < D1: Y
+* < D2: blit width in bytes (even, 2 must be added same interface as blitter)
+* trashes: none
 
+clear_plane_any_cpu_16x16:
+    move.w  d3,-(a7)
+    move.w  #18,d3
+    bsr     clear_plane_any_cpu_any_height
+    move.w  (a7)+,d3
+    rts
+    
+clear_plane_any_cpu_any_height:
+    movem.l d0-D3/a0-a2,-(a7)
+    subq.w  #1,d3
+    bmi.b   5f
+    add.w   d1,d1
+    beq.b   1f		| optim
+	bmi.b	5f
+    lea mulNB_BYTES_PER_ROW_table(pc),a2
+    move.w  (a2,d1.w),d1
+    add.w   d1,a1
+1:
+
+    lsr.w   #3,d0
+    add.w   d0,a1
+	move.l	a1,d1
+    btst    #0,d1
+    bne.b   2f
+    cmp.w   #4,d2
+    bcs.b   2f
+	btst	#0,d2
+	bne.b	2f
+	btst	#1,d2
+	beq.b	6f
+2:  
+    * odd address
+    move.w  d3,d0
+    subq.w  #1,d2
+3:
+    move.l  a1,a0
+    move.w  d2,d1   | reload d1
+4:
+    clr.b   (a0)+
+    dbf d1,4b
+    * next line
+    add.w   #NB_BYTES_PER_ROW,a1
+    dbf d0,3b
+5:
+    movem.l (a7)+,d0-D3/a0-a2
+    rts
+
+6:
+    * even address, big width: can use longword erase
+    move.w  d3,d0
+    lsr.w   #2,d2
+    subq.w  #1,d2
+7:
+    move.l  a1,a0
+    move.w  d2,d1
+8:
+    clr.l   (a0)+
+    dbf d1,8b
+    * next line
+    add.w   #NB_BYTES_PER_ROW,a1
+    dbf d0,7b
+    bra.b   5b
 * what: blits 16x16 data on bg planes, cookie cut
 * args:
 * < A0: data (16x16X(7+1))
@@ -1887,9 +1962,8 @@ color_row_1:
 	.set	beampos,beampos+0x800
 	.set	testcol,testcol+0x011
 	.endr
-    dc.w	 intreq,0x8010
 	* pal limit
-    dc.w  0xFFDF,0xFFFE           
+    dc.w  0xFFCF,0xFFFE       | PAL wait (should be 0xFFDF but probably fmode=3 changes it)
     dc.w  0x0401,0xFFFE
 	
 color_row_30:
@@ -1897,13 +1971,17 @@ color_row_30:
     dc.w  0x0C01,0xFFFE           
 	.set    testcol,0xF0
 	.set    beampos,0x1401
+	
 color_row_30_plus:
-	.rept	(48/8)
+	.rept	(40/8)
 	dc.w	fgcol,(testcol & 0x0FFF)
 	dc.w	beampos,0xFFFE
 	.set	beampos,beampos+0x800
 	.set	testcol,testcol+0x022
 	.endr
+	dc.w	fgcol,(testcol & 0x0FFF)
+    dc.w	 intreq,0x8010
+	dc.w	color,(0xF0F)
 	dc.w	fgcol,0xF00	| test
     dc.l    -2					
 	
