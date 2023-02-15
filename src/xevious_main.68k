@@ -1920,8 +1920,7 @@ adj_for_big_explosion_frame: | $15B1
 update_solvalou_sprite_XY: | $15C1
     lea       obj_tbl+_OBJSIZE*0x23,a5         | solvalou
     move.w    (_X,a5),d0
-    move.b    (_dX,a5),d1
-    ext.w     d1
+    move.w    (_dX,a5),d1
     lsl.w     #1,d1
     add.w     d1,d0
     cmp.w     #144*32,d0                        | too small?
@@ -1932,8 +1931,7 @@ update_solvalou_sprite_XY: | $15C1
     move.w    #304*32,d0                        | set to 304
 2:  move.w    d0,(_X,a5)
     move.w    (_Y,a5),d0
-    move.b    (_dY,a5),d1
-    ext.w     d1
+    move.w    (_dY,a5),d1
     lsl.w     #1,d1
     add.w     d1,d0
     cmp.w     #16*32,d0                         | too small?
@@ -1955,10 +1953,10 @@ handle_solvalou_inputs: | $15FE
     and.w     #0x0f,d0                          | joystick only
 set_solvalou_dXdY:
     lea       dir_delta_tbl,a1
-    add.w     d0,d0                             | entry offset
+    lsl.w     #2,d0                             | entry offset
     lea       obj_tbl+_OBJSIZE*0x23,a5
-    move.b    (a1,d0.w),(_dX,a5)
-    move.b    (1,a1,d0.w),(_dY,a5)
+    move.w    (0,a1,d0.w),(_dX,a5)
+    move.w    (2,a1,d0.w),(_dY,a5)
     rts
 
 gen_rnd_dir: | $1622
@@ -1967,7 +1965,7 @@ gen_rnd_dir: | $1622
     beq.b     1f
     rts
 1:  bsr       pseudo_random_gen
-    and.b     #0x0f,d0
+    and.w     #0x0f,d0
     cmp.b     #9,d0
     bcc.b     1b
     bra.b     set_solvalou_dXdY
@@ -1975,16 +1973,17 @@ gen_rnd_dir: | $1622
 * input read from 51xx/60xx hardware
 * - only returns 9 directions (0-8)
 * - dir=8 results in no movement
+    .align 2
 dir_delta_tbl: | $1633
-    .byte 0xF0, 0                               | U
-    .byte 0xF0, 0xF0                            | U+R
-    .byte 0, 0xE8                               | R
-    .byte 0x10, 0xF0                            | D+R
-    .byte 0x10, 0                               | D
-    .byte 0x10, 0x10                            | D+L
-    .byte 0, 0x18                               | L
-    .byte 0xF0, 0x10                            | U+L
-    .byte 0, 0                                  | none/invalid
+    .word 0xfff0, 0x0000                        | U
+    .word 0xfff0, 0xfff0                        | U+R
+    .word 0x0000, 0xffE8                        | R
+    .word 0x0010, 0xfff0                        | D+R
+    .word 0x0010, 0x0000                        | D
+    .word 0x0010, 0x0010                        | D+L
+    .word 0x0000, 0x0018                        | L
+    .word 0xfff0, 0x0010                        | U+L
+    .word 0x0000, 0x0000                        | none/invalid
 
 check_solvalou_hit: | $1645
     move.b    (sprite_shadow_msb+2*0x23+0),d3   | solvalou spriteY
@@ -2138,7 +2137,7 @@ main_fn_30__handle_shooting: | $1727
 9:  rts
 
 handle_shooting: | $1772
-    tst.b     (attract_mode_stage)              | attract mode?
+    tst.w     (attract_mode_stage)              | attract mode?
     bne.b     gen_rnd_shot                      | yes, go
     lea       P1_inputs,a1
     btst.b    #5,(a1)                           | Button 1?
@@ -2157,7 +2156,7 @@ process_button_1:
 
 gen_rnd_shot: | $179B
     bsr       pseudo_random_gen
-    and.b     #0x0f,d0                          | 1/16 chance of firing
+    and.w     #0x0f,d0                          | 1/16 chance of firing
     bra.b     loc_1787                          | continue
         
 main_fn_30_shot_fn: | $17A2
@@ -2204,7 +2203,7 @@ delete_shot:
 
 * this only happens when the shot hits a bacura
 shot_destroyed: | $180D
-    move.b    #24,(_dX,a5)                      | reflected
+    move.w    #24,(_dX,a5)                      | reflected
     move.b    #0x23,(_COLOUR,a5)
     move.b    #0xff,(_TIMER,a5)
     bsr       save_PC_to_fn_tbl_and_ret
@@ -2241,7 +2240,7 @@ main_fn_31__handle_bombing: | $1862
     bne.w     9f                                | yes, return
     tst.b     (solvalou_exploding)              | exploding?
     bne.w     9f                                | yes, return
-    tst.b     (attract_mode_stage)              | in attract mode?
+    tst.w     (attract_mode_stage)              | in attract mode?
     bne.b     gen_random_bomb_press             | yes, go
 * read BUTTON2 from h/w
     btst.b    #0,(dswb)                         | bomb pressed?
@@ -2327,7 +2326,7 @@ check_flying_enemies_shot: | $1928
     bcc.b     loc_1972
     move.b    #3,(_STATE,a1)                    | enemy hit
     clr.b     (_EXTRA,a5)                       | flag shot to be destroyed
-    tst.b     (attract_mode_stage)              | attract mode?
+    tst.w     (attract_mode_stage)              | attract mode?
     bne       loc_1972                          | yes, skip
     moveq     #0,d0
     move.b    (_PTS,a1),d0                      | enemy points
@@ -2405,7 +2404,7 @@ handle_bombed_obj_and_award_points: | $19EE
 1:  bsr.b     check_object_on_target            | on target?
     bcc.b     loc_1A2C                          | no, skip  
     move.b    #3,(_STATE,a1)                    | state=hit
-    tst.b     (attract_mode_stage)              | attract mode?
+    tst.w     (attract_mode_stage)              | attract mode?
     bne       loc_1A2C                          | no, skip
     moveq     #0,d0
     move.b    (_PTS,a1),d0
@@ -3478,7 +3477,7 @@ zakato_explode_and_remove: | $25C2
 handle_13_Zakato_closeY: | $25D7
     bsr       init_teleport
     move.b    #21,(_PTS,a5)                     | 200 pts
-    clr.b     (_dY,a5)                          | MSB
+    clr.w     (_dY,a5)
     move.w    #16,(_dX,a5)
     bsr       save_PC_to_fn_tbl_and_ret
     bsr       zakato_teleport                   | done teleporting?
@@ -5565,7 +5564,7 @@ handle_49_Andor_Genesis_obj_01: | $3A0E
 * - program by EVEZOO
 * scores 10 pts because _PTS is zero
 handle_53_Easter_Egg: | $3A46
-    tst.b     (attract_mode_stage)              | attract mode?
+    tst.w     (attract_mode_stage)              | attract mode?
     bne       remove_easter_egg                 | yes, go
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | bank=0, size=1x1
