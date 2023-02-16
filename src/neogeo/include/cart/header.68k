@@ -15,6 +15,10 @@
     .org 0x0108
     .word __NGH__       | NGH
     
+    .org 0x10E
+    .long memcard_buf
+    .word 128
+    
     .org 0x0114
     .byte 0             | eye-catcher
 

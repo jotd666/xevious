@@ -159,13 +159,13 @@ demo_game:
     move    #0x2700,sr            | disable interrupts
     lea     0x10F300,sp
     move.b  #2,BIOS_USER_MODE     | tell BIOS we're running the game
-    bsr     platform_init         | neo geo-specific init
+    bsr.b   platform_init         | neo geo-specific init
     jmp     xevious_reset         | pass control to the xevious core
 
 title_display:
 * we're not doing things the NeoGeo way
     move.b  BIOS_SELECT_TIMER,d0
-    jmp       BIOSF_SYSTEM_RETURN
+    jmp     BIOSF_SYSTEM_RETURN
 
 _player_start:
 * we're not doing things the NeoGeo way
@@ -181,7 +181,7 @@ _coin_sound:
         
 _vblank:
     btst    #7,BIOS_SYSTEM_MODE
-    bne     .gamemode
+    bne.b   .gamemode
     jmp     BIOSF_SYSTEM_INT1
 .gamemode:
     movem.l d0-d7/a0-a6,-(a7)
@@ -192,52 +192,6 @@ _vblank:
     movem.l (a7)+,d0-d7/a0-a6
     move.w  #4,REG_IRQACK
     rte
-
-.if 0
-nmi: | 0066
-    clr.b     (_nmi_mask)
-*   ignore bit0 of IN2 test
-    tst.b     (_upright)                        | only 1 set of controls?
-    bne       1f                                | yes, skip
-    move.b    BIOS_P2CURRENT,d0                 | read IN2
-    tst.b     (_current_player_E)               | player 2?
-    bne       2f                                | yes, skip
-1:  move.b    BIOS_P1CURRENT,d0                 | read IN1
-2:  
-* re-map from neo geo
-* - dk       4=jump, 3=down,  2=up,   1=left, 0=right
-* - neogeo   4=jump, 3=right, 2=left, 1=down, 0=up
-    move.b    d0,d5
-    move.b    d0,d6
-    and.b     #0x10,d0                          | 4=jump
-    and.b     #0x03,d5                          | 1=down, 0=up
-    lsl.b     #2,d5                             | 3=down, 2=up
-    or.b      d5,d0                             | 4=jump, 3=down, 2=up
-    move.b    d6,d5
-    and.b     #4,d5                             | 2=left
-    lsr.b     #1,d5                             | 1=left        
-    or.b      d5,d0                             | 4=jump, 3=down, 2=up, 1=left
-    move.b    d6,d5
-    and.b     #8,d5                             | 3=right
-    lsr.b     #3,d5                             | 0=right
-    or.b      d5,d0                             | 4=jump, 3=down, 2=up, 1=left, 0=right
-*
-    move.b    d0,d1                             | d1=raw
-    and.b     #0x0f,d0                          | joystick only
-    move.b    d0,d2                             | d2=joystick only
-    move.b    (_last_raw_in),d0                 
-    neg.b     d0                                | negate
-    and.b     d1,d0                             | rising-edge detect
-    and.b     #0x10,d0                          | button only
-    lsl       #3,d0                             | shift to bit 7
-    or.b      d2,d0                             | add joystick bits
-    move.b    d1,(_last_raw_in)
-    move.b    d0,(_controller_in)
-*   ignore reset input
-nmi_exit:
-    move.b    #1,(_nmi_mask)
-    rts
-.endif
 
 osd_kick_wdog:
     KICK_WDOG
@@ -605,7 +559,7 @@ osd_w_fg_videoram:
     move.w    d0,d3                             | copy offset
     and.w     #0x3f,d3                          | row (sprite # indirectly)
     cmp.w     #FGNS,d3                          | visible?
-    bge       9f                                | no, skip
+    bge.b     9f                                | no, skip
     * use lookup for SBC1 offset
     lea       fg_offset_lookup_tbl,a0
     lsl.w     #1,d0
@@ -679,7 +633,7 @@ osd_update_scroll_hw:
     addq.w    #1,d1                             | scroll+1
     and.w     #0x01ff,d1                        | handle wrap
     cmp.w     (bg_scroll_x_r),d1                | same as last?
-    bne       arbitrary_scroll                  | no, recalculate entire screen
+    bne.w     arbitrary_scroll                  | no, recalculate entire screen
     * has scrolled down by 1 pixel row
     move.w    d6,(bg_scroll_x_r)
     and.w     #7,d6                             | bit offset
@@ -820,7 +774,7 @@ osd_update_sprite_shadow:
     lea       scb4_shadow,a4
     moveq     #64-1,d7
 1:  jsr       update_sprite_shadow
-    adda.w    #_OBJSIZE,a5
+    lea       (_OBJSIZE,a5),a5
     dbf       d7,1b
     rts
 
@@ -836,10 +790,10 @@ update_sprite_shadow: | $0332
     move.b    #1,(_STATE,a5)                    | state=1 (inactive)
     clr.w     (0,a3)                            | sprite0 size=0 (deactivate)
     clr.w     (2,a3)                            | sprite1 size=0 (deactivate)
-0:  adda.w    #2*4*2,a1
-    adda.w    #2,a2
-    adda.w    #2*2,a3
-    adda.w    #2*2,a4
+0:  lea       (2*4*2,a1),a1
+    lea       (2,a2),a2
+    lea       (2*2,a3),a3
+    lea       (2*2,a4),a4
     rts
 
     ** SCB1
@@ -1118,13 +1072,14 @@ osd_read_start:
 ***
 
 osd_read_high_scores:
+.if 0
     movem.l   d0-d7/a0-a6,-(a7)
     * try reading card data first
     move.b    #0x01,(BIOS_CRDF)
     move.w    #__NGH__,(BIOS_CRDNGH)
     jsr       BIOSF_CARD
     move.b    (BIOS_CRDRESULT),d0
-    bne.b     1f
+    bne.b     2f
     * found some data for Xevious
     move.b    #0x02,(BIOS_CRDF)
     move.w    #__NGH__,(BIOS_CRDNGH)
@@ -1135,6 +1090,11 @@ osd_read_high_scores:
     move.b    (BIOS_CRDRESULT),d0
     bne       9f                                | error reading, exit
     movem.l   (a7)+,d0-d7/a0-a6
+.else
+    move.l    (memcard_buf),d0
+    cmp.l     (memcard_hdr),d0                  | valid save data?
+    bne.b     1f                                | no, return
+.endif    
     * extract high score from entry 1
     lea       mc_scores,a2
     move.b    (0,a2),(a1)+
@@ -1144,19 +1104,20 @@ osd_read_high_scores:
     move.w    #16*5-1,d7
 0:  move.b    (a2)+,(a0)+
     dbf       d7,0b
-    rts
+1:  rts
+
     * handle card search data errors
-1:  cmp.b     #0x80,d0                          | not inserted?
+2:  cmp.b     #0x80,d0                          | not inserted?
     beq.b     9f                                | not, return
     cmp.b     #0x81,d0                          | not formatted?
-    bne.b     2f                                | not, go
+    bne.b     3f                                | not, go
     * format card
     move.b    #0x00,(BIOS_CRDF)
     jsr       BIOSF_CARD
     move.b    (BIOS_CRDRESULT),d0
     * not much we can do about failure
     bra.b     9f
-2:  cmp.b     #0x82,d0                          | no data?
+3:  cmp.b     #0x82,d0                          | no data?
     beq.b     9f                                | no data, return
     nop
 9:  movem.l   (a7)+,d0-d7/a0-a6
@@ -1174,6 +1135,8 @@ osd_write_high_scores:
     move.w    #16*5-1,d7
 2:  move.b    (a0)+,(a2)+
     dbf       d7,2b
+.if 0
+    *** write to memcard
     move.b    #0x03,(BIOS_CRDF)
     move.w    #__NGH__,(BIOS_CRDNGH)
     move.b    #0,(BIOS_CRDFILE)
@@ -1182,9 +1145,17 @@ osd_write_high_scores:
     jsr       BIOSF_CARD
     move.b    (BIOS_CRDRESULT),d0
     bne       9f                                | error writing, exit
+.else
+    *** write to BRAM
+    lea       0x10F300,a5
+    move.b    #1,(0xBBF,a5)                     | mark BRAM as being used
+    jsr       0xC12322                          | init_workbackup_ram
+    clr.b     (0xBBF,a5)                        | unmark BRAM as being used
+.endif
 9:  movem.l   (a7)+,d0-d7/a0-a6
     rts
 
+    .align 4
 memcard_hdr:
     .byte     'X','E','V','I','O','U','S',' '
     .byte     ' ',' ',' ',' ',' ',' ',' ',' '

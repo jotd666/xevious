@@ -309,12 +309,12 @@ main_fn_0__main_thread: | $049B
     bsr       clear_fg_to_transparent
     bsr       clear_bg_to_black
     bsr       init_high_score_table
-    
+.ifne OPT_ENABLE_HIGH_SCORE_IO    
     * added for 68K transcode
     lea       high_score_1st_msb,a0
     lea       RAM_high_score,a1
     jsr       osd_read_high_scores
-    
+.endif    
     * don't need to worry about cocktail mode
     move.b    #1,(scroll_disabled)
     move.w    #0xfff8,(scroll_delta)
@@ -1567,16 +1567,16 @@ name_entry_append_char: | $124A
     bsr       display_char
     move.w    d0,(name_entry_curr_char_screen_offset)
     subq.b    #1,(name_entry_char_cnt)          | last char?
-    bne.b     9f                                | no, skip
+    bne.b     9f                                | no, return
     
 name_entry_finished: | $1262
     * some writes to $A00X addresses, sound???
-    
+.ifne OPT_ENABLE_HIGH_SCORE_IO
     * added for 68K transcode
     lea       high_score_1st_msb,a0
     lea       RAM_high_score,a1
     jsr       osd_write_high_scores
-    
+.endif    
     bra       game_over
 
 9:  rts
@@ -6020,12 +6020,12 @@ solvalou_exploding:                     ds.b  1
 new_high_score_entry_index:             ds.b  1
 name_entry_char_cnt:                    ds.b  1
     .align 2
-name_entry_curr_char_screen_offset:     ds.w  2
+name_entry_curr_char_screen_offset:     ds.w  1
 name_entry_ptr_curr_char:               ds.l  1
 *** SPRITERAM_1_SHADOW was here ***
 * current player state information
 * - needs to be at least 64 ($40) bytes
-* - other needs to be the same
+* - 'other' (below) needs to be the same
 * need to read msb,Ks as a word
     .align 2
 curr_player_score_msb:                  ds.b  1
@@ -6130,6 +6130,6 @@ bg_videoram:                            ds.b  0x800
 
 * hitbox routines use sprite shadow register values
 * - but for efficiency they're in OSD format
-* - so maintain a 'raw' copy of X{8:1] & Y[7:0]
+* - so maintain a 'raw' copy of (X{8:0]+8)>>1 & ($EF-Y[7:0])
 * - layout is 64x Y,X pairs
 sprite_shadow_msb:                      ds.b  64*2
