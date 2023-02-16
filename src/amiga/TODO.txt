@@ -5,14 +5,13 @@
 * can be worked on my own:
 
 - sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
-- fg tile refresh not right
+- fg tile refresh not right for scores
 - sprites for big mothership (allows to use alternate brown/gold colors)
 - colored "hiscore"
-- double buffering on sprite layer to avoid flicker: maybe not needed
+- double buffering on sprite layer to avoid flicker
 - rip sounds
 - save/load hiscore
 - without whdload: screen garbled
 - killed: last position of sprites isn't erased (discontinuous) for
-  ground objects
-- possible bug (freeze) when using clear_plane (cpu version)
+  lower part objects (d0=32)
 - optim: cookie cut with fixed 0 source if plane_pic_0 (saves bandwidth)

@@ -20,7 +20,7 @@ _custom = 0xDFF000
 
 BASE_BPLCON3_VALUE = (1<<12)|(1<<10)
 NB_PLAYFIELD_PLANES = 4
-FG_DIRTY_TILES_SIZE = 40*32
+FG_DIRTY_TILES_SIZE = 64*32
 TOTAL_NB_COLORS = 32   | 16+16
 NB_BYTES_PER_ROW = 40
 NB_LINES = 288
@@ -1066,11 +1066,11 @@ osd_update_32_sprite_hw:
 	* erase previous sprite position
 	move.w	(4,a5),d1   | Y
 	sub.w	#4*8,d1
-	bmi.b		11f		| not visible
+	bmi		11f		| not visible
 	cmp.w	min_sprite_y(pc),d1
-	bcs.b	11f
+	bcs	11f
 	cmp.w	max_sprite_y(pc),d1
-	bcc.b	11f
+	bcc	11f
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
 	
@@ -1106,19 +1106,18 @@ osd_update_32_sprite_hw:
 	* offset = (32-x)<<6 + y
 	lsl.w	#6,d0
 	add.w	d1,d0	| should do it
+	addq	#1,d0
 	bclr	#0,d0	| even
-	addq	#2,d0
 	
 	* mark a 4x4 square as dirty
 	lea	fg_dirty_tiles,a0
 	move.l	#-1,d1
 	move.l	#1<<6,d2
+	.rept	4
 	move.l	d1,(a0,d0.w)	| 4 in a column (Y)
 	sub.l	d2,d0		| increase X
-	move.l	d1,(a0,d0.w)
-	sub.l	d2,d0		| increase X
-	move.l	d1,(a0,d0.w)
-	sub.l	d2,d0		| increase X
+	bmi.b	11f
+	.endr
 	move.l	d1,(a0,d0.w)
 11:
 
@@ -1220,11 +1219,7 @@ osd_update_32_sprite_hw:
 
 	* now restore all foreground tiles behind the previous
 	* positions of the previously active objects
-	
-	*move.w	#31,d4			| 32 sprites
-	*lea		fg_colorram,a1
-	*lea		fg_videoram,a2
-	
+		
 	* then back up current object state (X,Y,STATE) for next update
 	move.l	(a7)+,a4
 	move.w	#NB_SPRITES_TOTAL/2-1,d0	| 32*8 bytes
@@ -1261,9 +1256,9 @@ osd_update_32_sprite_hw:
 	subq.l	#1,d0
 	move.b	(a5,d0.w),d1	| fetch tile from character grid
 	cmp.b	#BLANK_FG_TILE_ID,d1
-	beq.b	4b				| no need to OR with blank tile
+	beq.b	4b				| no need to OR if blank tile
 	move.b	(a4,d0.w),d2	| fetch tile from color grid
-	**move.b	#17,d1
+	**move.b	#17,d1	| uncomment to test with "H" chars
 	* now update tile to reflect the color change
 	movem.l	d3-d4/a2-a5,-(a7)
 	bsr	update_fg_tile
@@ -1833,7 +1828,7 @@ original_palette:
 
 		.align 4
 	
-	ds.b	96		| safety/margin
+	ds.b	480		| safety/margin, probably writes in here when X is low
 fg_dirty_tiles:
 	ds.b	FG_DIRTY_TILES_SIZE
 	ds.b	96		| safety/margin
