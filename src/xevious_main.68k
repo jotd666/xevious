@@ -3950,10 +3950,12 @@ handle_01_Bacura: | $2B23
     addq.b    #1,(_Y,a5)                        | MSB
     bsr       save_PC_to_fn_tbl_and_ret
     move.w    (_X,a5),d0                        | spriteX[8:0]<<5
-    lsr.w     #7,d0                             | spritex[8:2]
-    and.w     #7,d0                             | spriteX[4:2]
-    movea.l   #bacura_sprite_tbl,a0
-    lsl.w     #1,d0                             | x2
+    *lsr.w     #7,d0                             | spriteX[8:2]
+    lsr.w     #6,d0                             | spriteX[8:1]
+    *and.w     #7,d0                             | spriteX[4:2]
+    and.w     #0x0e,d0                          | spriteX[4:2][0]
+    lea       bacura_sprite_tbl,a0
+    *lsl.w     #1,d0                             | x2 - entry offset
     move.b    (a0,d0.w),(_COLOUR,a5)
     move.b    (1,a0,d0.w),(_CODE,a5)
     bsr       move_object_dX
@@ -3972,7 +3974,7 @@ bacura_sprite_tbl: | $2B5D
     .byte 0x2C, 0x2D
        
 handle_06_Bullet: | $2B6D
-    movea.l   #angle_dX_dY_tbl,a2
+    lea       angle_dX_dY_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     bsr       save_PC_to_fn_tbl_and_ret
     bsr       move_object_dX_dY
@@ -3984,259 +3986,261 @@ handle_07_Garu_Zakato_Bullet: | $2B79
                         
 handle_2C_Grobda_stationary: | $2B83
     move.w    #8,d0                             | dX=8 (stop)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #21,(_PTS,a5)                     | 200 pts
     move.b    #0x4c,(_CODE,a5)
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit
-    bra       set_object_colour_and_move_dX
+    bsr       check_grobda_hit
+    bra       set_grobda_colour_and_move_dX
 
 * 
 * Grobda (Tank/Stingray) 400 pts
 * - moving
 handle_35_Grobda_fwd: | $2B96
     move.w    #14,d0                            | dX=14 (fwd)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #30,(_PTS,a5)                     | 400 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 * Grobda (Tank/Stingray) 600 pts
 * - moves forward (forever) when in crosshairs
 handle_36_Grobda_crosshairs_fwd: | $2BA6
     move.w    #8,d0                             | dX=8 (stop)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #36,(_PTS,a5)                     | 600 pts
     move.b    #0x4c,(_CODE,a5)
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit
-    bsr       check_grobda_in_crosshairs
-    bcs       grobda_start_moving_fwd   
-    bra       set_object_colour_and_move_dX
+    bsr       check_grobda_hit
+    bsr       check_grobda_in_crosshairs        | in crosshairs?
+    bcs.b     grobda_start_moving_fwd           | yes, go
+    bra       set_grobda_colour_and_move_dX
 
 grobda_start_moving_fwd: | $2BBE
     move.w    #14,(_dX,a5)                      | dX=14 (fwd)
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX     | yes, Z80 code does JR $00
         
-set_object_colour_and_move_dX: | $2BD5
+set_grobda_colour_and_move_dX: | $2BD5
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     bsr       move_object_dX
     bra       add_obj_handler
+
+* (code for 37_Grobda unused was here)
 
 * Grobda (Tank/Stingray) 1,000 pts
 * - moving, stops when in crosshairs
 handle_38_Grobda_fwd_crosshairs_stop_fwd: | $2C2E
     move.w    #14,d0                            | dX=14 (fwd)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #48,(_PTS,a5)                     | 1,000 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit
-    bsr       check_grobda_in_crosshairs
-    bcs       grobda_stops_in_crosshairs
+    bsr       check_grobda_hit
+    bsr       check_grobda_in_crosshairs        | in crosshairs?
+    bcs.b     grobda_stops_in_crosshairs        | yes, go
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 grobda_stops_in_crosshairs: | $2C44
     move.w    #8,(_dX,a5)                       | stop
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     subq.b    #1,(_TIMER,a5)                    | start moving again?
-    beq       1f                                | yes, go
-    bra       set_object_colour_and_move_dX
+    beq.b     1f                                | yes, go
+    bra       set_grobda_colour_and_move_dX
 1:  move.w    #14,(_dX,a5)                      | fwd
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 * Grobda (Tank/Stingray) 1,500 pts
 * - darts backwards when targeted
 handle_39_Grobda_targeted_back_stop: | $2C77
     move.w    #8,d0                             | dX=8 (stop)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #51,(_PTS,a5)                     | 1,500 pts
     move.b    #0x4c,(_CODE,a5)
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit
-    bsr       check_targeted_and_init_timer
-    bcs       grobda_dart_back
-    bra       set_object_colour_and_move_dX
+    bsr       check_grobda_hit
+    bsr       check_targeted_and_init_timer     | targeted?
+    bcs.b     grobda_dart_back                  | yes, go
+    bra       set_grobda_colour_and_move_dX
 
 grobda_dart_back: | $2C90
     move.w    #2,(_dX,a5)                       | backwards
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     subq.b    #1,(_TIMER,a5)                    | dec timer
-    beq       grobda_stop
+    beq.b     grobda_stop
     bsr       animate_grobda_backwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 grobda_stop: | $2CAD
     move.w    #8,(_dX,a5)                       | stop
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
-    bra       set_object_colour_and_move_dX
+    bsr       check_grobda_hit
+    bra       set_grobda_colour_and_move_dX
 
 * Grobda (Tank/Stingray) 2,000 pts
 * - moving, darts forward when targeted
 handle_3A_Grobda_fwd_crosshairs_darts_fwd: | $2CC4
     move.w    #14,d0                            | dX=14 (fwd)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #54,(_PTS,a5)                     | 2,000 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit
-    bsr       check_grobda_in_crosshairs
-    bcs       grobda_darts_fwd_in_crosshairs
+    bsr       check_grobda_hit
+    bsr       check_grobda_in_crosshairs        | in crosshairs?
+    bcs.b     grobda_darts_fwd_in_crosshairs    | yes, go
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
     
 grobda_darts_fwd_in_crosshairs: | $2CDB
     move.w    #22,(_dX,a5)                      | fast fwd
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     subq.b    #1,(_TIMER,a5)                    | stop darting?
-    beq       1f                                | yes, go
+    beq.b     1f                                | yes, go
     bsr       animate_grobda_fast_forward
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 1:  move.w    #14,(_dX,a5)                      | fwd
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 * Grobda (Tank/Stingray) 2,500 pts
 * - moving, darts back then forward when targeted
 handle_3B_Grobda_fwd_targeted_back_fwd: | $2D10
     move.w    #14,d0                            | dX=14 (fwd)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #57,(_PTS,a5)                     | 2,500 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit
-    bsr       check_targeted_and_init_timer
-    bcs       grobda_3B_dart_back
+    bsr       check_grobda_hit
+    bsr       check_targeted_and_init_timer     | targeted?
+    bcs.b     grobda_3B_dart_back               | yes, go
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 grobda_3B_dart_back: | $2D27
     move.w    #2,(_dX,a5)                       | backwards
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     subq.b    #1,(_TIMER,a5)                    | time to change dir?
-    beq       grobda_3B_dart_fwd                | yes, go
+    beq.b     grobda_3B_dart_fwd                | yes, go
     bsr       animate_grobda_backwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 grobda_3B_dart_fwd: | $2D44
     move.w    #14,(_dX,a5)                      | forward
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 handle_3C_Grobda_targeted_fast_fwd: | $2D5C
     move.w    #8,d0                             | dX=8 (stop)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #63,(_PTS,a5)                     | 10,000 pts
     move.b    #0x4c,(_CODE,a5)
     bsr       save_PC_to_fn_tbl_and_ret
 loc_2D68:   
-    bsr       check_object_hit
-    bsr       check_targeted_and_init_timer
-    bcs       1f
-    bra       set_object_colour_and_move_dX   
+    bsr       check_grobda_hit
+    bsr       check_targeted_and_init_timer     | targeted?
+    bcs.b     1f                                | yes, go
+    bra       set_grobda_colour_and_move_dX   
 1:  move.w    #22,(_dX,a5)                      | fast fwd
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit
+    bsr       check_grobda_hit
     subq.b    #1,(_TIMER,a5)                    | dec timer
-    beq       2f
+    beq.b     2f
     bsr       animate_grobda_fast_forward
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 2:  move.w    #8,(_dX,a5)                       | stop
     SET_REENTRY_ADDR_HERE
     bra       loc_2D68    
         
 * Grobda (Tank/Stingray) 200 pts
-* - stationary (same behaviour as $2C)
+* - stationary (crater removed when hit)
 handle_3D_Grobda_stationary_in_water: | $2DA3
     move.w    #8,d0                             | dX=8 (stop)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #21,(_PTS,a5)                     | 200 pts
     move.b    #0x4c,(_CODE,a5)
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit_and_remove
-    bra       set_object_colour_and_move_dX
+    bsr       check_grobda_hit_and_remove
+    bra       set_grobda_colour_and_move_dX
 
 * Grobda (Tank/Stingray) 400 pts
 * - moving
 handle_3E_Grobda_fwd_in_water: | $2DB7
     move.w    #14,d0                            | dX=14 (fwd)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #30,(_PTS,a5)                     | 400 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit_and_remove
+    bsr       check_grobda_hit_and_remove
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 * Grobda (Tank/Stingray) 600 pts
 * - moves forward when in crosshairs
 handle_3F_Grobda_crosshairs_fwd_in_water: | $2DC8
     move.w    #8,d0                             | dX=8 (stop)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #36,(_PTS,a5)                     | 600 pts
     move.b    #0x4c,(_CODE,a5)
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit_and_remove
-    bsr       check_grobda_in_crosshairs
-    bcs       1f
-    bra       set_object_colour_and_move_dX
+    bsr       check_grobda_hit_and_remove
+    bsr       check_grobda_in_crosshairs        | in crosshairs?
+    bcs.b     1f                                | yes, go
+    bra       set_grobda_colour_and_move_dX
 1:  move.w    #14,(_dX,a5)                      | fwd
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit_and_remove
+    bsr       check_grobda_hit_and_remove
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
 * Grobda (Tank/Stingray) 2,500 pts
 * - moves forward, then back, then fwd when targeted
 handle_40_Grobda_fwd_targeted_back_fwd_in_water: | $2DF9
     move.w    #14,d0                            | dX=14 (fwd)
-    bsr       activate_and_set_object_dX
+    bsr       activate_and_set_grobda_dX
     move.b    #57,(_PTS,a5)                     | 2,500 pts
     bsr       save_PC_to_fn_tbl_and_ret
-    bsr       check_object_hit_and_remove
-    bsr       check_targeted_and_init_timer
-    bcs       1f
+    bsr       check_grobda_hit_and_remove
+    bsr       check_targeted_and_init_timer     | targeted?
+    bcs.b     1f                                | yes, go
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 1:  move.w    #2,(_dX,a5)                       | backwards
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit_and_remove
+    bsr.b     check_grobda_hit_and_remove
     subq.b    #1,(_TIMER,a5)                    | time to move fwd?
-    beq       2f                                | yes, go
+    beq.b     2f                                | yes, go
     bsr       animate_grobda_backwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 2:  move.w    #14,(_dX,a5)                      | forwards    
     SET_REENTRY_ADDR_HERE
-    bsr       check_object_hit_and_remove
+    bsr.b     check_grobda_hit_and_remove
     bsr       animate_grobda_forwards
-    bra       set_object_colour_and_move_dX
+    bra       set_grobda_colour_and_move_dX
 
-check_object_hit: | $2E45
+check_grobda_hit: | $2E45
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       1f                                | yes, go
+    beq.b     1f                                | yes, go
     rts
-1:  adda.l    #4,a7                             | return up call stack
+1:  lea       (4,a7),a7                         | return up call stack
     bra       handle_bomb_explosion
 
-check_object_hit_and_remove: | $2E55
+check_grobda_hit_and_remove: | $2E55
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       1f                                | yes, go
+    beq.b     1f                                | yes, go
     rts
-1:  adda.l    #4,a7                             | return up call stack
+1:  lea       (4,a7),a7                         | return up call stack
     bra       explode_and_remove_object
 
 animate_grobda_forwards: | $2E65
@@ -4265,7 +4269,7 @@ animate_grobda_fast_forward: | $2E81
     rts
             
 * d0.w=dX
-activate_and_set_object_dX: | $2E8C
+activate_and_set_grobda_dX: | $2E8C
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | size=0
     move.w    d0,(_dX,a5)
@@ -4273,33 +4277,33 @@ activate_and_set_object_dX: | $2E8C
     rts
 
 check_targeted_and_init_timer: | $2EA0
-    movea.l   #obj_tbl+_OBJSIZE*0x20,a0
-    move.b    (_X,a0),d0                        | MSB X crosshairs
+    lea       obj_tbl+_OBJSIZE*0x20,a0
+    move.b    (_X,a0),d0                        | MSB X bomb target
     sub.b     (_X,a5),d0                        | MSB X object
     subq.b    #2,d0
-    addq.b    #4,d0
-    bcc       9f
-    move.b    (_Y,a0),d0                        | MSB Y crosshairs
+    addq.b    #4,d0                             | match?
+    bcc.b     9f                                | no, exit
+    move.b    (_Y,a0),d0                        | MSB Y bomb target
     sub.b     (_Y,a5),d0                        | MSB Y object
     subq.b    #2,d0
-    addq.b    #4,d0
-    bcc       9f
+    addq.b    #4,d0                             | match?
+    bcc.b     9f                                | no, exit
     move.b    #48,(_TIMER,a5)                   | init timer
     ori.b     #(1<<0),ccr                       | restore C flag
 9:  rts
     
 check_grobda_in_crosshairs: | $2EBB
-    movea.l   #obj_tbl+_OBJSIZE*0x22,a0         | crosshairs
-    move.b    (_X,a0),d0                        | MSB X
-    sub.b     (_X,a5),d0
+    lea       obj_tbl+_OBJSIZE*0x22,a0          | crosshairs
+    move.b    (_X,a0),d0                        | MSB X crosshairs
+    sub.b     (_X,a5),d0                        | MSB X object
     subq.b    #2,d0
-    addq.b    #4,d0
-    bcc       9f
-    move.b    (_Y,a0),d0                        | MSB Y
-    sub.b     (_Y,a5),d0
+    addq.b    #4,d0                             | match?
+    bcc.b     9f                                | no, exit
+    move.b    (_Y,a0),d0                        | MSB Y crosshairs
+    sub.b     (_Y,a5),d0                        | MSB Y object
     subq.b    #2,d0
-    addq.b    #4,d0
-    bcc       9f
+    addq.b    #4,d0                             | match?
+    bcc.b     9f                                | no, exit
     move.b    #48,(_TIMER,a5)                   | init timer
     ori.b     #(1<<0),ccr                       | restore C flag
 9:  rts
@@ -4313,7 +4317,7 @@ check_grobda_in_crosshairs: | $2EBB
 * - path data length in object timer table+1
 handle_2E_Domogram: | $2ED6
     move.b    #2,(_STATE,a5)
-    clr.b     (_ATTR,a5)                        | size=1x1
+    clr.b     (_ATTR,a5)                        | bank=0, size=1x1
     move.b    #0x3c,(_CODE,a5)
     move.b    #42,(_PTS,a5)                     | 800 pts
     move.b    #1,(_VECLEN,a5)                   | flag vector finished
@@ -4327,18 +4331,18 @@ handle_2E_Domogram: | $2ED6
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq       handle_bomb_explosion             | yes, go
     subq.b    #1,(_VECLEN,a5)                   | vector done?
-    bne       domogram_main                     | no, go
+    bne.b     domogram_main                     | no, go
 * get next path vector
     move.l    (_EXTRA,a5),a0                    | ptr path data
     move.b    (a0)+,(_VECLEN,a5)
     moveq     #0,d2
     move.b    (a0)+,d2                          | vector index
     move.l    a0,(_EXTRA,a5)                    | store updated ptr path data
-    movea.l   #domogram_vector_tbl,a2
+    lea       domogram_vector_tbl,a2
     bsr       cpy_dY_dX_to_obj
     subq.b    #1,(_NVEC,a5)                     | dec num vectors
-    beq       domogram_done_all_vectors
-    bra       domogram_main
+    beq.b     domogram_done_all_vectors
+    bra.b     domogram_main
 
 domogram_done_all_vectors: | $2F3E
     SET_REENTRY_ADDR_HERE
@@ -4348,22 +4352,22 @@ domogram_done_all_vectors: | $2F3E
     
 domogram_main: | $2F54
     tst.b     (_TYPE,a5)                        | animation shot timer
-    bne       domogram_shooting
+    bne.b     domogram_shooting
     move.b    (gnd_stop_firing_row),d0
     cmp.b     (_X,a5),d0                        | MSB. stop firing?
-    bcs       domogram_colour_and_move          | yes, go
+    bcs.b     domogram_colour_and_move          | yes, go
     move.b    (countup_timer_1),d0
     and.b     #7,d0                             | time to dec shot timer?
-    bne       domogram_colour_and_move          | no, go
+    bne.b     domogram_colour_and_move          | no, go
     subq.b    #1,(_TIMER,a5)                    | time to shoot?
-    bne       domogram_colour_and_move          | no, go
+    bne.b     domogram_colour_and_move          | no, go
     move.b    #24,(_TYPE,a5)                    | init animation timer
     
 domogram_shooting: | $2F76
     subq.b    #1,(_TYPE,a5)                     | dec animation timer
     move.b    (_TYPE,a5),d0
     cmp.b     #12, d0                           | time to spawn bullet?
-    bne       domogram_animate_sprite           | no, go
+    bne.b     domogram_animate_sprite           | no, go
     bsr       init_new_bullet
     bsr       pseudo_random_gen                 | rnd shot timer
     and.b     (_FFREQ,a5),d0                    | scale with mask
@@ -4374,7 +4378,7 @@ domogram_shooting: | $2F76
 domogram_animate_sprite: | $2F8C
     lsr.b     #2,d0
     and.w     #7,d0
-    movea.l   #domogram_sprite_tbl,a0
+    lea       domogram_sprite_tbl,a0
     move.b    (a0,d0.w),(_CODE,a5)
 
 domogram_colour_and_move: | $2F99
