@@ -96,26 +96,10 @@ mul\value\()_table:
 * the non shifted version is just so simple...
 * huge thanks to dual playfield and bplcon1 x-shift!
 .macro	SET_FG_BYTE
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	move.b	(a0)+,d0
-	move.b	d0,(offset,a1)
-	move.b	d0,(offset,a2)
-	.else
 	move.b	(a0)+,(offset,a1)
-	.endif
 	.endm
-.macro	CLR_FG_BYTE
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	clr.b	(offset,a2)
-	.endif
-	clr.b	(offset,a1)
-	.endm
+
 .macro	OR_FG_BYTE
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	move.b	(offset,a2),d0
-	or.b	(a0),d0
-	move.b	d0,(offset,a2)
-	.endif
 	move.b	(offset,a1),d0
 	or.b	(a0)+,d0
 	move.b	d0,(offset,a1)
@@ -949,10 +933,8 @@ update_fg_tile:
 	bcs.b	1f
 	sub.w	#40*4,d0
 1:	
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	lea	(fg_screen_data_2,d0.w),a2
-	.endif
-	lea	(fg_screen_data_1,d0.w),a1
+	move.l	fg_drawed_screen_ptr(pc),a1
+	lea		(a1,d0.w),a1
 	cmp.w	#FG_TILE_DRAW_FULL,d3
 	bne.w	5f
 	
@@ -976,7 +958,8 @@ update_fg_tile:
 5:
 	cmp.w	#FG_TILE_CLEAR,d3
 	beq	6f
-	* draw
+	* or it. This is the "tile refresh" mode. We just need
+	* to refresh the back buffer, not the one being shown
 	btst	#7,d4
 	bne	2f
 	.set	offset,0
@@ -995,10 +978,25 @@ update_fg_tile:
 	rts
 6:
 	* clear
+	* because systematic tile refresh is optimized
+	* clearing has to clear tiles immediately on BOTH
+	* buffers else the effect is weird
+	* (on INSERT COIN flashing message)
+	*
+	* this is the best compromise as tile clearing happens
+	* rarely compared to refreshes
+	*
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	move.l	fg_displayed_screen_ptr(pc),a2
+	lea		(a2,d0.w),a2
+	.endif
 
 	.set	offset,0
 	.rept		8
-	CLR_FG_BYTE
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	clr.b	(offset,a2)
+	.endif
+	clr.b	(offset,a1)
 	.set	offset,offset+NB_BYTES_PER_ROW
 	.endr
 	rts
@@ -1222,18 +1220,22 @@ osd_update_32_sprite_hw:
 	dbf		d0,3b
 
 	
-	* in the end, redraw dirty foreground tiles
+	* in the end, redraw all foreground tiles
+	* this is much faster and simpler than marking the
+	* "dirty" tiles, because if the tile is empty nothing
+	* is done anyway
+	
 	moveq	#0,d0
 	lea		fg_colorram,a4
 	lea		fg_videoram,a5
 	moveq	#FG_TILE_DRAW_OR,d3
+	* wait blit to avoid surprises with unfinished blits
 	bsr		wait_blit
 4:
 	move.b	(a5,d0.w),d1	| fetch tile from character grid
 	cmp.b	#BLANK_FG_TILE_ID,d1
 	beq.b	5f				| no need to OR if blank tile
 	move.b	(a4,d0.w),d2	| fetch tile from color grid
-	**move.b	#17,d1	| uncomment to test with "H" chars
 	* now update tile to reflect the color change
 	movem.l	d0/d3/a2-a5,-(a7)
 	bsr	update_fg_tile
