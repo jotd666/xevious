@@ -4,13 +4,14 @@
 
 * can be worked on my own:
 
+- button pulse pour hiscore entry NW
+- dump sprites in one image without palette
 - sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
 - fg tile refresh not right for scores
-- sprites for big mothership (allows to use alternate brown/gold colors)
+- sprites for big mothership (allows to use alternate brown/gold colors): set section 14
 - colored "hiscore"
-- double buffering on sprite layer to avoid flicker
+- double buffering on sprite layer to avoid flicker: in test
 - rip sounds
-- save/load hiscore
 - without whdload: screen garbled
 - killed: last position of sprites isn't erased (discontinuous) for
   lower part objects (d0=32)
