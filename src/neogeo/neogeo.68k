@@ -197,10 +197,16 @@ osd_kick_wdog:
     KICK_WDOG
     rts
 
-    .equ    SPRITEX_0,        8
-    .equ    SPRITEY_0,        (0x1F0)
+    .equ    SPRITEX_0,              8
+    .equ    SPRITEY_0,              (0x1F0)
+                                    
+    .equ    SCB3_STICKY,            (1<<6)
 
-    .equ    SCB3_STICKY,      (1<<6)
+* NEO GEO FIX LAYER tile allocations
+    
+    .equ    FG_FIX_BASE,            0x0400
+    .equ    FG_ASCII_TRANS_BASE,    0x0500
+    .equ    FG_ASCII_OPAQUE_BASE,   0x0600
     
 * NEO GEO sprite allocations
 * -   0- 31 (unused)
@@ -209,27 +215,27 @@ osd_kick_wdog:
 * - 224-263 (36+4) foreground tilemap
 * - 264-265 (2) visible display masking sprites
 
-    .equ    BGSS,             32
-    .equ    XSSS,             96
-    .equ    FGSS,             224
-    .equ    DMSS,             264
+    .equ    BGSS,                   32
+    .equ    XSSS,                   96
+    .equ    FGSS,                   224
+    .equ    DMSS,                   264
+                                    
+    .equ    BGNS,                   64
+    .equ    XSNS,                   128
+    .equ    FGNS,                   36+4
+    .equ    DMNS,                   2
 
-    .equ    BGNS,             64
-    .equ    XSNS,             128
-    .equ    FGNS,             36+4
-    .equ    DMNS,             2
-
-    .equ    FG_TILE_BASE,     0x0200
-    .equ    BG_TILE_BASE,     0x0600
-    .equ    XS_TILE_BASE,     0x0A00
+    .equ    FG_TILE_BASE,           0x0200
+    .equ    BG_TILE_BASE,           0x0600
+    .equ    XS_TILE_BASE,           0x0A00
     
     * fg and bg tiles share the first 128 palettes
     * - fg uses colours 0-1 in each palette
     * - bg uses colours 8-11 in each palette
-    .equ    FG_PAL_BASE,      0
-    .equ    BG_PAL_BASE,      0
+    .equ    FG_PAL_BASE,            0
+    .equ    BG_PAL_BASE,            0
     * sprites use the second 128 palettes
-    .equ    XS_PAL_BASE,      128           
+    .equ    XS_PAL_BASE,            128           
     
 platform_init:
 
@@ -242,6 +248,7 @@ platform_init:
     jsr       BIOSF_LSP_1ST
 
 * setup palette(s)
+    clr.b     REG_PALBANK0
     lea       _xevious_tile_palette.l,a0
     lea       PALETTES,a1                       | start at palette #0
     move.w    #128-1,d7                         | 128 palettes
@@ -489,6 +496,52 @@ platform_init:
     move.b    #1,(REG_ENVIDEO)                  | enable video
 .endif
 
+.ifeq OPT_SKIP_SPLASH
+    clr.b     REG_PALBANK1                      | alt palette bank
+    lea       PALETTES,a0
+    * palette 0 - transparent/high score colour/black
+    move.w    #0x8000,(0,a0)
+    move.w    (_xevious_tile_palette+0x1f*32+2),d0
+    move.w    d0,(2,a0)
+    move.w    #BLACK,(4,a0)
+    * palette 1 - transparent/black/white
+    lea       (32,a0),a0
+    move.w    #0,(0,a0)
+    move.w    #BLACK,(2,a0)
+    move.w    #WHITE,(4,a0)
+    * palette 2 - transparent/solvalou symbol colour/black
+    lea       (32,a0),a0
+    move.w    #0,(0,a0)
+    move.w    (_xevious_tile_palette+0x2a*32+2),d0
+    move.w    d0,(2,a0)
+    move.w    #BLACK,(4,a0)
+    ** show splash screen on fix layer
+    lea       VRAM_RW.l,a0
+    move.w    #1,(2,a0)                         | VRAM_MOD=1
+    lea       splash,a1
+    move.w    #FIXMAP+(37*32),d1
+    lea       splash_attr,a2
+1:  move.w    d1,(-2,a0)                        | VRAM_ADDR
+    move.w    #FG_ASCII_OPAQUE_BASE,d0          | tile base
+    or.w      (a2)+,d0                          | line attribute
+    moveq     #32-1,d6                          | 32 chars per line
+    
+2:  move.b    (a1)+,d0
+    move.w    d0,(a0)                           | VRAM
+    dbf       d6,2b                             | do line
+    sub.w     #32,d1                            | next line VRAM address
+    tst.b     (a1)                              | last line?
+    bne.b     1b                                | no, loop
+    *
+3:  KICK_WDOG
+    jsr       BIOSF_SYSTEM_IO                   | update inputs etc
+    move.b    BIOS_P1CURRENT,d0                 | read IN1
+    and.b     #0xf0,d0                          | any buttons pressed?
+    beq.b     3b                                | no, loop
+    jsr       BIOSF_FIX_CLEAR
+    clr.b     REG_PALBANK0                      | main palette bank
+.endif | OPT_SKIP_SPLASH
+
     * some working variables
     move.w    #0,(btm_sprite)
     move.w    #0,(bg_scroll_x_r)
@@ -496,6 +549,55 @@ platform_init:
 5:  KICK_WDOG
     rts
 
+splash:
+    *         "  [--------------------------]  "
+    .ascii    "                                "
+    .ascii    "            XEVIOUS     Beta1   "
+    .ascii    "                                "
+    .ascii    "            NGH 420             "
+    .ascii    "                                "
+    .ascii    "  This is a 68K transcode of    "
+    .ascii    "  the arcade game Xevious       "
+    .ascii    "  released by Namco in 1983.    "
+    .ascii    "                                "
+    .ascii    "  The core is a line-by-line    "
+    .ascii    "  translation of the Z80        "
+    .ascii    "  assembler code in the MAIN    "
+    .ascii    "  and SUB CPU ROMs. Every       "
+    .ascii    "  nuance and every bug is       "
+    .ascii    "  faithfully replicated in      "
+    .ascii    "  the transcode. The graphics   "
+    .ascii    "  and palette have been         "
+    .ascii    "  ripped as-is from the         "
+    .ascii    "  arcade ROMs for use in this   "
+    .ascii    "  version.                      "
+    .ascii    "                                "
+    .ascii    "  The core itself is platform   "
+    .ascii    "  agnostic and can be ported    "
+    .ascii    "  to other 68K systems with a   "
+    .ascii    "  well defined API.             "
+    .ascii    "                                "
+    .ascii    "  The Neo Geo version supports  "
+    .ascii    "  high score load & save on     "
+    .ascii    "  both BRAM and memory card.    "
+    .ascii    "                                "
+    .ascii    "  Arcade dipswitches are        "
+    .ascii    "  supported via the soft DIP    "
+    .ascii    "  settings.                     "
+    .ascii    "                                "
+    .ascii    "     Copyright 2023 tcdev       "
+    .ascii    "    retroports.blogspot.com     "
+    .byte     0
+    .align 2
+
+splash_attr:
+    .word     0x0000, 0x0000, 0x0000, 0x0000
+    .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
+    .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
+    .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
+    .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
+    .word     0x2000, 0x2000
+            
 * 60Hz VBLANK interrupt
 osd_enable_vblank_interrupt:
     move      #0x2000,sr                        | enable interrupts
