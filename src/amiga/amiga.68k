@@ -392,6 +392,29 @@ _vblank:
 	bra.b	3f
 1:
 	* has to be copper
+	* let's switch screen buffers
+	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
+	* toggle fg planes (double buffering)
+	lea		fg_drawed_screen_ptr(pc),a0
+	lea		fg_displayed_screen_ptr(pc),a4
+	lea		fg_screen_data_1,a1
+	lea		fg_screen_data_2,a5
+	* also switch previous state memory
+	lea		previous_sprite_state_1(pc),a3
+	lea		previous_sprite_state_ptr(pc),a2
+	cmp.l	(a0),a1
+	bne.b	2f
+	* screen data 1 is displayed screen
+	* set it to drawn screen
+	exg		a1,a5
+	lea		previous_sprite_state_2(pc),a3
+2:
+	move.l	a3,(a2)
+	move.l	a1,(a0)
+	move.l	a5,(a4)
+	bsr		set_fg_bitplanes
+	.endif
+	
 	jsr		xevious_im1_irq
 	
     move.w  vbl_counter(pc),d0
@@ -903,6 +926,8 @@ update_fg_tile:
 	.endif
 	* update color for that row
 	lea	_fg_color_table,a1
+	tst	d1
+	beq.b	0f		| don't update row 0
 	.ifdef	NO68020
 	move.w	d1,d5
 	add.w	d5,d5
@@ -912,7 +937,7 @@ update_fg_tile:
 	move.l	(a1,d1.w*4),a1	
 	.endif
 	move.w	d2,(a1)			| color palette index
-
+0:
 	tst	d3
 	bne.b	4f
 	* no need to draw tile, called from color change
@@ -1032,37 +1057,22 @@ osd_update_sprite_shadow:
 
 
 * d0 = base sprite number (0/32)
+*
+* Since sprites aren't really sprites but BOBs
+* updating only the relevant half of
+* the sprites trashes the other half when pre-erasing
+* the latter sprites if some sprites had been previously
+* drawed here. This and also leftovers of BOBs when player
+* is killed. So, too complicated, let's update everything
+* just store the previous positions only by half (because the
+* others aren't updated anyway)
+
 osd_update_32_sprite_hw:
 	move.w	d0,d7
-	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
-	bne.b	2f
-	* change bitplanes to show previous planes
-	bsr		set_fg_bitplanes
-	
-	* toggle fg planes (double buffering)
-	lea		previous_sprite_state_ptr(pc),a2
-	lea		fg_screen_pointer(pc),a0
-	lea		fg_screen_data_1,a1
-	lea		previous_sprite_state_1(pc),a3
-	cmp.l	(a0),a1
-	bne.b	1f
-	lea		fg_screen_data_2,a1
-	lea		previous_sprite_state_2(pc),a3
-1:
-	move.l	a3,(a2)
-	move.l	a1,(a0)
-	.endif
-2:	
+
 	*lsl.w	#8,d0
 	*add.w	#0xc00,d0
 	*move.w	d0,_custom+color
-	
-	clr.w	min_sprite_y
-	move.w	#NB_LINES/2+16,max_sprite_y
-	tst.w	d7
-	beq.b	0f
-	move.w	#NB_LINES/2-16,min_sprite_y
-	move.w	#NB_LINES,max_sprite_y
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
@@ -1077,17 +1087,17 @@ osd_update_32_sprite_hw:
 	beq.w	11f
 	* erase previous sprite position
 	move.w	(4,a5),d1   | Y
-	sub.w	#4*8,d1
-	bmi		11f		| not visible
-	cmp.w	min_sprite_y(pc),d1
-	bcs	11f
-	cmp.w	max_sprite_y(pc),d1
-	bcc	11f
+	* 32 first Y pos aren't displayed
+	* also add -2 y offset to allow proper erase too
+	sub.w	#4*8+2,d1
+	bpl.b		3f
+	moveq	#0,d1		| fix issues with non deleted objects at top
+3:
+
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
 	
-	subq.w	#2,d1		| empiric
-	move.l		fg_screen_pointer(pc),a1
+	move.l		fg_drawed_screen_ptr(pc),a1
     move.w  #18,d3	| height
 	move.w	#4,d2	| width
 	* alternate between blitter & cpu for parallel processing
@@ -1119,10 +1129,6 @@ osd_update_32_sprite_hw:
 	bmi		2f		| not visible
 	cmp.w	#NB_LINES-15,d1
 	bcc.w	2f		| too low
-	cmp.w	min_sprite_y(pc),d1
-	bcs.w	2f
-	cmp.w	max_sprite_y(pc),d1
-	bcc.w	2f
 
 	move.w	d1,d3			| save y
 	clr.w	d0
@@ -1245,11 +1251,6 @@ zzz:
 			blitz
 			rts
 			
-min_sprite_y:
-	dc.w	0
-max_sprite_y:
-	dc.w	0
-	
 *P1 B2 = DSWB bit 0
 *P2 B2 = DWSB bit 4
 
@@ -1366,7 +1367,7 @@ set_bg_bitplanes:
     rts
 
 set_fg_bitplanes:
-    move.l		fg_screen_pointer(pc),a0
+    move.l		fg_displayed_screen_ptr(pc),a0
     moveq #NB_PLAYFIELD_PLANES-1,d1
 	move.l	a0,d0
     lea	fg_bitplanes+2,a0
@@ -1625,7 +1626,7 @@ clear_plane_any_cpu_any_height:
 
 blit_16x16_bob:
 	movem.l	d2-d4/a0-a5,-(a7)
-	move.l		fg_screen_pointer(pc),a1
+	move.l		fg_drawed_screen_ptr(pc),a1
 	lea		blit_plane_cookie_cut_16x16(pc),a5
 	btst	#6,d2
 	beq.b	0f
@@ -1826,8 +1827,14 @@ _previous_joypad_state_2:
 		dc.l	0
 _gfxbase:
 	dc.l	0
-fg_screen_pointer:
+fg_drawed_screen_ptr:
 	dc.l	fg_screen_data_1
+fg_displayed_screen_ptr:
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	dc.l	fg_screen_data_2
+	.else
+	dc.l	fg_screen_data_1
+	.endif
 	
 	.include	"sound_entries.68k"
 	
@@ -1968,7 +1975,7 @@ end_color_copper:
 	.set    testcol,0x0
 color_row_0:
 	dc.w	beampos,0xFFFE
-	dc.w	fgcol,(testcol & 0x0FFF)
+	dc.w	fgcol,0xfa0    | orange
 	.set	beampos,beampos+0x800
 	.set	testcol,testcol+0x011
 color_row_1:

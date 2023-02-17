@@ -7,10 +7,8 @@
 - dump sprites in one image without palette (to test sprite attributes)
 - sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
 - sprites for big mothership (allows to use alternate brown/gold colors): set section 14
-- properly colored "hiscore"
+- properly colored "hiscore" (no copper flash: for instance fix orange color
+  in xevious menu, and fix white color during gameplay, or just fix orange on the first row!!!)
 - rip sounds
 - without whdload: screen garbled
-- killed: last position of sprites isn't erased (discontinuous) for
-  lower part objects (d0=32): remove y flip flop update everythin
-  everytime to test
 - optim: cookie cut with fixed 0 source if plane_pic_0 (saves bandwidth)
