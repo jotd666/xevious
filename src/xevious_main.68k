@@ -321,7 +321,7 @@ main_fn_0__main_thread: | $049B
     
 main_thread_main_loop: | $04BB
     clr.b     (is_real_game)
-    .ifne OPT_SKIP_TITLE
+    .ifne OPT_SKIP_ATTRACT
     bra       coined_up
     .endif
     tst.b     (num_credits)                     | zero?
@@ -359,7 +359,7 @@ coined_up:
     bsr       display_credits   
     bsr       display_1_only_or_1_2_players
     tst.b     (start_pressed)                   | set in SUB CPU
-    .ifeq OPT_SKIP_TITLE
+    .ifeq OPT_SKIP_ATTRACT
     beq.w     9f
     .endif
     move.b    #1,(is_real_game)
