@@ -104,7 +104,13 @@ mul\value\()_table:
 	or.b	(a0)+,d0
 	move.b	d0,(offset,a1)
 	.endm
-	
+
+.macro	NOT_AND_FG_BYTE	
+	move.b	(a0)+,d0
+	not.b	d0
+	and.b	(offset,a1),d0
+	move.b	d0,(offset,a1)
+	.endm
 
 .macro blitz
 	move.w	d0,-(a7)
@@ -369,6 +375,8 @@ _vblank:
 	move.w	_custom+intreqr,d0
 	btst	#5,d0
 	beq.b	1f
+
+
 	moveq	#1,d0
 	jsr	_read_joystick
 	move.l	d0,_joypad_state
@@ -376,27 +384,8 @@ _vblank:
 	bra.b	3f
 1:
 	* has to be copper
-	* let's switch screen buffers
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
-	* toggle fg planes (double buffering)
-	lea		fg_drawed_screen_ptr(pc),a0
-	lea		fg_displayed_screen_ptr(pc),a4
-	lea		fg_screen_data_1,a1
-	lea		fg_screen_data_2,a5
-	* also switch previous state memory
-	lea		previous_sprite_state_1(pc),a3
-	lea		previous_sprite_state_ptr(pc),a2
-	cmp.l	(a0),a1
-	bne.b	2f
-	* screen data 1 is displayed screen
-	* set it to drawn screen
-	exg		a1,a5
-	lea		previous_sprite_state_2(pc),a3
-2:
-	move.l	a3,(a2)
-	move.l	a1,(a0)
-	move.l	a5,(a4)
-	bsr		set_fg_bitplanes
+	bsr		switch_screen_buffers
 	.endif
 	
 	jsr		xevious_im1_irq
@@ -419,6 +408,28 @@ _vblank:
 osd_kick_wdog:
     rts
 
+switch_screen_buffers:	
+	* let's switch screen buffers
+	* toggle fg planes (double buffering)
+	lea		fg_drawed_screen_ptr(pc),a0
+	lea		fg_displayed_screen_ptr(pc),a4
+	lea		fg_screen_data_1,a1
+	lea		fg_screen_data_2,a5
+	* also switch previous state memory
+	lea		previous_sprite_state_1(pc),a3
+	lea		previous_sprite_state_ptr(pc),a2
+	cmp.l	(a0),a1
+	bne.b	2f
+	* screen data 1 is displayed screen
+	* set it to drawn screen
+	exg		a1,a5
+	lea		previous_sprite_state_2(pc),a3
+2:
+	move.l	a3,(a2)
+	move.l	a1,(a0)
+	move.l	a5,(a4)
+	bra		set_fg_bitplanes
+	
 platform_init:
 	
 	lea		_custom,a5
@@ -864,17 +875,9 @@ FG_TILE_CLEAR = 3
 * most other registers are killed
 
 update_fg_tile:
-	moveq	#0,d4
 	lea		_fg_tile,a0
 	and.w	#0xFF,d1
-	* handle special case of orange color hiscore
-	* (probably not going to handle that after all...)
-	cmp.w	#17,d1		| "H" tile
-	bne.b	0f
-	cmp.w	#0x504,d0	| HISCORE pos
-	bne.b	0f
-	moveq	#1,d4
-0:
+	
 	cmp.w	#BLANK_FG_TILE_ID,d1
 	bne		0f
 	move.w	#FG_TILE_CLEAR,d3
@@ -967,13 +970,39 @@ update_fg_tile:
 	OR_FG_BYTE
 	.set	offset,offset+NB_BYTES_PER_ROW
 	.endr
+	* now remove all bits of the character on other planes
+	* to respect the original color
+	moveq	#2,d3
+10:
+	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
+	lea		(-8,a0),a0
+	.set	offset,0
+	.rept		8
+	NOT_AND_FG_BYTE
+	.set	offset,offset+NB_BYTES_PER_ROW
+	.endr
+	dbf		d3,10b
+	
 	rts
 2:
+	* or, flipped tile
 	.set	offset,NB_BYTES_PER_ROW*7
 	.rept		8
 	OR_FG_BYTE
 	.set	offset,offset-NB_BYTES_PER_ROW
 	.endr
+	* now remove all bits of the character on other planes
+	* to respect the original color
+	moveq	#2,d3
+20:
+	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
+	lea		(-8,a0),a0
+	.set	offset,NB_BYTES_PER_ROW*7
+	.rept		8
+	NOT_AND_FG_BYTE
+	.set	offset,offset-NB_BYTES_PER_ROW
+	.endr
+	dbf		d3,20b
 3:
 	rts
 6:
@@ -2012,7 +2041,8 @@ color_row_30_plus:
 	.set	testcol,testcol+0x022
 
 	dc.w	fgcol,(testcol & 0x0FFF)
-    dc.w	 intreq,0x8010
+ 	dc.w	beampos+0x400,0xFFFE
+   dc.w	 intreq,0x8010
 	*dc.w	color,(0xF0F)
 	*dc.w	fgcol,0xF00	| test
     dc.l    -2					
