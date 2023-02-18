@@ -4,18 +4,18 @@
 
 * can be worked on my own:
 
-- dump sprites in one image without palette (to test sprite attributes)
-- dump sprites in original colors and reduced colors
-- sprite attributes to code (ship explosion looks wrong): double height bit 1 of attrs double width bit 0 of attrs
+- sprite attributes double height/width small issues
 - sprites for big mothership (allows to use alternate brown/gold colors): set section 14
-- invisible enemies because palette issues
 - rip sounds
 - without whdload: screen garbled
 - find a way to make up for those shaking ground enemies
 - keyboard interrupt to insert coin & start game
 - find a way to NOT use color17 so FG color doesn't interfere with sprites
+- enemies #21 not displayed: invisible/just one pixel enemies (because palette issues?) strange as they
+  used to be displayed properly in previous versions
 
 further optims:
 
 - cookie cut with fixed 0 source if plane_pic_0 (saves bandwidth)
 - generate NOT tables for FG tiles to optimize tile refresh
+- don't generate mirror X-sprites if log doesn't tell game is using it

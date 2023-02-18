@@ -127,6 +127,8 @@ def get_used_bg_cluts():
 
     return rval
 
+# used to predict which sprites will be used
+# this feeds from a log computed at runtime and dumped with WinUAE
 def get_used_sprite_cluts():
     infile = os.path.join(winuae_dir,"sprite_tile_log")
     sprite_json_base = "sprite_tile_clut.json"
@@ -139,9 +141,22 @@ def get_used_sprite_cluts():
         row_index = 0
         for tile_index in range(320):
             for idx in range(128):
-                if contents[row_index+idx] == 0xee:
+                attributes = contents[row_index+idx]
+                if attributes:
+                    # bit 7 already encoded in tile_index
+                    # bit 3 = yflip: ignored atm we always generate both pics (which is maybe a waste!)
+                    # bit 2 = xflip: can be done dynamically with inverted blitter
+                    # bit 1 = double height: means we have to log others sprites with the same clut
+                    # bit 0 = double width: idem
+
                     clut_index = idx
                     rval[tile_index].add(clut_index)
+                    if attributes & 1:
+                        rval[tile_index+1].add(clut_index)
+                    if attributes & 2:
+                        rval[tile_index+2].add(clut_index)
+                        if attributes & 1:
+                            rval[tile_index+3].add(clut_index)
             row_index += 128
 
         save_json_tile_file(sprite_json_base,rval,copy_rval)
@@ -257,7 +272,6 @@ for n,mask in (("bg_tile_clut",0xFFFF),("sprite_clut",0x7F)):
 
 bg_tile_clut = block_dict["bg_tile_clut"]["data"]
 sprite_tile_clut = block_dict["sprite_clut"]["data"]
-
 
 
 dump_graphics = True
@@ -508,6 +522,24 @@ if dump_graphics:
     table = "sprite"
     raw_pic_data = block_dict[table]
 
+    # first dump all sprites with no particular color, doesn't matter
+    #print()
+    dummy_palette = ((0,0,0),(255,0,0),(0,255,0),(255,255,0),(255,0,255),(0,0,255),(255,255,255),(0,255,255))
+    side = 16
+    img = Image.new("RGB",(40*side,8*side))
+    sx=0
+    sy=0
+    for pic in block_dict[table]["data"]:
+        for i,p in enumerate(pic):
+            col = dummy_palette[p]
+            y,x = divmod(i,side)
+            img.putpixel((sx+x,sy+y),col)
+        sx += side
+        if sx == img.size[0]:
+            sx = 0
+            sy += side
+
+    img.save("dumps/sprites.png")
     used_sprite_cluts = get_used_sprite_cluts()
     sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
 

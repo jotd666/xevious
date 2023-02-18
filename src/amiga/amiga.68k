@@ -406,7 +406,7 @@ _vblank:
 
 osd_kick_wdog:
     rts
-
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
 switch_screen_buffers:	
 	* let's switch screen buffers
 	* toggle fg planes (double buffering)
@@ -428,6 +428,7 @@ switch_screen_buffers:
 	move.l	a1,(a0)
 	move.l	a5,(a4)
 	bra		set_fg_bitplanes
+	.endif
 	
 platform_init:
 	
@@ -1037,6 +1038,7 @@ osd_update_scroll_hw:
 	bra		set_bg_bitplanes
 
 
+
 * a5=obj_tbl
 osd_update_sprite_shadow:
 	lea       sprite_shadow_msb,a2
@@ -1094,6 +1096,7 @@ osd_update_sprite_shadow:
 * others aren't updated anyway)
 
 osd_update_32_sprite_hw:
+	move.w	d0,d7
 	*lsl.w	#8,d0
 	*add.w	#0xc00,d0
 	*move.w	d0,_custom+color
@@ -1118,21 +1121,44 @@ osd_update_32_sprite_hw:
 	moveq	#0,d1		| fix issues with non deleted objects at top
 3:
 
-	move.w	(6,a5),d0
-	subq.w	#8,d0		| sprite X offset
 	
 	move.l		fg_drawed_screen_ptr(pc),a1
     move.w  #18,d3	| height
 	move.w	#4,d2	| width
-	* alternate between blitter & cpu for parallel processing
+	* depending on double height/width properties, double amounts
+	move.b	(1,a5),d0	| attributes
+	btst	#0,d0		| double width (height on rotated display)
+	beq.b	31f
+	add.w	#16,d3
+31:
+	btst	#1,d0		| double height (width on rotated display)
+	beq.b	32f
+	add.w	#2,d2
+32:
+	move.w	(6,a5),d0
+	subq.w	#8,d0		| sprite X offset
+
+	movem.l	d3/a5,-(a7)
+    lea _custom,a5
+	* alternate between blitter & cpu for parallel erasing of planes
+	* (the code is a mess with registers, trying to optimize register saves)
 	* starts by cpu
     bsr     clear_plane_any_cpu_any_height
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
-	bsr		clear_plane_any_blitter_16x16
+	movem.l	a1/d0-d4,-(a7)
+	move.w	d3,d4
+    moveq.l #-1,d3
+    bsr clear_plane_any_blitter_internal
+	movem.l	(a7)+,a1/d0-d4
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
     bsr     clear_plane_any_cpu_any_height
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
-	bsr		clear_plane_any_blitter_16x16
+	move.l	d4,-(a7)
+	move.w	d3,d4
+    moveq.l #-1,d3
+    bsr clear_plane_any_blitter_internal
+	move.l	(a7)+,d4
+	movem.l	(a7)+,d3/a5
 11:
 
 	lea		(8,a5),a5
@@ -1156,9 +1182,9 @@ osd_update_32_sprite_hw:
 
 	move.w	d1,d3			| save y
 	clr.w	d0
-	move.b	(2,a4),d0	    | tile code
-	move.b	(3,a4),d1	    | tile color
-	move.b		(1,a4),d2   | tile attributes	
+	move.b	(2,a4),d0	    | sprite code
+	move.b	(3,a4),d1	    | sprite color
+	move.b		(1,a4),d2   | sprite attributes	
 	bpl.b	5f
 	* second bank
 	bset	#8,d0
@@ -1169,60 +1195,35 @@ osd_update_32_sprite_hw:
 	swap	d0
 	
 	.ifne  OPT_ENABLE_LOGGING
-	* log the tile, use start address in 0x104 then
+	* log the sprite, use start address in 0x104 then
 	* S sprite_tile_log <address> !128*!320
 	* then run the "convert_graphics.py" script
 	* to discover the new sprite configurations
 	
 	lea		sprite_tile_log,a1
 	move.l	a1,0x104
-	movem.l	d0/d1,-(a7)
+	movem.l	d0-d2,-(a7)
 	lsl.w	#7,d0		| times 128
 	add.l	d0,a1
 	and.w	#0x7F,d1	| significant color bits
-	move.b	#0xEE,(a1,d1.w)
-	movem.l	(a7)+,d0/d1
+	bset	#4,d2		| so it's not 0
+	move.b	d2,(a1,d1.w)
+	movem.l	(a7)+,d0-d2
 	.endif
 
-	* compute clut index in d1
-	and.w	#0x7F,d1	| significant color bits TEMP
+	move.w	(6,a4),d5	| prepare X
+	move.w	d2,d6
+	and.w	#3,d6
+	lea		sprite_draw_jump_table(pc),a0
+	.ifdef	NO68020
+	add.w	d6,d6
+	add.w	d6,d6
+	move.l	(a0,d6.w),a0
+	jsr		(a0)
+	.else
+	jsr		([a0,d6.w*4])
+	.endif
 	
-	* now d1 is the index, mul by 4 to get row pointer offset
-	* (there are 2 versions of the sprite normal,mirror for each
-	* color configuration)
-	add.w	d1,d1
-	* d1 times 128*2 (<<8) is the row start pointer
-	lsl.l	#8,d0
-
-	lea		_sprite_tile,a0
-
-
-	add.l	d0,a0		| row offset
-	move.w	(a0,d1.w),d1	| col offset
-	bne.b	7f
-	* sprite is not known with that CLUT configuration: blue flash
-	move.w	#BASE_BPLCON3_VALUE,bplcon3+_custom
-	move.w	#0xF,color+_custom
-	tst.b	unknown_sprite_found
-	bne.b	2f
-	st.b	unknown_sprite_found
-	**bsr		zzz
-	nop
-	
-	bra.b	2f
-7:
-	btst	#7,d2			| X-flip?
-	beq.b	3f
-	add.w	#4*(NB_PLAYFIELD_PLANES+1),d1			| mirror planes come right after
-3:
-	cmp.w	#1,d1		| test blankptr
-	beq.b	2f			| skip
-	
-	lea	(a3,d1.w),a0	| get pointer on bitplane pointer list
-	move.w	(6,a4),d0
-	subq.w	#8,d0		| sprite X offset
-	move.w	d3,d1		| restore y
-	bsr	blit_16x16_bob
 2:
 	lea		(8,a4),a4		| next sprite
 	dbf		d4,4b
@@ -1263,9 +1264,9 @@ osd_update_32_sprite_hw:
 	beq.b	5f				| no need to OR if blank tile
 	move.b	(a4,d0.w),d2	| fetch tile from color grid
 	* now update tile to reflect the color change
-	movem.l	d0/d3/a2-a5,-(a7)
+	movem.l	d0/d3/a4-a5,-(a7)
 	bsr	update_fg_tile
-	movem.l	(a7)+,d0/d3/a2-a5
+	movem.l	(a7)+,d0/d3/a4-a5
 5:
 	addq.w	#1,d0
 	cmp.w	#FG_DIRTY_TILES_SIZE,d0
@@ -1278,7 +1279,95 @@ osd_update_32_sprite_hw:
 zzz:
 			blitz
 			rts
-			
+
+sprite_draw_jump_table:
+	dc.l	draw_16x16_sprite_part
+	dc.l	sprite_draw_double_width
+	dc.l	sprite_draw_double_height
+	dc.l	sprite_draw_double_width_and_height
+	
+* < D0: tile index
+* < D1: color table index
+* < D2: attributes
+* < D3: Y
+* < D5: X
+* < A3: bitplane pointer list
+
+* trashed registers: A0
+sprite_draw_double_width:
+	bsr		draw_16x16_sprite_part
+	add.w	#16,d3
+	bra		draw_16x16_sprite_part
+	
+sprite_draw_double_width_and_height:
+	add.w	#16,d3
+	addq	#3,d0
+	bsr		draw_16x16_sprite_part
+	subq	#2,d0
+	bsr		draw_16x16_sprite_part
+	sub.w	#16,d3
+	subq	#1,d0
+	* no RTS!
+sprite_draw_double_height:
+	addq	#2,d0
+	bsr		draw_16x16_sprite_part
+	subq	#2,d0
+	add.w	#16,d5
+	bra		draw_16x16_sprite_part
+	
+* internal routine
+* < D0: tile index
+* < D1: color table index
+* < D2: attributes
+* < D3: Y
+* < D5: X
+* < A3: bitplane pointer list
+* trashed registers: A0
+
+draw_16x16_sprite_part:
+	movem.w	d0/d1,-(a7)
+	* d0 is the tile index, compute clut index in d1
+	and.w	#0x7F,d1	| significant color bits TEMP
+	
+	* now d1 is the index, mul by 4 to get row pointer offset
+	* (there are 2 versions of the sprite normal,mirror for each
+	* color configuration)
+	add.w	d1,d1
+	* d1 times 128*2 (<<8) is the row start pointer
+	lsl.l	#8,d0
+
+	lea		_sprite_tile,a0
+
+	add.l	d0,a0		| row offset
+	move.w	(a0,d1.w),d1	| col offset
+	bne.b	7f
+	* sprite is not known with that CLUT configuration: blue flash
+	move.w	#BASE_BPLCON3_VALUE,bplcon3+_custom
+	move.w	#0xF,color+_custom
+	tst.b	unknown_sprite_found
+	bne.b	2f
+	st.b	unknown_sprite_found
+	**bsr		zzz
+	nop
+	
+	bra.b	2f
+7:
+	btst	#7,d2			| X-flip?
+	beq.b	3f
+	add.w	#4*(NB_PLAYFIELD_PLANES+1),d1			| mirror planes come right after
+3:
+	cmp.w	#1,d1		| test blankptr
+	beq.b	2f			| skip
+	
+	lea	(a3,d1.w),a0	| get pointer on bitplane pointer list
+	move.w	d5,d0		| restore x
+	subq.w	#8,d0		| sprite X offset
+	move.w	d3,d1		| restore y
+	bsr	blit_16x16_bob
+2:
+	movem.w	(a7)+,d0/d1
+	rts
+	
 *P1 B2 = DSWB bit 0
 *P2 B2 = DWSB bit 4
 
@@ -1821,16 +1910,17 @@ wait_blit:
 	
 	MUL_TABLE	NB_BYTES_PER_ROW,512
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512
-	
+
+SPRITE_MEM_SIZE = 8
 current_sprite_state:
-	ds.b	8*NB_SPRITES_TOTAL
+	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 previous_sprite_state_ptr:
 	dc.l	previous_sprite_state_1
 previous_sprite_state_1:
-	ds.b	8*NB_SPRITES_TOTAL
+	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
 previous_sprite_state_2:
-	ds.b	8*NB_SPRITES_TOTAL
+	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 	.endif
 
 unknown_tile_found:
