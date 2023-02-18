@@ -10,8 +10,8 @@ if not shutil.which("sox"):
 #wav_files = glob.glob("sounds/*.wav")
 
 wav_files = ["credit.wav"]
-outfile = "../src/amiga/sounds.68k"
-sndfile = "../src/amiga/sound_entries.68k"
+outfile = "../../src/amiga/sounds.68k"
+sndfile = "../../src/amiga/sound_entries.68k"
 
 snd_header = r"""
 FXFREQBASE = 3579564

@@ -13,6 +13,7 @@
 - without whdload: screen garbled
 - find a way to make up for those shaking ground enemies
 - keyboard interrupt to insert coin & start game
+- find a way to NOT use color17 so FG color doesn't interfere with sprites
 
 further optims:
 
