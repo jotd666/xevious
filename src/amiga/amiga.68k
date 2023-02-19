@@ -472,7 +472,9 @@ platform_init:
     * init sprite, bitplane, whatever dma
     move.w #0x83E0,dmacon(a5)
 
-	* install vblank handler
+	* install keyboard and vblank/copper handler
+	pea		level2_interrupt(pc)
+	move.l	(a7)+,0x68.W
 	pea		_vblank(pc)
 	move.l	(a7)+,0x6C.W
 	
@@ -544,9 +546,9 @@ set_aga_color_registers:
     move.w  #BASE_BPLCON3_VALUE,bplcon3(a5)
     rts
 
-* 60Hz VBLANK interrupt
+* 60Hz VBLANK interrupt (also keyboard)
 osd_enable_vblank_interrupt:
-	move.w	#0xC030,_custom+intena
+	move.w	#0xC038,_custom+intena
 	rts
 
 osd_ack_vblank_interrupt:
@@ -1297,6 +1299,7 @@ sprite_draw_jump_table:
 sprite_draw_double_width:
 	bsr		draw_16x16_sprite_part
 	add.w	#16,d3
+	addq.w	#1,d0	| neighbour tile
 	bra		draw_16x16_sprite_part
 	
 sprite_draw_double_width_and_height:
@@ -1304,8 +1307,10 @@ sprite_draw_double_width_and_height:
 	addq	#3,d0
 	bsr		draw_16x16_sprite_part
 	subq	#2,d0
+	add.w	#16,d5
 	bsr		draw_16x16_sprite_part
 	sub.w	#16,d3
+	sub.w	#16,d5
 	subq	#1,d0
 	* no RTS!
 sprite_draw_double_height:
@@ -1526,6 +1531,9 @@ osd_debug_hook:
 	
 osd_read_coin:
 	movem.l	a0/d1/d2,-(a7)
+	lea keyboard_table(pc),a0
+	tst.b	(5,a0)		| "5" key like in MAME
+	bne.b	0f
 	move.b	#0,d0
 	move.l	_joypad_state(pc),d1
 	btst	#JPB_BTN_GRN,d1	
@@ -1533,6 +1541,8 @@ osd_read_coin:
 	move.l	_previous_joypad_state(pc),d2
 	btst	#JPB_BTN_GRN,d2	
 	bne.b	1f
+0:
+	clr.b	(5,a0)		| ack key
 	lea		credit_sound,a0
 	lea		_custom,a6
 	jsr		_mt_playfx
@@ -1551,16 +1561,22 @@ osd_read_coin:
 	*
 		* D0 bit0=P1, bit1=P2.
 osd_read_start:
-	move.l	d1,-(a7)
 	move.b	#0,d0
+	lea keyboard_table(pc),a0
+	tst.b	(1,a0)		| "1" key like in MAME
+	beq.b	1f
+	clr.b	(1,a0)
+	bset	#0,d0
+	bra.b	1f
+	move.l	d1,-(a7)
 	move.l	_joypad_state(pc),d1
 	btst	#JPB_BTN_YEL,d1
 	movem.l	(a7)+,d1
-	beq.b	osd_no_yel
+	beq.b	1f
 	bset	#0,d0
-osd_no_yel:
+1:
 	tst.b	d0
-9:	rts
+	rts
 		
 osd_read_high_scores:
 	movem.l	d0-d7/a0-a6,-(a7)
@@ -1591,7 +1607,71 @@ osd_write_high_scores:
 0:
 	movem.l	(a7)+,d0-d7/a0-a6
 	rts
+
+
+level2_interrupt:
+	movem.l	D0/A0/A5,-(a7)
+	LEA	0x00BFD000,A5
+	MOVEQ	#0x08,D0
+	AND.B	0x1D01(A5),D0
+	BEQ	.nokey
+	MOVE.B	0x1C01(A5),D0
+	NOT.B	D0
+	ROR.B	#1,D0		| raw key code here
+    
+    lea keyboard_table(pc),a0
 	
+    bclr    #7,d0
+    seq (a0,d0.w)       | updates keyboard table
+    bne.b   .no_playing     | we don't care about key release
+    
+    cmp.b   #0x19,d0
+    bne.b   .no_kb_pause
+
+    bsr	toggle_pause
+.no_kb_pause:
+
+.no_playing:
+
+
+	BSET	#0x06,0x1E01(A5)
+	move.l	#2,d0
+	bsr	beamdelay
+	BCLR	#0x06,0x1E01(A5)	| acknowledge key
+
+.nokey:
+	movem.l	(a7)+,d0/a0/a5
+	move.w	#8,_custom+intreq
+	rte
+	
+toggle_pause:
+	movem.l	d0/a6,-(a7)
+	bsr.b		0f
+	movem.l	(a7)+,d0/a6
+	rts
+	
+0:
+	eor.b   #1,pause_flag
+
+keyboard_table:
+	ds.b	0x100
+
+pause_flag:
+	dc.w	0
+    
+* < D0: numbers of vertical positions to wait
+beamdelay:
+0:
+	move.w  d0,-(a7)
+    move.b	0xdff006,d0	| VPOS
+1:
+	cmp.b	0xdff006,d0
+	beq.s	1b
+	move.w	(a7)+,d0
+	dbf	d0,0b
+	rts
+
+
 * what: clears a plane of any width (using blitter), 16 height
 * args:
 * < A1: dest
@@ -1977,7 +2057,6 @@ original_palette:
 		.bss
 
 		.align 4
-	
 	
 	.ifne	OPT_ENABLE_LOGGING
 bg_tile_log:
