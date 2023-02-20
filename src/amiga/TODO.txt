@@ -2,6 +2,7 @@
 
 - sprite shadow management: complete?
 - find a way to make up for those shaking ground enemies
+- sprite CLUT missing transparency
 
 * can be worked on my own:
 
@@ -11,10 +12,14 @@
 - black small balls enemies not displayed: make a difference
   between black and transparent color
 - still some missing tiles (zone 14)
+- blit sprite in negative: should accept it up to -16
+  (careful with multable: maybe first add 16, multiply then
+  sub 16*40, plus add 16 "lost" rows. OR clip y blit (much faster)
+  
+  
 
 further optims:
 
-- reduce y height + introduce y offset for bobs
 - cookie cut with fixed 0 source if plane_pic_0 (saves bandwidth)
 - generate NOT tables for FG tiles to optimize tile refresh
 - don't generate mirror X-sprites if log doesn't tell game is using it

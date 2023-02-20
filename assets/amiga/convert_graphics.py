@@ -260,9 +260,10 @@ sprite_names = load_names("sprite_names.json")
 # most displayed items which are:
 # player ship, bomb sights, shots, bombs (colors 16-31)
 #
-for n,mask in (("bg_tile_clut",0xFFFF),("sprite_clut",0x7F)):
+
+for n in ("bg_tile_clut","sprite_clut"):
     tc = block_dict[n]["data"]
-    block_dict[n]["data"] = [[palette[i & mask] for i in tile_clut] for tile_clut in tc ]
+    block_dict[n]["data"] = [[palette[i] for i in tile_clut] for tile_clut in tc ]
 
 # reorganize palete like we want, leaving 0,0,0 first, keeping the xevious title
 # filling color index unchanged (now that we found the color !) and putting the sprite
@@ -381,15 +382,18 @@ def write_tiles(t,matrix,f,is_bob):
                 item = item_data[k]
                 f.write("* {}\n".format(k))
                 # first y offset & height
-                f.write("\tdc.w\t{y_offset},{height}\n".format(**item_data))
+                f.write("\tdc.w\t{y_offset},{height}   | y_offset,height \n".format(**item_data))
                 # we know that a lot of images are similar:
                 # the palettes are different so the bitplanes are identical
                 # only in a different order. Also, there's a lot of only-zero
                 # planes as only 8 colors are used
                 # so the picture (including mask) is a list of pointers on planes
                 # plane data (32 bytes) are only listed once, and used a lot of times
+
+                plane_size = 4*item_data["height"]   # 64 max
+
                 for p in range(BG_NB_PLANES+1):  # +1: mask
-                    block = tuple(item[p*64:p*64+64])
+                    block = tuple(item[p*plane_size:p*plane_size+plane_size])
                     block_id = bob_plane_cache.get(block)
                     if block_id is None:
                         # block is not in cache
@@ -430,7 +434,7 @@ def write_tiles(t,matrix,f,is_bob):
 
 def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
     input_image = Image.new("RGB",(side,side))
-    first_non_black_y = 0
+    first_non_black_y = None
     last_non_black_y = 0
     for i,p in enumerate(pic):
         col = current_palette[p]
@@ -438,19 +442,20 @@ def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
         input_image.putpixel((x,y),col)
         # note down first & last non-black line
         if col != black:
-            if not first_non_black_y:
+            if first_non_black_y is None:
                 first_non_black_y = y
             if y > last_non_black_y:
                 last_non_black_y = y
 
-    if False: # is_sprite:
+    if is_sprite:
+        if first_non_black_y is None:
+            first_non_black_y = 0
         # crop image to reduce size
         # saves memory and blitter bandwidth
-        last_non_black_y += 1
-        height = last_non_black_y-first_non_black_y
+        height = last_non_black_y-first_non_black_y+1
 
         if first_non_black_y != 0 or last_non_black_y != side:
-            input_image = input_image.crop((0,first_non_black_y,side,last_non_black_y))
+            input_image = input_image.crop((0,first_non_black_y,side,first_non_black_y+height))
         y_offset = first_non_black_y
     else:
         y_offset = 0
@@ -502,8 +507,8 @@ if dump_graphics:
     raw_blocks[table] = []
     for i,pic in enumerate(pics):
         d = generate_tile(pic,side,current_palette,current_palette,nb_planes=1,is_sprite=False)
-        raw_blocks[table].append(d["standard"])
-        raw_blocks[table].append(d["mirror"])
+        for s in STD_MIRROR_LIST:
+            raw_blocks[table].append(d[s])
         if dump_pngs:
             ImageOps.scale(d["png"],scale,0).save("dumps/fg/img_{:02}.png".format(i))
 
