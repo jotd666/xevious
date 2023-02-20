@@ -380,6 +380,8 @@ def write_tiles(t,matrix,f,is_bob):
             for k in STD_MIRROR_LIST:
                 item = item_data[k]
                 f.write("* {}\n".format(k))
+                # first y offset & height
+                f.write("\tdc.w\t{y_offset},{height}\n".format(**item_data))
                 # we know that a lot of images are similar:
                 # the palettes are different so the bitplanes are identical
                 # only in a different order. Also, there's a lot of only-zero
@@ -428,10 +430,31 @@ def write_tiles(t,matrix,f,is_bob):
 
 def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
     input_image = Image.new("RGB",(side,side))
+    first_non_black_y = 0
+    last_non_black_y = 0
     for i,p in enumerate(pic):
         col = current_palette[p]
         y,x = divmod(i,side)
         input_image.putpixel((x,y),col)
+        # note down first & last non-black line
+        if col != black:
+            if not first_non_black_y:
+                first_non_black_y = y
+            if y > last_non_black_y:
+                last_non_black_y = y
+
+    if False: # is_sprite:
+        # crop image to reduce size
+        # saves memory and blitter bandwidth
+        last_non_black_y += 1
+        height = last_non_black_y-first_non_black_y
+
+        if first_non_black_y != 0 or last_non_black_y != side:
+            input_image = input_image.crop((0,first_non_black_y,side,last_non_black_y))
+        y_offset = first_non_black_y
+    else:
+        y_offset = 0
+        height = side
 
     rval = []
     for the_tile in [input_image,ImageOps.mirror(input_image)]:
@@ -442,7 +465,7 @@ def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
         blit_pad=is_sprite)
         rval.append(raw)
 
-    return {"png":input_image,"standard":rval[0],"mirror":rval[1]}
+    return {"png":input_image,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
 
 def dump_asm_bytes(block,f):
     c = 0
@@ -551,6 +574,7 @@ if dump_graphics:
                 (143,143,98):(143,)*3,
                 # (174,174,143):(174,)*3,  used in explosion
                 (210,210,174):(210,)*3}
+    to_remove = {}
     sprite_used_colors = [x for x in sprite_used_colors if x not in to_remove]
     sprite_quantized_rgb = quantize_palette_16(sprite_used_colors,table) #reduced_color_dict["sprites"]
 

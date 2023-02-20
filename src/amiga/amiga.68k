@@ -382,11 +382,35 @@ _vblank:
 	move.w	#0x20,_custom+intreq	
 	bra.b	3f
 1:
+ 	clr.b	no_gfx_update
+    move.w  vbl_counter(pc),d0
+	* 50Hz is too much even for A1200, specially
+	* when there are a lot of objects on screen
+	* just update once out of 2 (25Hz)
+	* (too bad for the start of the game, where things
+	* are pretty light, but in the later stages, this is 
+	* just too much to handle, even for a fast amiga, because
+	* of all the blits
+*	cmp.w	#0,d0	| skip that frame
+*	beq.b	12f
+*	cmp.w	#2,d0	| skip that frame
+*	beq.b	12f
+*	cmp.w	#4,d0	| is going to be updated twice (60Hz emu)
+*	bne.b	2f
+	* optimized to:
+	btst	#0,d0
+	bne.b	2f
+12:
+	st.b	no_gfx_update
+	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
+	bra.b	21f
+	.endif
+2:
 	* has to be copper
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 	bsr		switch_screen_buffers
 	.endif
-	
+21:	
 	jsr		xevious_im1_irq
 	
     move.w  vbl_counter(pc),d0
@@ -1085,7 +1109,9 @@ osd_update_sprite_shadow:
 	bra.b	2b
 	
 
-
+out:
+	rts
+	
 * d0 = base sprite number (0/32)
 *
 * Since sprites aren't really sprites but BOBs
@@ -1098,6 +1124,8 @@ osd_update_sprite_shadow:
 * others aren't updated anyway)
 
 osd_update_32_sprite_hw:
+	tst.b	no_gfx_update
+	bne.b	out
 	move.w	d0,d7
 	*lsl.w	#8,d0
 	*add.w	#0xc00,d0
@@ -1283,7 +1311,7 @@ zzz:
 			rts
 
 sprite_draw_jump_table:
-	dc.l	draw_16x16_sprite_part
+	dc.l	draw_sprite_part
 	dc.l	sprite_draw_double_width
 	dc.l	sprite_draw_double_height
 	dc.l	sprite_draw_double_width_and_height
@@ -1297,28 +1325,31 @@ sprite_draw_jump_table:
 
 * trashed registers: A0
 sprite_draw_double_width:
-	bsr		draw_16x16_sprite_part
+	bsr		draw_sprite_part
 	add.w	#16,d3
 	addq.w	#1,d0	| neighbour tile
-	bra		draw_16x16_sprite_part
+	bra		draw_sprite_part
 	
 sprite_draw_double_width_and_height:
 	add.w	#16,d3
 	addq	#3,d0
-	bsr		draw_16x16_sprite_part
+	bsr		draw_sprite_part
 	subq	#2,d0
 	add.w	#16,d5
-	bsr		draw_16x16_sprite_part
+	bsr		draw_sprite_part
 	sub.w	#16,d3
 	sub.w	#16,d5
-	subq	#1,d0
-	* no RTS!
-sprite_draw_double_height:
-	addq	#2,d0
-	bsr		draw_16x16_sprite_part
+	addq	#1,d0
+	bsr		draw_sprite_part
 	subq	#2,d0
 	add.w	#16,d5
-	bra		draw_16x16_sprite_part
+	bra		draw_sprite_part
+	
+sprite_draw_double_height:
+	bsr		draw_sprite_part
+	addq	#2,d0
+	add.w	#16,d5
+	bra		draw_sprite_part
 	
 * internal routine
 * < D0: tile index
@@ -1329,8 +1360,8 @@ sprite_draw_double_height:
 * < A3: bitplane pointer list
 * trashed registers: A0
 
-draw_16x16_sprite_part:
-	movem.w	d0/d1,-(a7)
+draw_sprite_part:
+	movem.w	d0/d1/d3,-(a7)
 	* d0 is the tile index, compute clut index in d1
 	and.w	#0x7F,d1	| significant color bits TEMP
 	
@@ -1359,7 +1390,7 @@ draw_16x16_sprite_part:
 7:
 	btst	#7,d2			| X-flip?
 	beq.b	3f
-	add.w	#4*(NB_PLAYFIELD_PLANES+1),d1			| mirror planes come right after
+	add.w	#4+4*(NB_PLAYFIELD_PLANES+1),d1			| mirror planes come right after
 3:
 	cmp.w	#1,d1		| test blankptr
 	beq.b	2f			| skip
@@ -1368,9 +1399,12 @@ draw_16x16_sprite_part:
 	move.w	d5,d0		| restore x
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
-	bsr	blit_16x16_bob
+	add.w	(a0)+,d1	| y offset
+	move.w	(a0)+,d3	| height
+	* attributes remain in d2
+	bsr	blit_16x_bob
 2:
-	movem.w	(a7)+,d0/d1
+	movem.w	(a7)+,d0/d1/d3
 	rts
 	
 *P1 B2 = DSWB bit 0
@@ -1564,10 +1598,11 @@ osd_read_start:
 	move.b	#0,d0
 	lea keyboard_table(pc),a0
 	tst.b	(1,a0)		| "1" key like in MAME
-	beq.b	1f
+	beq.b	0f
 	clr.b	(1,a0)
 	bset	#0,d0
 	bra.b	1f
+0:
 	move.l	d1,-(a7)
 	move.l	_joypad_state(pc),d1
 	btst	#JPB_BTN_YEL,d1
@@ -1813,23 +1848,25 @@ clear_plane_any_cpu_any_height:
     add.w   #NB_BYTES_PER_ROW,a1
     dbf d0,7b
     bra.b   5b
-* what: blits 16x16 data on bg planes, cookie cut
+	
+* what: blits 16x?? data on fg planes, cookie cut
 * args:
 * < A0: data (16x16X(7+1))
 * < D0: X
 * < D1: Y
 * < D2: bit 6: 0: direct, 1: flip
+* < D3: height
 * trashes: D0-D1
 
-blit_16x16_bob:
-	movem.l	d2-d4/a0-a5,-(a7)
+blit_16x_bob:
+	movem.l	d2-d5/a0-a5,-(a7)
 	move.l		fg_drawed_screen_ptr(pc),a1
-	lea		blit_plane_cookie_cut_16x16(pc),a5
+	lea		blit_plane_cookie_cut_16x(pc),a5
 	btst	#6,d2
 	beq.b	0f
-	lea		blit_plane_cookie_cut_16x16_flipped(pc),a5	
+	lea		blit_plane_cookie_cut_16x_flipped(pc),a5	
 0:
-	moveq	#NB_PLAYFIELD_PLANES-1,d3
+	moveq	#NB_PLAYFIELD_PLANES-1,d5
 	moveq	#-1,d2
 	move.l	a0,a4		| pointers on planes
 	move.l	(NB_PLAYFIELD_PLANES*4,a4),a3		| mask is the last plane
@@ -1838,8 +1875,8 @@ blit_16x16_bob:
 	move.l	a1,a2
 	jsr		(a5)
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
-	dbf		d3,1b
-	movem.l	(a7)+,d2-d4/a0-a5
+	dbf		d5,1b
+	movem.l	(a7)+,d2-d5/a0-a5
 	rts
 	
 * what: blits 16x16 data on one plane, cookie cut
@@ -1851,14 +1888,15 @@ blit_16x16_bob:
 * < D0: X
 * < D1: Y
 * < D2: blit mask
+* < D3: height
 * trashes: D0-D1
 
-blit_plane_cookie_cut_16x16:
+blit_plane_cookie_cut_16x:
     movem.l d2-d7/a1-a5,-(a7)
     lea _custom,A5
+	move.w	d3,d4
 	move.l d2,d3		|masking of first/last word    
     move.w  #4,d2       | 16 pixels + 2 shift bytes
-    move.w  #16,d4      | 16 pixels height   
     bsr blit_plane_any_internal_cookie_cut
     movem.l (a7)+,d2-d7/a1-a5
     rts
@@ -1872,14 +1910,16 @@ blit_plane_cookie_cut_16x16:
 * < D0: X
 * < D1: Y
 * < D2: blit mask
+* < D3: height
 * trashes: D0-D1
 
-blit_plane_cookie_cut_16x16_flipped:
+blit_plane_cookie_cut_16x_flipped:
     movem.l d2-d7/a1-a5,-(a7)
     lea _custom,A5
+	move.w	d3,d4
+	neg.w	d4
 	move.l d2,d3		|masking of first/last word    
     move.w  #4,d2       | 16 pixels + 2 shift bytes
-    move.w  #-16,d4      | 16 pixels height
     bsr blit_plane_any_internal_cookie_cut
     movem.l (a7)+,d2-d7/a1-a5
     rts
@@ -2009,6 +2049,7 @@ unknown_sprite_found:
 	dc.b	0
 ingame_palette_loaded:
 	dc.b	0
+no_gfx_update:
 	dc.b	0
 	
 scroll_offset:
