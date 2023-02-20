@@ -739,16 +739,16 @@ update_bg_tile:
 	tst.w	(a0)
 	bne.b	7f
 	* tile is not known with that CLUT configuration: flash
-	**move.w	#0,bplcon3+_custom
-	**move.w	#0xF00,color+_custom
-	**tst.b	unknown_tile_found
-	**bne.w	9f
-	**st.b	unknown_tile_found
-	**lsr.l	#8,d1
-	**lsr.l	#1,d1		| row
-	**lsr.l	#1,d3		| column
-	**lea		_bg_tile,a1
-	**
+	move.w	#0,bplcon3+_custom
+	move.w	#0xF00,color+_custom
+	tst.b	unknown_tile_found
+	bne.w	9f
+	st.b	unknown_tile_found
+	lsr.l	#8,d1
+	lsr.l	#1,d1		| row
+	lsr.l	#1,d3		| column
+	lea		_bg_tile,a1
+	
 	**blitz
 	bra.w	9f
 7:

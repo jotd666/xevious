@@ -5,6 +5,14 @@ import gen_color_dict
 
 import collections
 
+
+
+dump_graphics = True  # uncomment for dry-run
+dump_pngs = True  # uncomment for faster operation, pngs aren't needed for asset generation per se
+
+sprite_color_count = collections.Counter()
+sprite_color_usage = collections.defaultdict(set)
+
 title_tiles = {240, 241, 242, 243, 244, 245, 246, 247, 248,
 249, 256, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425,
 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437,
@@ -275,9 +283,6 @@ bg_tile_clut = block_dict["bg_tile_clut"]["data"]
 sprite_tile_clut = block_dict["sprite_clut"]["data"]
 
 
-dump_graphics = True
-dump_pngs = True
-
 def mkdir(d):
     if not os.path.exists(d):
         os.mkdir(d)
@@ -312,11 +317,16 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
             if dump_pngs:
                 current_palette = tile_clut[clut_index]
                 input_image = Image.new("RGB",(side,side))
+                img_name = image_names_dict.get(tile_index,"img")
                 for i,p in enumerate(pic):
                     col = current_palette[p]
                     y,x = divmod(i,side)
                     input_image.putpixel((x,y),col)
-                ImageOps.scale(input_image,scale,0).save("dumps/{}/orig/{}_{:02}_{}.png".format(img_type,image_names_dict.get(tile_index,"img"),tile_index,clut_index))
+                    # statistics / color usage
+                    sprite_color_count[col] += 1
+                    sprite_color_usage[col].add(img_name)
+
+                ImageOps.scale(input_image,scale,0).save("dumps/{}/orig/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index))
 
             current_palette = reduced_tile_clut[clut_index]
             if all(x==black for x in current_palette):
@@ -605,6 +615,13 @@ if dump_graphics:
     reduced_tile_clut = reduced_sprite_tile_clut,
     tile_clut = sprite_tile_clut,
     global_palette = partial_palette_sprite)
+
+    # dump statistics on sprites
+    color_stats = sorted([{"color":str(color),"used":sorted(sprite_color_usage[color]),"count":count}
+    for color,count in sprite_color_count.items()],key=lambda x:x["count"])
+
+    with open("dumps/spritecolors.json","w") as f:
+        json.dump(color_stats,f,indent=2)
 
     # first background then sprites (bitplanes are configured accordingly)
     # also sprites are mainly bobs but to get the chance to use real HW sprites

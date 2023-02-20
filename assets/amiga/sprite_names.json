@@ -1,7 +1,14 @@
 {
-"8-15":"disc_enemy",
-"80":"player_ship",
-"192-208":"ship_exploding",
+"1-7":"terrazi",
+"8-15":"toroid",
+"16-22":"torkan",
+"80":"solvalou",
+"192-208":"solvalou_exploding",
 "276":"crosshairs",
-	"304-319":"shine"
+"304-319":"shine",
+"88-95":"andor_genesis",
+"288-303":"bacura",
+"128-159":"andor_genesis",
+"160-165":"jara",
+"184-187":"bragza"
 }
