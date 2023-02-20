@@ -459,7 +459,7 @@ main_gameplay_loop: | $0593
     cmp.b     #54,d0                            | more than 70% thru?
     bcc.b     2f                                | no, skip
     addq.w    #1,(area)                         | next area
-    cmp.b     #16,(area)                        | last area?
+    cmp.w     #16,(area)                        | last area?
     bne.b     2f                                | no, skip
     move.w    #6,(area)                         | restart at area=7
     * decrement the AI level according to the
@@ -1153,15 +1153,16 @@ exit_attract_mode_title_screen: | $0D21
     bra       flash_insert_coin_and_check_credits
                 
 attract_mode_gameplay: | $0D35
-    clr.b     (curr_player)                     | player 1
-    clr.b     (area)
-    clr.b     (enemy_AI_level)
+    moveq     #0,d0
+    move.b    d0,(curr_player)                  | player 1
+    move.w    d0,(area)
+    move.b    d0,(enemy_AI_level)
     lea       area_offset_in_map_tbl,a0
-    move.b    (d0.w,a0),(area_offset_in_map)
+    move.b    (a0,d0.w),(area_offset_in_map)
     move.w    #0xd00,(scroll_cntr)
     clr.w     d0                                | area 1 (offset=0)
-    movea.l   #area_object_tbl_tbl,a0
-    lsl.w     #1,d0                             | redundant
+    lea       area_object_tbl_tbl,a0
+    lsl.w     #2,d0                             | redundant
     move.l    (a0,d0.w),(area_obj_ptr)          | init area object ptr
     bsr       clear_fg_to_transparent
     bsr       fill_bg_with_forest
