@@ -11,12 +11,7 @@
 - find a way to NOT use color17 so FG color doesn't interfere with sprites
 - black small balls enemies not displayed: make a difference
   between black and transparent color
-- still some missing tiles (zone 14)
-- blit sprite in negative: should accept it up to -16
-  (careful with multable: maybe first add 16, multiply then
-  sub 16*40, plus add 16 "lost" rows. OR clip y blit (much faster)
-  
-  
+- still some missing tiles/sprites (zone 14)
 
 further optims:
 

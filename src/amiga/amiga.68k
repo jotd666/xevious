@@ -1205,11 +1205,13 @@ osd_update_32_sprite_hw:
 	cmp.b	#STATE_INACTIVE,(a4)
 	beq.w	2f
 	move.w	(4,a4),d1
-	sub.w	#4*8,d1
-	bmi		2f		| not visible
+	sub.w	#4*8,d1		| apply Y offset
+	* at this point, Y can be negative, but
+	* we allow this as blitter routine is able
+	* to perform Y-clipping in that case
 	cmp.w	#NB_LINES-15,d1
-	bcc.w	2f		| too low
-
+	bgt.w	2f		| too low
+	
 	move.w	d1,d3			| save y
 	clr.w	d0
 	move.b	(2,a4),d0	    | sprite code
@@ -1888,7 +1890,7 @@ clear_plane_any_cpu_any_height:
 	
 * what: blits 16x?? data on fg planes, cookie cut
 * args:
-* < A0: data (16x16X(7+1))
+* < A0: data (16 pixels wide, 4+1 planes)
 * < D0: X
 * < D1: Y
 * < D2: bit 6: 0: direct, 1: flip
@@ -1896,8 +1898,25 @@ clear_plane_any_cpu_any_height:
 * trashes: D0-D1
 
 blit_16x_bob:
-	movem.l	d2-d5/a0-a5,-(a7)
-	move.l		fg_drawed_screen_ptr(pc),a1
+	movem.l	d2-d6/a0-a5,-(a7)
+	* first check if Y is positive
+	moveq	#0,d6	| bitmap offset
+	tst		d1
+	bpl.b	10f
+	* Y is negative, handle the Y-clipping 
+	* or completely zap the blit
+	add.w	d1,d3
+	bmi.b	2f
+	beq.b	2f		| no need to blit if height <= 0
+	* compute offset to add to bitmap
+	neg		d1    | make it positive
+	* add a 4-byte offset per line
+	move.w	d1,d6
+	add.w	d6,d6
+	add.w	d6,d6
+	moveq	#0,d1	| draw from Y=0
+10:
+	move.l	fg_drawed_screen_ptr(pc),a1
 	lea		blit_plane_cookie_cut_16x(pc),a5
 	btst	#6,d2
 	beq.b	0f
@@ -1909,11 +1928,13 @@ blit_16x_bob:
 	move.l	(NB_PLAYFIELD_PLANES*4,a4),a3		| mask is the last plane
 1:
 	move.l	(a4)+,a0     | next plane
+	add.w	d6,a0		 | add y-offset if any
 	move.l	a1,a2
 	jsr		(a5)
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
 	dbf		d5,1b
-	movem.l	(a7)+,d2-d5/a0-a5
+2:
+	movem.l	(a7)+,d2-d6/a0-a5
 	rts
 	
 * what: blits 16x16 data on one plane, cookie cut
