@@ -1173,8 +1173,37 @@ osd_read_start:
 ***   - (no need to save this explicitly)
 ***
 
+*** BRAM (MVS only)
+*** Memory card (MVS,AES,NGCD)
+
+patch_high_score_table:
+    * extract high score from entry 1
+    lea       mc_scores,a2
+    move.b    (0,a2),(a1)+
+    move.b    (1,a2),(a1)+
+    move.b    (2,a2),(a1)+
+    * extract high score table
+    move.w    #16*5-1,d7
+0:  move.b    (a2)+,(a0)+
+    dbf       d7,0b
+    rts
+
 osd_read_high_scores:
-.if 0
+    * try to read from BRAM first
+    * - any memory card saves will overwrite
+.ifndef __cd__
+    tst.b     (BIOS_MVS_FLAG)                   | MVS?
+    beq       check_memcard_data                | no, skip
+check_BRAM_data:
+    move.l    (memcard_buf),d0
+    cmp.l     (memcard_hdr),d0                  | valid save data?
+    bne.b     check_memcard_data                | no, skip
+    movem.l   a0-a1,-(a7)
+    bsr.b     patch_high_score_table
+    movem.l   (a7)+,a0-a1
+.endif | __cd__
+
+check_memcard_data:    
     movem.l   d0-d7/a0-a6,-(a7)
     * try reading card data first
     move.b    #0x01,(BIOS_CRDF)
@@ -1192,21 +1221,7 @@ osd_read_high_scores:
     move.b    (BIOS_CRDRESULT),d0
     bne       9f                                | error reading, exit
     movem.l   (a7)+,d0-d7/a0-a6
-.else
-    move.l    (memcard_buf),d0
-    cmp.l     (memcard_hdr),d0                  | valid save data?
-    bne.b     1f                                | no, return
-.endif    
-    * extract high score from entry 1
-    lea       mc_scores,a2
-    move.b    (0,a2),(a1)+
-    move.b    (1,a2),(a1)+
-    move.b    (2,a2),(a1)+
-    * extract high score table
-    move.w    #16*5-1,d7
-0:  move.b    (a2)+,(a0)+
-    dbf       d7,0b
-1:  rts
+    bra       patch_high_score_table
 
     * handle card search data errors
 2:  cmp.b     #0x80,d0                          | not inserted?
@@ -1237,8 +1252,22 @@ osd_write_high_scores:
     move.w    #16*5-1,d7
 2:  move.b    (a0)+,(a2)+
     dbf       d7,2b
-.if 0
+    
+    * write to BOTH BRAM and memcard (if valid)
+    
+.ifndef __cd__
+    tst.b     (BIOS_MVS_FLAG)                   | MVS?
+    beq       write_memcard_data                | no, skip
+    *** write to BRAM first
+write_BRAM_data:
+    lea       0x10F300,a5
+    move.b    #1,(0xBBF,a5)                     | mark BRAM as being used
+    jsr       0xC12322                          | init_workbackup_ram
+    clr.b     (0xBBF,a5)                        | unmark BRAM as being used
+.endif | __cd__
+
     *** write to memcard
+write_memcard_data:
     move.b    #0x03,(BIOS_CRDF)
     move.w    #__NGH__,(BIOS_CRDNGH)
     move.b    #0,(BIOS_CRDFILE)
@@ -1247,13 +1276,6 @@ osd_write_high_scores:
     jsr       BIOSF_CARD
     move.b    (BIOS_CRDRESULT),d0
     bne       9f                                | error writing, exit
-.else
-    *** write to BRAM
-    lea       0x10F300,a5
-    move.b    #1,(0xBBF,a5)                     | mark BRAM as being used
-    jsr       0xC12322                          | init_workbackup_ram
-    clr.b     (0xBBF,a5)                        | unmark BRAM as being used
-.endif
 9:  movem.l   (a7)+,d0-d7/a0-a6
     rts
 
