@@ -1495,7 +1495,44 @@ create_direction_table:
 	
 direction_table:
 	ds.b	16
+
+* TODO: adapt for AGA sprites (not same width)	
+* < d0.w: x
+* < d1.w: y
+* > d0.L: control word
+store_sprite_pos:
+    movem.l  d1/a0/a1,-(a7)
+
+    lea	HW_SpriteXTable(pc),a0
+    lea	HW_SpriteYTable(pc),a1
+
+    add.w	d0,d0
+    add.w	d0,d0
+    move.l	(a0,d0.w),d0
+    add.w	d1,d1
+    add.w	d1,d1
+    or.l	(a1,d1.w),d0
+    movem.l  (a7)+,d1/a0/a1
+    rts
 	
+HW_SpriteXTable:
+	.set	reptn,0
+	.rept 320
+	.set	x,reptn+0x80
+	.set reptn,reptn+1
+    .byte  0,x>>1,0,x&1
+  .endr
+
+
+HW_SpriteYTable:
+  .set	reptn,0
+  .rept 260
+	.set	ys,reptn+0x2c
+	.set	ye,ys+16       | size = 16
+    .byte  ys&255, 0, ye&255, ((ys>>6)&4) | ((ye>>7)&Z)
+  .endr
+
+
 * set_bitplanes
 * what: sets bitplanes in copperlist
 

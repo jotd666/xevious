@@ -25,3 +25,13 @@ further optims:
 - don't generate mirror X-sprites if log doesn't tell game is using it
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
+  
+  Build process:
+
+- To create the ".bin" files and some palette .s asm files, from "assets" subdir, 
+  just run the "convert_sprites.py" python script, then use the "convert_sounds.py"
+  python script (audio).
+- python and sox must be installed to be able to perform the wav2raw conversions
+- get "bitplanelib.py" (asset conversion tool needs it) at https://github.com/jotd666/amiga68ktools.git
+
+Binary assets must be created first, then makefile must be called to create the main program
