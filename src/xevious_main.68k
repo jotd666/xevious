@@ -4857,62 +4857,62 @@ gen_rnd_spriteY: | $3398
 
 main_fn_4__spawn_flying_enemies: | $33B3
     tst.b     (scroll_disabled)
-    bne       9f
+    bne.b     9f
     moveq     #0,d7
     move.b    (num_flying_enemies),d7
-    beq       9f
+    beq.b     9f
     moveq     #0,d0
     move.b    (flying_enemy_type_tbl_offset),d0
-    movea.l   #flying_enemy_type_tbl,a0
+    lea       flying_enemy_type_tbl,a0
     lea       (a0,d0.w),a0
-    movea.l   #obj_tbl+_OBJSIZE*0x3a,a1         | flying enemies
+    lea       obj_tbl+_OBJSIZE*0x3a,a1          | flying enemies
     subq.b    #1,d7                             | adjust for 68K
 1:  move.b    (a0)+,(_TYPE,a1)
-    adda.l    #_OBJSIZE,a1
+    lea       (_OBJSIZE,a1),a1                  | next object
     dbf       d7,1b
 9:  rts
 
 main_fn_3__init_bacura: | $33D0
     tst.b     (scroll_disabled)
-    bne       9f
+    bne.b     9f
     moveq     #0,d7
     move.b    (num_bacura),d7
-    beq       9f
-    movea.l   #obj_tbl+_OBJSIZE*0x10,a1         | start of Bacura
-    subq.b    #1,d7
+    beq.b     9f
+    lea       obj_tbl+_OBJSIZE*0x10,a1          | start of Bacura
+    subq.b    #1,d7                             | adjust for 68K
 1:  move.b    #1,(_TYPE,a1)
-    adda.l    #_OBJSIZE,a1
+    lea       (_OBJSIZE,a1),a1                  | next object
     dbf       d7,1b
 9:  rts
 
 main_fn_5__inc_num_bacura: | $33E5
     bsr       save_PC_to_fn_tbl_and_ret
     tst.b     (scroll_disabled)
-    bne       9f
+    bne.b     9f
     tst.b     (bacura_inc_cnt)
-    beq       9f
+    beq.b     9f
 1:  move.b    #60,(one_second_cntr)
     bsr       save_PC_to_fn_tbl_and_ret
     tst.b     (scroll_disabled)
-    bne       main_fn_5__inc_num_bacura
-    subq.b    #1,(one_second_cntr)
-    bne       9f
+    bne.b     main_fn_5__inc_num_bacura
+    subq.b    #1,(one_second_cntr)              | time to inc?
+    bne.b     9f                                | no, skip
     addq.b    #1,(num_bacura)
     subq.b    #1,(bacura_inc_cnt)
-    beq       main_fn_5__inc_num_bacura
-    bra       1b
+    beq.b     main_fn_5__inc_num_bacura
+    bra.b     1b
 9:  rts
 
 handle_08_Giddo_Spario: | $340D
     move.b    #2,(_STATE,a5)
     move.b    #0x80,(_ATTR,a5)                  | bank=1,size=1x1
     bsr       gen_random_Y_store_obj
-    movea.l   #angle_dX_dY_sheonite_tbl,a2
+    lea       angle_dX_dY_sheonite_tbl,a2
     bsr       calc_dX_dY_for_vector_to_solvalou
     move.b    #0,(_PTS,a5)                      | 10 pts
     bsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       giddo_spario_hit                  | yes, go
+    beq.b     giddo_spario_hit                  | yes, go
     move.b    (countup_timer_1),d0
     lsr.b     #1,d0
     move.l    d0,d1                             | copy
@@ -4931,8 +4931,8 @@ giddo_spario_hit: | $3451
     addq.b    #1,(_TIMER,a5)
     move.b    (_TIMER,a5),d0
     lsr.b     #1,d0
-    cmp.b     #4,d0
-    beq       remove_giddo_spario
+    cmp.b     #4,d0                             | time to remove?
+    beq.b     remove_giddo_spario               | yes, go
     addq.b    #4,d0
     move.b    d0,(_CODE,a5)
     bsr       move_object_dX_dY
@@ -4953,39 +4953,39 @@ remove_giddo_spario: | $3476
 * eg. Area 9 is awarded an extra 200 points from a Zolbak
 handle_4B_Andor_Genesis_obj_15: | $3481
     cmp.b     #3,(obj_tbl+_OBJSIZE*0x0E+_STATE) | object 14 (core)
-    beq       andor_genesis_destroyed
+    beq.b     andor_genesis_destroyed
     move.b    #0x10,d0
-    cmp.b     (_X,a5),d0                        | MSB
-    beq       1f
+    cmp.b     (_X,a5),d0                        | MSB, stop descending?
+    beq.b     1f                                | yes, go
     *** TBD sound
     move.w    #0x10,d0
-    lsl.w     #1,d0
+    add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | update spriteX
     bra       cycle_andor_genesis_colour
 
 1:  SET_REENTRY_ADDR_HERE
-    tst.b     (andor_genesis_end_flag)
-    bne       andor_genesis_leave
-    cmp.b     #3,(obj_tbl+_OBJSIZE*0x0E+_STATE) | object 14
-    beq       andor_genesis_destroyed
+    tst.b     (andor_genesis_end_flag)          | time to leave?
+    bne.b     andor_genesis_leave               | yes, go
+    cmp.b     #3,(obj_tbl+_OBJSIZE*0x0E+_STATE) | object 14 destroyed?
+    beq.b     andor_genesis_destroyed           | yes, go
     *** TBD sound
     bra       cycle_andor_genesis_colour
 
 * a5=object 15
 andor_genesis_destroyed: | $34BC
-    move.b    #0x1D,(andor_genesis_colour)
+    move.b    #0x1d,(andor_genesis_colour)
     move.b    #3,(_TIMER,a5)
     SET_REENTRY_ADDR_HERE
-    subq.b    #1,(_TIMER,a5)
-    bne       1f
+    subq.b    #1,(_TIMER,a5)                    | time to stop cycling colour?
+    bne.b     1f                                | no, skip
     move.b    #6,(andor_genesis_colour)
     SET_REENTRY_ADDR_HERE
 1:  move.b    #0x30,d0
-    cmp.b     (_X,a5),d0                        | MSB
-    beq       remove_andor_genesis
+    cmp.b     (_X,a5),d0                        | time to remove?
+    beq.b     remove_andor_genesis              | yes, go
     move.w    scroll_delta,d0                   | scroll with screen
     neg.w     d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | update spriteX
     rts
 
@@ -4995,9 +4995,9 @@ andor_genesis_leave: | $34F5
     beq       andor_genesis_destroyed
     move.b    #0xf8,d0
     cmp.b     (_X,a5),d0                        | MSB
-    beq       remove_andor_genesis
+    beq.b     remove_andor_genesis
     move.w    #0xfff8,d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | update spriteX
     *** TBD sound
     bra       cycle_andor_genesis_colour
@@ -5018,11 +5018,11 @@ handle_4A_Andor_Genesis_obj_14: | $3525
     move.w    (obj_tbl+_OBJSIZE*0x0f+_Y),(_Y,a5)  | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       andor_genesis_core_hit            | yes, go
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    beq.b     andor_genesis_core_hit            | yes, go
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.b    (_STATE,a0),d0
     subq.b    #1,d0                             | inactive?
-    beq       remove_andor_genesis_core         | yes, go
+    beq.b     remove_andor_genesis_core         | yes, go
     move.b    (countup_timer_1),d0
     lsr.b     #3,d0
     and.w     #0x0c,d0                          | size=1x1
@@ -5040,12 +5040,12 @@ remove_andor_genesis_core: | $3562
 andor_genesis_core_hit: | $356B
     bsr       pre_gun_port_explosion
     SET_REENTRY_ADDR_HERE
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.w    (_X,a0),(_X,a5)                   | update spriteX
     move.w    (_Y,a0),(_Y,a5)                   | update spriteY
     bsr       gun_port_explosion
-    cmp.b     #4,(_STATE,a5)
-    beq       1f
+    cmp.b     #4,(_STATE,a5)                    | finished exploding?
+    beq       1f                                | no, skip
     rts
 1:
 * here the core turns into the indestructible Bragza
@@ -5058,12 +5058,12 @@ andor_genesis_core_hit: | $356B
 handle_Bragza: | $35A5
     move.b    (countup_timer_1),d0
     lsr.b     #1,d0
-    move.b    d0,d1
+    move.b    d0,d1                             | copy
     and.w     #3,d0
-    add.b     #0xb8,d0
+    add.b     #0xb8,d0                          | generate sprite code
     move.b    d0,(_CODE,a5)
     and.w     #7,d1
-    add.b     #0x15,d1
+    add.b     #0x15,d1                          | generate colour
     move.b    d1,(_COLOUR,a5)
     bsr       move_object_dX
     bra       add_obj_handler
@@ -5084,13 +5084,13 @@ handle_4F_Andor_Genesis_obj_13: | $35C2
     move.b    (ffreq_mask_andor_genesis),(_FFREQ,a5)
     bsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       tl_gun_port_hit                   | yes, go
+    beq.b     tl_gun_port_hit                   | yes, go
     cmp.b     #3,(obj_tbl+_OBJSIZE*0x0e+_STATE)
-    beq       tl_gun_port_hit
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    beq.b     tl_gun_port_hit
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.b    (_STATE,a0),d0
     subq.b    #1,d0                             | inactive?
-    beq       remove_tl_gun_port                | yes, go
+    beq.b     remove_tl_gun_port                | yes, go
     move.w    (_X,a0),d0                        | object15
     add.w     #0xfe00,d0                        | calc spriteY
     move.w    d0,(_X,a5)                        | update spriteY
@@ -5106,7 +5106,7 @@ remove_tl_gun_port: | $3615
 tl_gun_port_hit: | $361E
     bsr       pre_gun_port_explosion
     SET_REENTRY_ADDR_HERE
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0xfe00,d0                        | calc spriteX
     move.w    d0,(_X,a5)                        | update spriteX
@@ -5114,9 +5114,9 @@ tl_gun_port_hit: | $361E
     add.w     #0x0200,d0                        | calc spriteY
     move.w    d0,(_Y,a5)                        | update spriteY
     bsr       gun_port_explosion
-    cmp.b     #4,(_STATE,a5)
-    bne       9f
-    bra       remove_tl_gun_port
+    cmp.b     #4,(_STATE,a5)                    | finished exploding?
+    bne.b     9f                                | no, skip
+    bra.b     remove_tl_gun_port
 9:  rts
 
 * installed into object #12
@@ -5135,13 +5135,13 @@ handle_50_Andor_Genesis_obj_12: | $364D
     move.b    (ffreq_mask_andor_genesis),(_FFREQ,a5)
     bsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       tr_gun_port_hit                   | yes, go
+    beq.b     tr_gun_port_hit                   | yes, go
     cmp.b     #3,(obj_tbl+_OBJSIZE*0x0e+_STATE)
-    beq       tr_gun_port_hit
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    beq.b     tr_gun_port_hit
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.b    (_STATE,a0),d0
     subq.b    #1,d0                             | inactive?
-    beq       remove_tr_gun_port                | yes, go
+    beq.b     remove_tr_gun_port                | yes, go
     move.w    (_X,a0),d0                        | object15
     add.w     #0xfe00,d0                        | calc spriteY
     move.w    d0,(_X,a5)                        | update spriteY
@@ -5157,7 +5157,7 @@ remove_tr_gun_port: | $36A0
 tr_gun_port_hit: | $36A9
     bsr       pre_gun_port_explosion
     SET_REENTRY_ADDR_HERE
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0xfe00,d0                        | calc spriteX
     move.w    d0,(_X,a5)                        | update spriteX
@@ -5165,9 +5165,9 @@ tr_gun_port_hit: | $36A9
     add.w     #0xfe00,d0                        | calc spriteY
     move.w    d0,(_Y,a5)                        | update spriteY
     bsr       gun_port_explosion
-    cmp.b     #4,(_STATE,a5)
-    bne       9f
-    bra       remove_tr_gun_port
+    cmp.b     #4,(_STATE,a5)                    | finished exploding?
+    bne.b     9f                                | no, skip
+    bra.b     remove_tr_gun_port
 9:  rts
 
 * installed into object #11
@@ -5186,13 +5186,13 @@ handle_51_Andor_Genesis_obj_11: | $36D8
     move.b    (ffreq_mask_andor_genesis),(_FFREQ,a5)
     bsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       bl_gun_port_hit                   | yes, go
+    beq.b     bl_gun_port_hit                   | yes, go
     cmp.b     #3,(obj_tbl+_OBJSIZE*0x0e+_STATE)
-    beq       bl_gun_port_hit
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    beq.b     bl_gun_port_hit
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.b    (_STATE,a0),d0
     subq.b    #1,d0                             | inactive?
-    beq       remove_bl_gun_port                | yes, go
+    beq.b     remove_bl_gun_port                | yes, go
     move.w    (_X,a0),d0                        | object15
     add.w     #0x0200,d0                        | calc spriteY
     move.w    d0,(_X,a5)                        | update spriteY
@@ -5208,17 +5208,17 @@ remove_bl_gun_port: | $372B
 bl_gun_port_hit: | $3734
     bsr       pre_gun_port_explosion
     SET_REENTRY_ADDR_HERE
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0x0200,d0                        | calc spriteX
     move.w    d0,(_X,a5)                        | update spriteX
     move.w    (_Y,a0),d0
     add.w     #0x0200,d0                        | calc spriteY
     move.w    d0,(_Y,a5)                        | update spriteY
-    bsr       gun_port_explosion
-    cmp.b     #4,(_STATE,a5)
-    bne       9f
-    bra       remove_bl_gun_port
+    bsr.w     gun_port_explosion
+    cmp.b     #4,(_STATE,a5)                    | finished exploding?
+    bne.b     9f                                | no, skip
+    bra.b     remove_bl_gun_port
 9:  rts
 
 * installed into object #10
@@ -5237,13 +5237,13 @@ handle_52_Andor_Genesis_obj_10: | $3763
     move.b    (ffreq_mask_andor_genesis),(_FFREQ,a5)
     bsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       br_gun_port_hit                   | yes, go
+    beq.b     br_gun_port_hit                   | yes, go
     cmp.b     #3,(obj_tbl+_OBJSIZE*0x0e+_STATE)
-    beq       br_gun_port_hit
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    beq.b     br_gun_port_hit
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.b    (_STATE,a0),d0
     subq.b    #1,d0                             | inactive?
-    beq       remove_br_gun_port                | yes, go
+    beq.b     remove_br_gun_port                | yes, go
     move.w    (_X,a0),d0                        | object15
     add.w     #0x0200,d0                        | calc spriteY
     move.w    d0,(_X,a5)                        | update spriteY
@@ -5259,17 +5259,17 @@ remove_br_gun_port: | $37B6
 br_gun_port_hit: | $37BF
     bsr       pre_gun_port_explosion
     SET_REENTRY_ADDR_HERE
-    movea.l   #obj_tbl+_OBJSIZE*0x0f,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x0f,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0x0200,d0                        | calc spriteX
     move.w    d0,(_X,a5)                        | update spriteX
     move.w    (_Y,a0),d0
     add.w     #0xfe00,d0                        | calc spriteY
     move.w    d0,(_Y,a5)                        | update spriteY
-    bsr       gun_port_explosion
-    cmp.b     #4,(_STATE,a5)
-    bne       9f
-    bra       remove_br_gun_port
+    bsr.b     gun_port_explosion
+    cmp.b     #4,(_STATE,a5)                    | finished exploding?
+    bne.b     9f                                | no, skip
+    bra.b     remove_br_gun_port
 9:  rts
 
 pre_gun_port_explosion: | $37EE
@@ -5284,18 +5284,18 @@ gun_port_explosion: | $37F8
     lsr.b     #2,d0
     and.w     #7,d0
     subq.b    #5,d0
-    addq.b    #3,d0
-    bcc       1f
-    bsr       adj_gun_port_for_sprite_size
+    addq.b    #3,d0                             | adjust for size?
+    bcc.b     1f                                | no, skip
+    bsr.b     adj_gun_port_for_sprite_size
 1:  move.b    d1,d0
-    and.w     #3,d0
-    bne       9f
+    and.w     #3,d0                             | time to animate sprite?
+    bne.b     9f                                | no, go
     lsr.b     #2,d1
     and.w     #7,d1
-    cmp.b     #7,d1
-    beq       gun_port_explosion_finished
-    movea.l   #gun_port_explosion_sprite_tbl,a0
-    lsl.w     #1,d1
+    cmp.b     #7,d1                             | done exploding?
+    beq.b     gun_port_explosion_finished       | yes, go
+    lea       gun_port_explosion_sprite_tbl,a0
+    add.w     d1,d1                             | x2
     move.b    (a0,d1.w),(_CODE,a5)
     move.b    (1,a0,d1.w),(_ATTR,a5)
 9:  rts
@@ -5313,7 +5313,8 @@ gun_port_explosion_sprite_tbl: | $382F
     .byte 0x6C, 3
     .byte 0x62, 0
     .byte 0x63, 0
-
+    .align 2
+    
 adj_gun_port_for_sprite_size: | $383D
     subq.b    #1,(_X,a5)                        | MSB
     addq.b    #1,(_Y,a5)                        | MSB
@@ -5323,7 +5324,7 @@ cycle_andor_genesis_colour: | $3847
     move.b    (countup_timer_1),d0
     lsr.b     #3,d0
     and.w     #7,d0
-    movea.l   #andor_genesis_colour_tbl,a0
+    lea       andor_genesis_colour_tbl,a0
     move.b    (a0,d0.w),(andor_genesis_colour)
     rts
 
@@ -5333,22 +5334,22 @@ andor_genesis_colour_tbl: | $3858
 * installed into object #1
 * top-left corner piece
 handle_41_Andor_Genesis_obj_09: | $3860
-    movea.l   #obj_tbl+_OBJSIZE*0x09,a4         | override: object=9
+    lea       obj_tbl+_OBJSIZE*0x09,a4          | override: object=9
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x58,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
     add.w     #0x0500,d0                        | calc spriteY
     move.w    d0,(_Y,a4)
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x09,a4         | override: object=9
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x09,a4          | override: object=9
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0xFB00,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5357,22 +5358,22 @@ handle_41_Andor_Genesis_obj_09: | $3860
 * installed into object #2
 * top-middle piece
 handle_42_Andor_Genesis_obj_08: | $3898
-    movea.l   #obj_tbl+_OBJSIZE*0x08,a4         | override: object=8
+    lea       obj_tbl+_OBJSIZE*0x08,a4          | override: object=8
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x80,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
     add.w     #0x0100,d0                        | calc spriteY
     move.w    d0,(_Y,a4)                        | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x08,a4         | override: object=8
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x08,a4          | override: object=8
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0xFB00,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5381,22 +5382,22 @@ handle_42_Andor_Genesis_obj_08: | $3898
 * installed into object #3
 * top-right corner piece
 handle_43_Andor_Genesis_obj_07: | $38CD
-    movea.l   #obj_tbl+_OBJSIZE*0x07,a4         | override: object=7
+    lea       obj_tbl+_OBJSIZE*0x07,a4          | override: object=7
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x84,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
-    add.w     #0xFD00,d0                        | calc spriteY
+    add.w     #0xfd00,d0                        | calc spriteY
     move.w    d0,(_Y,a4)                        | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x07,a4         | override: object=7
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x07,a4          | override: object=7
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
-    add.w     #0xFB00,d0                        | calc spriteX
+    add.w     #0xfb00,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5405,22 +5406,22 @@ handle_43_Andor_Genesis_obj_07: | $38CD
 * installed into object #4
 * left-middle piece
 handle_44_Andor_Genesis_obj_06: | $3905
-    movea.l   #obj_tbl+_OBJSIZE*0x06,a4         | override: object=6
+    lea       obj_tbl+_OBJSIZE*0x06,a4          | override: object=6
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x88,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
     add.w     #0x0500,d0                        | calc spriteY
     move.w    d0,(_Y,a4)                        | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x06,a4         | override: object=6
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x06,a4          | override: object=6
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
     sub.w     #0x0100,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5429,22 +5430,22 @@ handle_44_Andor_Genesis_obj_06: | $3905
 * installed into object #5
 * centre piece
 handle_45_Andor_Genesis_obj_05: | $393A
-    movea.l   #obj_tbl+_OBJSIZE*0x05,a4         | override: object=5
+    lea       obj_tbl+_OBJSIZE*0x05,a4          | override: object=5
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x8C,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
     add.w     #0x0100,d0                        | calc spriteY
     move.w    d0,(_Y,a4)                        | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x05,a4         | override: object=5
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x05,a4          | override: object=5
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
     sub.w     #0x0100,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5453,22 +5454,22 @@ handle_45_Andor_Genesis_obj_05: | $393A
 * installed into object #6
 * middle-right piece
 handle_46_Andor_Genesis_obj_04: | $396C
-    movea.l   #obj_tbl+_OBJSIZE*0x04,a4         | override: object=4
+    lea       obj_tbl+_OBJSIZE*0x04,a4          | override: object=4
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x90,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
-    add.w     #0xFD00,d0                        | calc spriteY
+    add.w     #0xfd00,d0                        | calc spriteY
     move.w    d0,(_Y,a4)                        | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x04,a4         | override: object=4
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x04,a4          | override: object=4
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
     sub.w     #0x0100,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5477,22 +5478,22 @@ handle_46_Andor_Genesis_obj_04: | $396C
 * installed into object #7
 * bottom-left corner piece
 handle_47_Andor_Genesis_obj_03: | $39A1
-    movea.l   #obj_tbl+_OBJSIZE*0x03,a4         | override: object=3
+    lea       obj_tbl+_OBJSIZE*0x03,a4          | override: object=3
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x94,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
     add.w     #0x0500,d0                        | calc spriteY
     move.w    d0,(_Y,a4)                        | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x03,a4         | override: object=3
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x03,a4          | override: object=3
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0x0300,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5501,22 +5502,22 @@ handle_47_Andor_Genesis_obj_03: | $39A1
 * installed into object #8
 * bottom-middle piece
 handle_48_Andor_Genesis_obj_02: | $39D9
-    movea.l   #obj_tbl+_OBJSIZE*0x02,a4         | override: object=2
+    lea       obj_tbl+_OBJSIZE*0x02,a4          | override: object=2
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x98,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
     add.w     #0x0100,d0                        | calc spriteY
     move.w    d0,(_Y,a4)                        | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x02,a4         | override: object=2
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x02,a4          | override: object=2
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0x0300,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5525,22 +5526,22 @@ handle_48_Andor_Genesis_obj_02: | $39D9
 * installed into object #9
 * bottom-right corner piece
 handle_49_Andor_Genesis_obj_01: | $3A0E
-    movea.l   #obj_tbl+_OBJSIZE*0x01,a4         | override: object=1
+    lea       obj_tbl+_OBJSIZE*0x01,a4          | override: object=1
     move.b    #3,(_STATE,a4)                    | indestructible
-    move.b    #3,(_ATTR,a4)                     | size=3x3
+    move.b    #3,(_ATTR,a4)                     | size=2x2
     move.b    #0x9C,(_CODE,a4)
     move.w    (obj_tbl+_OBJSIZE*0x0F+_Y),d0     | object 15
-    add.w     #0xFD00,d0                        | calc spriteY
+    add.w     #0xfd00,d0                        | calc spriteY
     move.w    d0,(_Y,a4)                        | update spriteY
     bsr       save_PC_to_fn_tbl_and_ret
-    movea.l   #obj_tbl+_OBJSIZE*0x01,a4         | override: object=1
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a0         | object15
+    lea       obj_tbl+_OBJSIZE*0x01,a4          | override: object=1
+    lea       obj_tbl+_OBJSIZE*0x0F,a0          | object15
     move.w    (_X,a0),d0
     add.w     #0x0300,d0                        | calc spriteX
     move.w    d0,(_X,a4)
     move.b    (andor_genesis_colour),(_COLOUR,a4)
     cmp.b     #1,(_STATE,a0)                    | core state=1?
-    bne       9f                                | no, return
+    bne.b     9f                                | no, return
     clr.b     (_STATE,a4)
     clr.b     (_TYPE,a4)
     bra       add_obj_handler
@@ -5552,13 +5553,13 @@ handle_49_Andor_Genesis_obj_01: | $3A0E
 * scores 10 pts because _PTS is zero
 handle_53_Easter_Egg: | $3A46
     tst.w     (attract_mode_stage)              | attract mode?
-    bne       remove_easter_egg                 | yes, go
+    bne.b     remove_easter_egg                 | yes, go
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | bank=0, size=1x1
     clr.b     (_CODE,a5)                        | invisible sprite
     SET_REENTRY_ADDR_HERE
     cmp.b     #3,(_STATE,a5)                    | hit?
-    beq       check_copyright_strings           | yes, go
+    beq.b     check_copyright_strings           | yes, go
     bsr       scroll_sprite_X       
     bra       add_obj_handler
 
@@ -5567,12 +5568,12 @@ check_copyright_strings: | $3A75
     *** here is where the Z80 code checked the copyright strings
     *** and displayed a message if they had been modified
     *** obviously no point doing that now
-    bsr       display_easter_egg
+    bsr.b     display_easter_egg
     SET_REENTRY_ADDR_HERE
-    subq.b    #1,(_TIMER,a5)                    | dec timer
-    beq       1f
+    subq.b    #1,(_TIMER,a5)                    | time to wipe?
+    beq.b     1f                                | yes, go
     rts
-1:  bsr       wipe_easter_egg
+1:  bsr.w     wipe_easter_egg
     
 remove_easter_egg: | $3AA5
     clr.b     (_STATE,a5)
@@ -5616,8 +5617,8 @@ str_AMIGA_by_tcdev_jotd:
 .endif
     
 cpl_and_display_string_16: | $3B48
-    movea.l   #str_decrypt_buf,a1
-    moveq     #16-1,d7
+    lea       str_decrypt_buf,a1
+    moveq     #16-1,d7                          | 16 chars to decrypt
 1:  move.b    (a0)+,d0
     not.b     d0
     move.b    d0,(a1)+
@@ -5630,8 +5631,8 @@ cpl_and_display_string_16: | $3B48
     rts 
     
 cpl_and_display_string_24: | $3B62
-    movea.l   #str_decrypt_buf,a1
-    moveq     #24-1,d7
+    lea       str_decrypt_buf,a1
+    moveq     #24-1,d7                          | 24 chars to decrypt
 1:  move.b    (a0)+,d0
     not.b     d0
     move.b    d0,(a1)+
