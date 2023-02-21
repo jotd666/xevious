@@ -527,13 +527,15 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                     p = the_tile.getpixel((x,y))
                     if p in this_sprite_palette_set:
                         the_partial_sprite.putpixel((x,y),p)
-            sprite_out = bitplanelib.palette_image2sprite(the_partial_sprite,None,this_sprite_palette,fmode=3)
+            # we don't need 64 bit wide here ATM
+            sprite_out = bitplanelib.palette_image2sprite(the_partial_sprite,None,this_sprite_palette,fmode=0)
             elementary_sprites.append(sprite_out)
 
         with open("../../src/amiga/sprite_test.68k","w") as f:
             for i,e in enumerate(elementary_sprites):
                 f.write("solvalou_{}:\n".format(i))
-                f.write("\t.word\t0,0,0,0,0,0,0,0")
+                #f.write("\t.word\t0,0,0,0,0,0,0,0")
+                f.write("\t.word\t0,0")
                 dump_asm_bytes(e,f)
                 f.write("\t.long\t0,0,0,0\n")
 

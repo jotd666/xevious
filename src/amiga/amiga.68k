@@ -483,6 +483,35 @@ platform_init:
 	bsr		set_fg_bitplanes
 	bsr		set_bg_bitplanes
 
+	* test (temp)
+	lea		solvalou_0,a0
+	move.l	a0,d0
+	lea		sprites,a0
+	move.w	d0,(6,a0)
+	swap	d0
+	move.w	d0,(2,a0)
+	lea		solvalou_1,a0
+	move.l	a0,d0
+	lea		sprites+8,a0
+	move.w	d0,(6,a0)
+	swap	d0
+	move.w	d0,(2,a0)
+	
+	lea		solvalou_1,a0
+	move.w	#20,D0
+	move.w	#20,D1
+	bsr		store_sprite_pos
+	move.w	d0,(2,a0)
+	swap	d0
+	move.w	d0,(a0)
+	lea		solvalou_0,a0
+	move.w	#20,D0
+	move.w	#20,D1
+	bsr		store_sprite_pos
+	move.w	d0,(2,a0)
+	swap	d0
+	move.w	d0,(a0)
+	
 	* load copperlist
 	
 	* set copperlist
@@ -2333,5 +2362,8 @@ color_row_30_plus:
 
 	* padding (workaround for gas bug)
 	ds.b	4
+	
+	.align	8
+	.include	"sprite_test.68k"
 _end_of_ng_data:
 		
