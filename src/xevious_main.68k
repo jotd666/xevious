@@ -4443,56 +4443,54 @@ domogram_vector_tbl: | $2FB1
                 
 main_fn_2__handle_objects: | $3000
     lea       obj_tbl,a0
-    move.w    #32*64/4,d7                       | 64 objects
+    move.w    #_OBJSIZE*64/4,d7                 | 64 objects
 1:  clr.l     (a0)+
     dbf       d7,1b
-    movea.l   #add_obj_handler,a0
+    lea       add_obj_handler,a0
     lea       main_2_fn_tbl_1,a1
-    moveq     #32-1,d7
+    moveq     #32-1,d7                          | first 32 functions
 2:  move.l    a0,(a1)+
     dbf       d7,2b                             | init 1st half fn table
     lea       main_2_fn_tbl_2,a1
-    moveq     #25-1,d7
+    moveq     #26-1,d7                          | another 26 functions
 3:  move.l    a0,(a1)+
     dbf       d7,3b                             | init 2nd half fn table
-    movea.l   #obj_tbl+_OBJSIZE*0x27,a5         | 1st bullet object
+    lea       obj_tbl+_OBJSIZE*0x27,a5          | 1st bullet object
     moveq     #19-1,d7                          | 19 bullets
 4:  move.b    #0x00,(_STATE,a5)
     move.b    #0x80,(_ATTR,a5)                  | bank=1
     move.b    #0x1e,(_CODE,a5)
-    adda.l    #_OBJSIZE,a5
+    lea       (_OBJSIZE,a5),a5
     dbf       d7,4b                             | init bullet fn table
     bsr       save_PC_to_fn_tbl_and_ret
     tst.b     (scroll_disabled)
-    bne       9f
+    bne.b     9f
     bsr       save_PC_to_fn_tbl_and_ret
     tst.b     (scroll_disabled)
-    bne       main_fn_2__handle_objects
+    bne.b     main_fn_2__handle_objects
     move.l    a6,-(a7)                          | save main jump table address
 
-    movea.l   #obj_tbl,a5                       | object pointer
+    lea       obj_tbl,a5                        | object pointer
     lea       main_2_fn_tbl_1,a6                | object fn
-    moveq     #32-1,d7
-loc_305E:
-    move.l    (a6),a0
+    moveq     #32-1,d7                          | 32 objects/functions
+5:  move.l    (a6),a0
     movem.l   d7/a5-a6,-(a7)
-    jsr       (a0)
+    jsr       (a0)                              | call handler fn
     movem.l   (a7)+,d7/a5-a6
-    add.w     #_OBJSIZE,a5                      | next object
-    adda.l    #4,a6                             | next object fn
-    dbf       d7,loc_305E
+    lea       (_OBJSIZE,a5),a5                  | next object
+    lea       (4,a6),a6                         | next object fn
+    dbf       d7,5b
     
-    adda.l    #_OBJSIZE*7,a5                    | skip solvalou, shots
+    lea       (_OBJSIZE*7,a5),a5                | skip solvalou, shots
     lea       main_2_fn_tbl_2,a6
-    move.q    #25-1,d7
-loc_306D:
-    move.l    (a6),a0
+    move.q    #25-1,d7                          | 25 objects/functions
+6:  move.l    (a6),a0
     movem.l   d7/a5-a6,-(a7)
-    jsr       (a0)
+    jsr       (a0)                              | call handler fn
     movem.l   (a7)+,d7/a5-a6
-    add.w     #_OBJSIZE,a5                      | next object
-    adda.l    #4,a6                             | next object fn
-    dbf       d7,loc_306D
+    lea       (_OBJSIZE,a5),a5                  | next object
+    lea       (4,a6),a6                         | next object fn
+    dbf       d7,6b
     
     move.l    (a7)+,a6                          | restore main jump table address
 9:  rts
@@ -4502,7 +4500,7 @@ add_obj_handler: | $3079
     bsr       save_PC_to_fn_tbl_and_ret
     moveq     #0,d0
     move.b    (_TYPE,a5),d0                     | valid type?
-    beq       9f                                | no, return
+    beq.b     9f                                | no, return
     lea       obj_handler_tbl,a0
     subq.w    #1,d0                             | 1st entry is object #1
     lsl.w     #2,d0                             | offset for object
@@ -4511,10 +4509,10 @@ add_obj_handler: | $3079
 
 move_object_dX_dY: | $3091
     move.w    (_dX,a5),d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | add and update spriteX
     move.w    (_dY,a5),d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_Y,a5)                        | add and update spriteY
     * fall thru
     
@@ -4523,7 +4521,7 @@ check_scroll_offscreen: | $30B4
     move.b    (_X,a5),d0                        | MSB in low byte
     addq.b    #1,d0
     cmp.b     #0x29,d0
-    bcc       handle_scroll_offscreen
+    bcc.b     handle_scroll_offscreen
     move.b    (_Y,a5),d0
     cmp.b     #0x1f,d0
     bcs       exit_caller
@@ -4536,45 +4534,45 @@ handle_scroll_offscreen:
 * a5=object ptr
 move_object_dX: | $30D4
     move.w    (_dX,a5),d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | update spriteX
-    bra       check_scroll_offscreen
+    bra.b     check_scroll_offscreen
             
 * a5=object ptr
 scroll_sprite_X: | $30E8
     move.w    (scroll_delta),d0
     neg.w     d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | update spriteX
-    bra       check_scroll_offscreen
+    bra.b     check_scroll_offscreen
 
 move_object_dX_dY_2: | $30FC
     move.w    (_dX,a5),d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | update spriteX
     move.w    (_dY,a5),d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_Y,a5)                        | update spriteY
     rts
     
 flying_enemy_hit: | $311F
     move.b    #7,(_COLOUR,a5)
-    move.b    #0xff,(_TIMER,a5)
+    move.b    #0xff,(_TIMER,a5)                 | init timer
     SET_REENTRY_ADDR_HERE
     addq.b    #1,(_TIMER,a5)                    | inc timer
     moveq     #0,d0
     move.b    (_TIMER,a5),d0
     cmp.b     #8,d0                             | time to adjust sprite size?
-    bne       1f                                | no, skip
+    bne.b     1f                                | no, skip
     subq.b    #1,(_X,a5)                        | dec MSB X
     addq.b    #1,(_Y,a5)                        | inc MSB Y
 1:  move.b    d0,d1                             | save timer value
     lsr.b     #2,d0
     cmp.b     #5,d0                             | explosion finished?
-    beq       remove_object_type_state
+    beq.b     remove_object_type_state
 * animate flying enemy explosion
-    movea.l   #flying_obj_explosion_sprites,a0
-    lsl.w     #1,d0                             | x2
+    lea       flying_obj_explosion_sprites,a0
+    add.w     d0,d0                             | x2
     move.b    (a0,d0.w),(_CODE,a5)
     and.w     #3,d1                             | timer
     lsl.b     #2,d1
@@ -4605,26 +4603,22 @@ handle_bomb_explosion: | $3186
     move.b    (_TIMER,a5),d0
     move.b    d0,d1
     and.b     #7,d1                             | time for next animation frame?
-    bne       loc_31CE                          | no, skip
+    bne.b     3f                                | no, skip
     lsr.b     #3,d0
     and.b     #7,d0                             | animation frame
     cmp.b     #7,d0                             | done animating?
-    beq       bomb_explosion_finished
+    beq.b     bomb_explosion_finished
     cmp.b     #2,d0
-    bne       1f
-    bsr       adj_for_big_explosion_frame2
+    bne.b     1f
+    bsr.b     adj_for_big_explosion_frame2
 1:  cmp.b     #5,d0
-    bne       2f
-    bsr       adj_for_small_explosion_frame2
+    bne.b     2f
+    bsr.b     adj_for_small_explosion_frame2
 2:  movea.l   #bomb_explosion_animation_tbl,a0
     lsl.w     #1,d0
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (1,a0,d0.w),(_ATTR,a5)
-    bsr       scroll_sprite_X
-    bra       add_obj_handler
-
-loc_31CE:
-    bsr       scroll_sprite_X
+3:  bsr       scroll_sprite_X
     bra       add_obj_handler
 
 bomb_explosion_finished: | $31D7
@@ -4641,20 +4635,13 @@ bomb_explosion_finished: | $31D7
     
 * these are sprite codes, sizes for the bomb explosion
 bomb_explosion_animation_tbl: | $31F4
-    .byte 0x60
-    .byte    0
-    .byte 0x61
-    .byte    0
-    .byte 0x64
-    .byte    3
-    .byte 0x68
-    .byte    3
-    .byte 0x6C
-    .byte    3
-    .byte 0x62
-    .byte    0
-    .byte 0x63
-    .byte    0
+    .byte 0x60, 0
+    .byte 0x61, 0
+    .byte 0x64, 3
+    .byte 0x68, 3
+    .byte 0x6C, 3
+    .byte 0x62, 0
+    .byte 0x63, 0
 
 adj_for_big_explosion_frame2: | $3202
     subq.b    #1,(_X,a5)                        | MSB
@@ -4668,33 +4655,29 @@ adj_for_small_explosion_frame2: | $320C
     
 explode_and_remove_object: | $3216
     move.b    #0x0c,(_COLOUR,a5)
-    move.b    #0xff,(_TIMER,a5)
+    move.b    #0xff,(_TIMER,a5)                 | init timer
     SET_REENTRY_ADDR_HERE
     addq.b    #1,(_TIMER,a5)
     move.b    (_TIMER,a5),d0
     move.b    d0,d1                             | copy
-    and.b     #3,d0
-    bne       loc_325D
+    and.b     #3,d0                             | time to animate
+    bne.b     3f                                | no, skip
     lsr.b     #2,d1
     and.w     #7,d1
     cmp.b     #7,d1                             | done exploding?
-    beq       remove_object
+    beq.b     remove_object                     | yes, go
     cmp.b     #2,d1
-    bne       1f
-    bsr       adj_for_big_explosion_frame2
+    bne.b     1f
+    bsr.b     adj_for_big_explosion_frame2
 1:  cmp.b     #5,d1
-    bne       2f
-    bsr       adj_for_small_explosion_frame2
-2:  movea.l   #bomb_explosion_animation_tbl,a0
-    lsl.w     #1,d1                             | entry offset
+    bne.b     2f
+    bsr.b     adj_for_small_explosion_frame2
+2:  lea       bomb_explosion_animation_tbl,a0
+    add.w     d1,d1                             | entry offset
     lea       (a0,d1.w),a0                      | ptr entry
     move.b    (a0)+,(_CODE,a5)
     move.b    (a0),(_ATTR,a5)
-    bsr       scroll_sprite_X
-    bra       add_obj_handler
-
-loc_325D: | $325D
-    bsr       scroll_sprite_X
+3:  bsr       scroll_sprite_X
     bra       add_obj_handler
 
 remove_object: | $3266
@@ -4705,10 +4688,10 @@ remove_object: | $3266
 chk_timer_fire_bullet_reinit_timer: | $3271
     move.b    (countup_timer_1),d0
     and.b     #7,d0
-    bne       9f
+    bne.b     9f
     subq.b    #1,(_TIMER,a5)                    | time to fire?
-    bne       9f                                | no, exit
-    bsr       init_new_bullet
+    bne.b     9f                                | no, exit
+    bsr.b     init_new_bullet
     bsr       pseudo_random_gen                 | rnd shot timer
     and.b     (_FFREQ,a5),d0                    | scale wirh mask
     addq.b    #1,d0
@@ -4716,20 +4699,20 @@ chk_timer_fire_bullet_reinit_timer: | $3271
 9:  rts
 
 init_new_bullet: | $3287
-    movea.l   #obj_tbl+_OBJSIZE*0x27,a0         | 1st bullet
+    lea       obj_tbl+_OBJSIZE*0x27,a0          | 1st bullet
     moveq     #19-1,d7                          | 19 bullets
 1:  cmp.b     #1,(_STATE,a0)                    | idle?
-    beq       found_idle_bullet_slot            | yes, go
-    adda.l    #_OBJSIZE,a0                      | next slot
+    beq.b     found_idle_bullet_slot            | yes, go
+    lea       (_OBJSIZE,a0),a0                  | next slot
     dbf       d7,1b
     rts
 
 find_idle_and_init_radiating_bullet: | $3297
-    movea.l   #obj_tbl+_OBJSIZE*0x27,a0         | bullet table
+    lea       obj_tbl+_OBJSIZE*0x27,a0          | bullet table
     moveq     #19-1,d7                          | 19 bullets
 1:  move.b    (_STATE,a0),d0
     subq.b    #1,d0
-    beq       init_radiating_bullet
+    beq.b     init_radiating_bullet
     lea       (_OBJSIZE,a0),a0
     dbf       d7,1b
     rts
@@ -4743,21 +4726,21 @@ set_state_and_copy_obj_coords: | $32A5
 
 * a0=bullet a5=object firing
 found_idle_bullet_slot: | $32BB
-    bsr       set_state_and_copy_obj_coords
-    move.b    #6,(_TYPE,a0)
+    bsr.b     set_state_and_copy_obj_coords
+    move.b    #6,(_TYPE,a0)                     | bullet
     rts
 
 * a0=bullet d2=angle index
 init_radiating_bullet: | $32C4
-    bsr       set_state_and_copy_obj_coords
-    movea.l   #angle_dX_dY_terrazi_torkan_tbl,a2
+    bsr.b     set_state_and_copy_obj_coords
+    lea       angle_dX_dY_terrazi_torkan_tbl,a2
     bsr       cpy_dY_dX_to_obj
-    move.b    #7,(_TYPE,a0)
+    move.b    #7,(_TYPE,a0)                     | Garu Zakato bullet
     rts
 
 brag_zakato_shoot: | $32D9
     move.b    (_X,a5),d4                        | save MSB
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
     move.b    (_X,a1),d0                        | MSB
     sub.b     d4,d0
     move.b    (_Y,a5),d4                        | save MSB
@@ -4767,11 +4750,11 @@ brag_zakato_shoot: | $32D9
     sub.b     #32,d2
     lsr.b     #3,d2
     and.w     #0x1f,d2
-    moveq     #5-1,d7
+    moveq     #5-1,d7                           | 5 bullets to shoot
 1:  move.l    d7,-(a7)
     bsr       find_idle_and_init_radiating_bullet
     move.l    (a7)+,d7
-    addq.b    #2,d2
+    addq.b    #2,d2                             | inc angle by 2
     and.w     #0x1f,d2
     dbf       d7,1b
     rts
@@ -4782,26 +4765,26 @@ init_garu_zakato_explosion: | $330A
 1:  move.l    d7,-(a7)
     bsr       find_idle_and_init_radiating_bullet
     move.l    (a7)+,d7
-    addq.b    #2,d2
-    and.b     #30,d2
+    addq.b    #2,d2                             | inc angle by 2
+    and.b     #30,d2                            | wrap at 31
     dbf       d7,1b
-    movea.l   #obj_tbl+_OBJSIZE*0x3B,a0         | garu_zakato
+    lea       obj_tbl+_OBJSIZE*0x3B,a0          | garu_zakato
     lea       (_OBJSIZE,a0),a1                  | next object
     movea.l   a1,a2                             | copy
-    moveq     #4-1,d7
+    moveq     #4-1,d7                           | 4 objects to init
 2:  move.w    (_X,a0),(_X,a1)
     move.w    (_Y,a0),(_Y,a1)
     lea       (_OBJSIZE,a1),a1
     dbf       d7,2b
-    movea.l   #brag_spario_dX_tbl,a0
-    movea.l   #brag_spario_dY_tbl,a1
-    moveq     #4-1,d7
-3:  move.b    (a0)+,d0
-    ext.w     d0
-    move.w    d0,(_dX,a2)
-    move.b    (a1)+,d0
-    ext.w     d0
-    move.w    d0,(_dY,a2)
+    lea       brag_spario_dX_tbl,a0
+    lea       brag_spario_dY_tbl,a1
+    moveq     #4-1,d7                           | 4 objects to init
+3:  move.b    (a0)+,d0                          | table entry
+    ext.w     d0                                | (68K)
+    move.w    d0,(_dX,a2)                       | init dX
+    move.b    (a1)+,d0                          | table entry
+    ext.w     d0                                | (68K)
+    move.w    d0,(_dY,a2)                       | init dY
     move.b    #9,(_TYPE,a2)                     | Brag Spario
     lea       (_OBJSIZE,a2),a2                  | next object
     dbf       d7,3b
@@ -4821,13 +4804,13 @@ brag_spario_dY_tbl: | $3361
 
 * a2=angle_dX_dY_tbl, a5=object
 calc_dX_dY_for_vector_to_solvalou: | $3365
-    movea.l   #obj_tbl+_OBJSIZE*0x23,a1         | solvalou
+    lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
     move.b    (_X,a1),d0                        | solvalou MSB
     sub.b     (_X,a5),d0                        | sub bullet MSB
     move.b    (_Y,a1),d1                        | solvalou MSB
     sub.b     (_Y,a5),d1                        | sub bullet MSB
     bsr       get_index_for_angle
-    addq.b    #4,d2
+    addq.b    #4,d2                             | black magic?
     * fall thru
     
 get_dX_dY_and_cpy_to_obj:
@@ -4837,7 +4820,7 @@ get_dX_dY_and_cpy_to_obj:
             
 * a2=table base addr, a5=object, d2=offset
 cpy_dY_dX_to_obj: | $3383
-    lsl.w     #1,d2                             | x2
+    add.w     d2,d2                             | x2
     lea       (a2,d2.w),a2                      | ptr entry
     move.b    (a2)+,d0
     ext.w     d0
@@ -4850,26 +4833,25 @@ cpy_dY_dX_to_obj: | $3383
 * a5=object   
 gen_random_Y_store_obj: | $338B
     bsr       pseudo_random_gen
-    and.w     #31,d0
-    cmp.b     #25,d0
-    bcc       gen_random_Y_store_obj
-    addq.w    #3,d0
-    lsl.w     #8,d0
-    move.w    d0,(_Y,a5)
+    and.w     #31,d0                            | 0-31
+    cmp.b     #25,d0                            | >24?
+    bcc.b     gen_random_Y_store_obj            | yes, try again
+    addq.w    #3,d0                             | offset
+    move.b    d0,(_Y,a5)                        | spriteY (MSB)
     rts
         
 gen_rnd_spriteY: | $3398
-    movea.l   #obj_tbl+0x23*_OBJSIZE,a4         | solvalou object
+    lea       obj_tbl+0x23*_OBJSIZE,a4          | solvalou object
 1:  bsr       pseudo_random_gen
     and.b     #31,d0
     cmp.b     #25,d0                            | too big?
-    bcc       1b                                | yes, try again
-    addq.b    #3,d0
+    bcc.b     1b                                | yes, try again
+    addq.b    #3,d0                             | offset
     move.b    d0,d1
     sub.b     (_Y,a4),d1
     subq.b    #8,d1
     add.b     #0x10,d1                          | too close to solvalou?
-    bcs       1b                                | yes, try again
+    bcs.b     1b                                | yes, try again
     move.b    d0,(_Y,a5)                        | spriteY (MSB)
     rts
 
