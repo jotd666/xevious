@@ -29,7 +29,7 @@
 
 	.include	"cia.i"
 	.include	"custom.i"
-	.include	"ReadJoypad.inc"
+	.include	"ReadJoypad.i"
 
 
 POTGO_RESET = 0xFF00  	| was 0xFFFF but changed, thanks to robinsonb5@eab

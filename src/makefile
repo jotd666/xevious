@@ -1,13 +1,18 @@
 PROGNAME = xevious
-HDBASE = K:\jff\AmigaHD
-WHDBASE = $(HDBASE)\PROJETS\HDInstall\DONE\WHDLoad
-WHDLOADER = ../$(PROGNAME).slave
 SOURCE = $(PROGNAME)HD.s
 MAIN = ..\$(PROGNAME)
 
 GCC_BIN = C:\amiga-gcc\bin
 ASM = $(GCC_BIN)/m68k-amigaos-as -c 
 MAIN_OBJ = amiga.o
+WHDLOADER = ../$(PROGNAME).slave
+
+# those 2 are defined for my PC, should include whdload.i
+# and system includes
+HDBASE = K:\jff\AmigaHD
+WHDBASE = $(HDBASE)\PROJETS\HDInstall\DONE\WHDLoad
+
+
 # leave MAIN_OBJ first
 OBJS = $(MAIN_OBJ) sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
 all: $(MAIN) $(WHDLOADER)
