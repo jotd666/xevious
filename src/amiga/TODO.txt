@@ -18,6 +18,9 @@
 - remove colors only used in "bragza" as there are a lot of them and
   we can't really afford it (maybe later a sprite for it with changing palette)
 - finish to name enemies & objects (useful for color stats)
+- tiles not found at start??? title tiles also with brown color config???
+  related to hole in map???
+  
 further optims:
 
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)

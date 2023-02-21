@@ -392,7 +392,7 @@ def write_tiles(t,matrix,f,is_bob):
                 item = item_data[k]
                 f.write("* {}\n".format(k))
                 # first y offset & height
-                f.write("\tdc.w\t{y_offset},{height}   | y_offset,height \n".format(**item_data))
+                f.write("\tdc.w\t{bitmap_type},0,{y_offset},{height}   | bitmap_type,pad,y_offset,height \n".format(**item_data))
                 # we know that a lot of images are similar:
                 # the palettes are different so the bitplanes are identical
                 # only in a different order. Also, there's a lot of only-zero
@@ -480,7 +480,7 @@ def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
         blit_pad=is_sprite)
         rval.append(raw)
 
-    return {"png":input_image,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
+    return {"bitmap_type":"BT_BOB","png":input_image,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
 
 def dump_asm_bytes(block,f):
     c = 0
@@ -642,6 +642,9 @@ if dump_graphics:
         blankptr = "BLANKPTR"
         f.write("{} = 0\n".format(nullptr))
         f.write("{} = 1\n".format(blankptr))
+        f.write("""BT_BOB = 0
+BT_SPRITE = 1
+""")
         t = "fg_tile"
         # foreground tiles: just write the 1-bitplane tiles and their mirrored counterpart
         f.write("\t.global\t_{0}\n_{0}:".format(t))
