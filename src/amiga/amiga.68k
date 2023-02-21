@@ -1361,11 +1361,12 @@ sprite_draw_double_height:
 * < D2: attributes
 * < D3: Y
 * < D5: X
-* < A3: bitplane pointer list
+* < A3: graphical object structure (type+2 pointers on bitplanes
+* if bobs, or 2 pointers on sprite data if sprites)
 * trashed registers: A0
 
 draw_sprite_part:
-	movem.w	d0/d1/d3,-(a7)
+	movem.w	d0/d1/d3-d4,-(a7)
 	* d0 is the tile index, compute clut index in d1
 	and.w	#0x7F,d1	| significant color bits TEMP
 	
@@ -1392,28 +1393,28 @@ draw_sprite_part:
 	
 	bra.b	2f
 7:
-	btst	#7,d2			| X-flip?
-	beq.b	3f
-	add.w	#8+4*(NB_PLAYFIELD_PLANES+1),d1			| mirror planes come right after (plus header)
-3:
+
 	cmp.w	#1,d1		| test blankptr
 	beq.b	2f			| skip
-	
-	lea	(a3,d1.w),a0	| get pointer on bitplane pointer list
+
+	move.w	(a3,d1.w),d4	| object type
+	* ATM ignore type, but soon we'll handle
+	* sprites from there
+	btst	#7,d2			| X-flip?
+	beq.b	3f
+	add.w	#4,d1		| pointer to mirror planes
+3:
+	move.l	(2,a3,d1.w),a0	| get pointer on bitplane pointer list
 	move.w	d5,d0		| restore x
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
-	move.w	(a0)+,d3	| object type
-	* ATM ignore type, but soon we'll handle
-	* sprites from there
-	addq.w	#2,a0		| skip extra param
 	* bob: get params
 	add.w	(a0)+,d1	| y offset
 	move.w	(a0)+,d3	| height
 	* attributes remain in d2
 	bsr	blit_16x_bob
 2:
-	movem.w	(a7)+,d0/d1/d3
+	movem.w	(a7)+,d0/d1/d3-d4
 	rts
 	
 *P1 B2 = DSWB bit 0

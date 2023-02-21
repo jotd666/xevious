@@ -10,6 +10,9 @@ import collections
 dump_graphics = True  # uncomment for dry-run
 dump_pngs = True  # uncomment for faster operation, pngs aren't needed for asset generation per se
 
+BT_BOB = "BT_BOB"
+BT_SPRITE = "BT_SPRITE"
+
 sprite_color_count = collections.Counter()
 sprite_color_usage = collections.defaultdict(set)
 
@@ -388,29 +391,34 @@ def write_tiles(t,matrix,f,is_bob):
 
             picname = "{}_pic_{:03d}".format(t,i)
             f.write("{0}:\n".format(picname))
+            f.write("\t.word\t{bitmap_type}\n".format(**item_data))
             for k in STD_MIRROR_LIST:
                 item = item_data[k]
-                f.write("* {}\n".format(k))
-                # first y offset & height
-                f.write("\tdc.w\t{bitmap_type},0,{y_offset},{height}   | bitmap_type,pad,y_offset,height \n".format(**item_data))
-                # we know that a lot of images are similar:
-                # the palettes are different so the bitplanes are identical
-                # only in a different order. Also, there's a lot of only-zero
-                # planes as only 8 colors are used
-                # so the picture (including mask) is a list of pointers on planes
-                # plane data (32 bytes) are only listed once, and used a lot of times
+                f.write("\t.long\t{}_{}\n".format(picname,k))
+            for k in STD_MIRROR_LIST:
+                item = item_data[k]
+                f.write("{}_{}:\n".format(picname,k))
+                if item_data["bitmap_type"] == BT_BOB:
+                    # first y offset & height
+                    f.write("\t.word\t{y_offset},{height}   | y_offset,height \n".format(**item_data))
+                    # we know that a lot of images are similar:
+                    # the palettes are different so the bitplanes are identical
+                    # only in a different order. Also, there's a lot of only-zero
+                    # planes as only 8 colors are used
+                    # so the picture (including mask) is a list of pointers on planes
+                    # plane data (32 bytes) are only listed once, and used a lot of times
 
-                plane_size = 4*item_data["height"]   # 64 max
+                    plane_size = 4*item_data["height"]   # 64 max
 
-                for p in range(BG_NB_PLANES+1):  # +1: mask
-                    block = tuple(item[p*plane_size:p*plane_size+plane_size])
-                    block_id = bob_plane_cache.get(block)
-                    if block_id is None:
-                        # block is not in cache
-                        block_id = bob_plane_id
-                        bob_plane_cache[block] = block_id
-                        bob_plane_id += 1
-                    f.write("\tdc.l\tplane_pic_{}\n".format(block_id))
+                    for p in range(BG_NB_PLANES+1):  # +1: mask
+                        block = tuple(item[p*plane_size:p*plane_size+plane_size])
+                        block_id = bob_plane_cache.get(block)
+                        if block_id is None:
+                            # block is not in cache
+                            block_id = bob_plane_id
+                            bob_plane_cache[block] = block_id
+                            bob_plane_id += 1
+                        f.write("\tdc.l\tplane_pic_{}\n".format(block_id))
         f.write("\t.datachip\n")
         for k,v in sorted(bob_plane_cache.items(),key=lambda x:x[1]):
             f.write("plane_pic_{}:".format(v))
@@ -480,7 +488,7 @@ def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
         blit_pad=is_sprite)
         rval.append(raw)
 
-    return {"bitmap_type":"BT_BOB","png":input_image,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
+    return {"bitmap_type":BT_BOB,"png":input_image,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
 
 def dump_asm_bytes(block,f):
     c = 0
@@ -642,8 +650,8 @@ if dump_graphics:
         blankptr = "BLANKPTR"
         f.write("{} = 0\n".format(nullptr))
         f.write("{} = 1\n".format(blankptr))
-        f.write("""BT_BOB = 0
-BT_SPRITE = 1
+        f.write("""BT_BOB = 1
+BT_SPRITE = 2
 """)
         t = "fg_tile"
         # foreground tiles: just write the 1-bitplane tiles and their mirrored counterpart
