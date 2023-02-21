@@ -474,6 +474,7 @@ platform_init:
     move.w #2<<4,bplcon1(a5)    | foreground tiles shifted by 2 pixels
     move.w #0x0044,bplcon2(a5)	| 2nd playfield has priority, sprites have priority
     move.w #BASE_BPLCON3_VALUE,bplcon3(a5)	| color bank offset for playfield 2
+	move.w	#0x32,bplcon4(a5)	| odd sprites palette start at color 48, even at 32
 	move.w	#-8,d0
     move.w d0,bpl1mod(a5)
     move.w d0,bpl2mod(a5)
@@ -1506,23 +1507,29 @@ create_direction_table:
 direction_table:
 	ds.b	16
 
-* TODO: adapt for AGA sprites (not same width)	
 * < d0.w: x
 * < d1.w: y
 * > d0.L: control word
 store_sprite_pos:
-    movem.l  d1/a0/a1,-(a7)
+    movem.l  a0/a1,-(a7)
 
     lea	HW_SpriteXTable(pc),a0
     lea	HW_SpriteYTable(pc),a1
 
+	.ifdef	NO68020
     add.w	d0,d0
     add.w	d0,d0
     move.l	(a0,d0.w),d0
+	move.w	d1,-(a7)
     add.w	d1,d1
     add.w	d1,d1
     or.l	(a1,d1.w),d0
-    movem.l  (a7)+,d1/a0/a1
+	move.w	(a7)+,d1
+	.else
+    move.l	(a0,d0.w*4),d0
+    or.l	(a1,d1.w*4),d0	
+	.endc
+    movem.l  (a7)+,a0/a1
     rts
 	
 HW_SpriteXTable:
@@ -2154,13 +2161,18 @@ _end_of_ng_code:
 		.text
 
 	.align 2
+* bg tiles (game floor) (0-15) + bobs (16-32) in AGA dual playfield
 palette:
 	.include "palette.68k"
+* used for bg "xevious" tiles for title screen
 title_palette:
 	.include "title_palette.68k"
+* only used for fg tile color (specially when flashing xevious title)
 original_palette:
 	.include "original_palette.68k"
-
+* hardware sprite colors (32-256)
+hw_sprite_palette:
+	.include	"hw_sprite_palette.68k"
 		.bss
 
 		.align 4

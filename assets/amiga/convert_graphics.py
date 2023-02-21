@@ -13,6 +13,12 @@ dump_pngs = True  # uncomment for faster operation, pngs aren't needed for asset
 BT_BOB = "BT_BOB"
 BT_SPRITE = "BT_SPRITE"
 
+black = (0,0,0)
+white = (255,255,255)
+
+# default hw sprite palette from color 32: all black
+hw_sprite_palette = [black] * (256-32)
+
 sprite_color_count = collections.Counter()
 sprite_color_usage = collections.defaultdict(set)
 
@@ -26,6 +32,10 @@ title_tiles = {240, 241, 242, 243, 244, 245, 246, 247, 248,
  486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497,
  498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511}
 
+# dictionary of sprites which aren't bobs but sprites
+# since game sprites can have more than 3 colors, we have to combine 2 sprites
+real_sprites = {80:[0,1]   # solvalou
+}
 # this script uses the original graphics.c with palette & cluts
 # and generates the bitmaps for the amiga version
 #
@@ -38,8 +48,6 @@ title_tiles = {240, 241, 242, 243, 244, 245, 246, 247, 248,
 
 block_dict = {}
 
-black = (0,0,0)
-white = (255,255,255)
 
 BG_NB_PLANES = 4
 STD_MIRROR_LIST = ("standard","mirror")
@@ -316,20 +324,7 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
         # generate the proper palette
         for clut_index in cluts:
             used_palette = global_palette if is_sprite or tile_index not in title_tiles else title_tile_palette
-
-            if dump_pngs:
-                current_palette = tile_clut[clut_index]
-                input_image = Image.new("RGB",(side,side))
-                img_name = image_names_dict.get(tile_index,"img")
-                for i,p in enumerate(pic):
-                    col = current_palette[p]
-                    y,x = divmod(i,side)
-                    input_image.putpixel((x,y),col)
-                    # statistics / color usage
-                    sprite_color_count[col] += 1
-                    sprite_color_usage[col].add(img_name)
-
-                ImageOps.scale(input_image,scale,0).save("dumps/{}/orig/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index))
+            # create sprite/tile with original/unmodified colors
 
             current_palette = reduced_tile_clut[clut_index]
             if all(x==black for x in current_palette):
@@ -337,11 +332,15 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
             else:
 
                 try:
-                    d = generate_tile(pic,side,current_palette,used_palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
+                    img_name = image_names_dict.get(tile_index,"img")
+                    d = generate_tile(pic,img_name,tile_index,side,current_palette,tile_clut[clut_index],
+                                    used_palette,nb_planes=BG_NB_PLANES,is_sprite=is_sprite)
                     # put dict in each slot
                     row[clut_index] = d
                     if dump_pngs:
-                        ImageOps.scale(d["png"],scale,0).save("dumps/{}/reduced/{}_{:02}_{}.png".format(img_type,image_names_dict.get(tile_index,"img"),tile_index,clut_index))
+                        ImageOps.scale(d["png"],scale,0).save("dumps/{}/reduced/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index))
+                        ImageOps.scale(d["png_org"],scale,0).save("dumps/{}/orig/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index))
+
                 except bitplanelib.BitplaneException as e:
                     print("{}:{}: {}".format(tile_index,clut_index,e))
 
@@ -450,14 +449,23 @@ def write_tiles(t,matrix,f,is_bob):
 
                 dump_asm_bytes(item,f)
 
-def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
+def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_palette,global_palette,nb_planes,is_sprite):
     input_image = Image.new("RGB",(side,side))
     first_non_black_y = None
     last_non_black_y = 0
+
+    input_image_orig_palette = Image.new("RGB",(side,side))
+
     for i,p in enumerate(pic):
+        orig_col = current_original_palette[p]
         col = current_palette[p]
         y,x = divmod(i,side)
         input_image.putpixel((x,y),col)
+        input_image_orig_palette.putpixel((x,y),orig_col)
+        # statistics / color usage
+        if is_sprite:
+            sprite_color_count[col] += 1
+            sprite_color_usage[col].add(img_name)
         # note down first & last non-black line
         if col != black:
             if first_non_black_y is None:
@@ -480,6 +488,57 @@ def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
         height = side
 
     rval = []
+
+    if is_sprite and tile_index in real_sprites:
+        # temp generate sprite data somewhere to test
+        # first separate in 3 colors max images
+        #for the_tile in [input_image,ImageOps.mirror(input_image)]:
+        the_tile = input_image_orig_palette
+        colors_found = set()
+        # first pass: extract palette, group 3 by 3
+        for x in range(the_tile.size[0]):
+            for y in range(the_tile.size[1]):
+                p = the_tile.getpixel((x,y))
+                if p != black:
+                    colors_found.add(p)
+
+        sprite_nums = real_sprites[tile_index]
+        if int((len(colors_found)/3)+0.5) != len(sprite_nums):
+            raise Exception("{}: {} colors for image, expecting max {}".format(tile_index,len(colors_found),len(sprite_nums)*3))
+        # game configures color banks bplcon=$32
+        # odd sprites palette start at color 48, even at 32
+        colors_found = iter(sorted(colors_found))
+        elementary_sprites = []
+
+        for s in sprite_nums:
+            cstart = s*4
+            if s & 1:
+                cstart += 12
+            this_sprite_palette = [black]
+            for i in range(3):
+                nc = next(colors_found,black)
+                this_sprite_palette.append(nc)
+                hw_sprite_palette[cstart+i+1] = nc
+            # draw a filtered image of pic with only those colors
+            the_partial_sprite = Image.new("RGB",the_tile.size)
+            this_sprite_palette_set = set(this_sprite_palette)
+            for x in range(the_tile.size[0]):
+                for y in range(the_tile.size[1]):
+                    p = the_tile.getpixel((x,y))
+                    if p in this_sprite_palette_set:
+                        the_partial_sprite.putpixel((x,y),p)
+            sprite_out = bitplanelib.palette_image2sprite(the_partial_sprite,None,this_sprite_palette,fmode=3)
+            elementary_sprites.append(sprite_out)
+
+        with open("../../src/amiga/sprite_test.68k","w") as f:
+            for i,e in enumerate(elementary_sprites):
+                f.write("solvalou_{}:\n".format(i))
+                f.write("\t.word\t0,0,0,0,0,0,0,0")
+                dump_asm_bytes(e,f)
+                f.write("\t.long\t0,0,0,0\n")
+
+
+    # BOB case (not sprite)
     for the_tile in [input_image,ImageOps.mirror(input_image)]:
         raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
         palette=global_palette,
@@ -488,7 +547,7 @@ def generate_tile(pic,side,current_palette,global_palette,nb_planes,is_sprite):
         blit_pad=is_sprite)
         rval.append(raw)
 
-    return {"bitmap_type":BT_BOB,"png":input_image,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
+    return {"bitmap_type":BT_BOB,"png":input_image,"png_org":input_image_orig_palette,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
 
 def dump_asm_bytes(block,f):
     c = 0
@@ -524,7 +583,7 @@ if dump_graphics:
     pics = fg_data["data"]
     raw_blocks[table] = []
     for i,pic in enumerate(pics):
-        d = generate_tile(pic,side,current_palette,current_palette,nb_planes=1,is_sprite=False)
+        d = generate_tile(pic,"",i,side,current_palette,current_palette,current_palette,nb_planes=1,is_sprite=False)
         for s in STD_MIRROR_LIST:
             raw_blocks[table].append(d[s])
         if dump_pngs:
@@ -584,8 +643,8 @@ if dump_graphics:
         if sx == img.size[0]:
             sx = 0
             sy += side
-
-    img.save("dumps/sprites.png")
+    if dump_pngs:
+        img.save("dumps/sprites.png")
     used_sprite_cluts = get_used_sprite_cluts()
     sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
 
@@ -631,16 +690,16 @@ if dump_graphics:
     with open("dumps/spritecolors.json","w") as f:
         json.dump(color_stats,f,indent=2)
 
-    # first background then sprites (bitplanes are configured accordingly)
-    # also sprites are mainly bobs but to get the chance to use real HW sprites
-    # the palette must be in 16-32 not in 0-16
 
-    bitplanelib.palette_dump(gen_color_dict.original_palette,os.path.join(src_dir,"original_palette.68k"),
-                            bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
-    bitplanelib.palette_dump(partial_palette_bg+partial_palette_sprite,os.path.join(src_dir,"palette.68k"),
-                            bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
-    bitplanelib.palette_dump(title_tile_palette,os.path.join(src_dir,"title_palette.68k"),
-                            bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
+    for p,fn in (
+        (gen_color_dict.original_palette,"original_palette.68k"),      # for foreground tiles (dynamic colors)
+        (partial_palette_bg+partial_palette_sprite,"palette.68k"),     # bg tiles (0-16) for in-game + bobs (16-32) AGA dual playfield
+        (title_tile_palette,"title_palette.68k"),                      # bg tiles (0-16) for title screen (5 unique colors)
+        (hw_sprite_palette,"hw_sprite_palette.68k")                       # hardware sprites to get more colors and/or less blitter ops
+        ):
+        bitplanelib.palette_dump(p,os.path.join(src_dir,fn),
+                                bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
+
 
 
     outfile = os.path.join(src_dir,"graphics.68k")
