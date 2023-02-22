@@ -402,6 +402,21 @@ sub_2_fn_7__reset_num_bacura: | $05D8
     move.l    a0,(area_obj_ptr)
     rts
     
+* handles Domogram (dome that follows paths)
+* byte2 = type
+* byte3 = offset
+* byte4 = sprite Y
+* byte5 = num 2-byte entries to follow
+* byte6 = vector length
+* byte7 = index into domogram vector table (dY,dX pairs)
+* byteN...
+*
+* @$7F<byte3> = <byte2> (type)
+* @$7B<byte3> = <byte4> sprite Y[2:0] x32
+* @$7B<byte3+1> = <byte4> sprite Y[7:3] /8
+* @$7D<byte3+1> = <byte5> num 2-byte entries to follow
+* @$9380<n*64> = <byte5>*2 bytes copied from <byte6> onwards
+
 sub_2_fn_15__domogram: | $05E1
     moveq     #0,d0
     move.b    (a0),d0                           | byte3=object offset (Z80)
@@ -419,15 +434,15 @@ sub_2_fn_15__domogram: | $05E1
     adda.w    #3,a0                             | ptr domogrm data
     move.l    a0,a1                             | copy
     move.b    d0,(_NVEC,a5)                     | number of domogram vectors
-    lsl.w     #1,d0                             | bytes to skip
+    add.w     d0,d0                             | bytes to skip
     adda.w    d0,a0
     move.l    a0,(area_obj_ptr)
     move.w    (next_domogram),d0
-	lsl.w     #6,d0                             | *64 offset in table
+	  lsl.w     #6,d0                             | *64 offset in table
     lea       domogram_tbl,a2
     lea       (a2,d0.w),a2                      | address in table
     move.l    a2,(_EXTRA,a5)                    | store ptr
-    moveq     #64,d7                            | 64 bytes (max) to copy
+    moveq     #64-1,d7                          | 64 bytes (max) to copy
 1:  move.b    (a1)+,(a2)+                       | copy path data
     dbf       d7,1b
     move.w    (next_domogram),d0
@@ -439,9 +454,9 @@ sub_2_fn_15__domogram: | $05E1
     rts
 
 sub_2_fn_18__sheonite_start: | $062E
-    movea.l   #obj_tbl+_OBJSIZE*0x3f,a5         | 6th flying object
+    lea       obj_tbl+_OBJSIZE*0x3f,a5          | 6th flying object
     move.b    #0x31,(_TYPE,a5)
-    suba.l    #_OBJSIZE,a5                      | 5th flying object
+    lea       (-_OBJSIZE,a5),a5                 | 5th flying object
     move.b    #0x32,(_TYPE,a5)
     clr.b     (sheonite_end_flag)
     move.l    a0,(area_obj_ptr)
@@ -453,7 +468,7 @@ sub_2_fn_19__sheonite_end: | $0640
     rts   
 
 sub_2_fn_20__andor_genesis_start: | $064A
-    movea.l   #obj_tbl+_OBJSIZE*0x0F,a5
+    lea       obj_tbl+_OBJSIZE*0x0F,a5
     ** Another Xevious BUG!!!
     ** state=2 causes this object to award points when
     ** the core is bombed
@@ -465,11 +480,11 @@ sub_2_fn_20__andor_genesis_start: | $064A
     clr.b     (_CODE,a5)
     move.l    a0,(area_obj_ptr)
     clr.b     (andor_genesis_end_flag)
-    movea.l   #andor_genesis_data,a0
-    movea.l   #obj_tbl+_OBJSIZE*1,a1            | object1
+    lea       andor_genesis_data,a0
+    lea       obj_tbl+_OBJSIZE*1,a1             | object1
     moveq     #15-1,d7                          | 15 objects
 1:  move.b    (a0)+,(_TYPE,a1)
-    adda.l    #_OBJSIZE,a1
+    lea       (_OBJSIZE,a1),a1
     dbf       d7,1b
     rts   
 
@@ -492,17 +507,18 @@ sub_fn_2__handle_objects: | $068F
     ** On the Neo Geo, @$0000=$00, which does match
     **   and ultimately jumps to an invalid address
     cmpa.l    #0,a0
-    beq.b       9f
+    beq.b     9f
     move.b    (scroll_cntr),d0                  | MSB
     cmp.b     (a0),d0                           | current row?
-    bne.b       9f
+    bne.b     9f
     moveq     #0,d0
     move.b    (1,a0),d0                         | byte #2 (type)
     adda.w    #2,a0                             | ptr byte #3
     lea       obj_fn_tbl,a1
     move.b    (-1,a1,d0.w),d0                   | table is -1 based, index=type
     lea       sub_fn_2_handler,a1
-    lsl.w     #2,d0                             | offset in table
+    add.w     d0,d0
+    add.w     d0,d0                             | offset in table
     movea.l   (a1,d0.w),a1                      | jump address
     jsr       (a1)
 9:  rts
@@ -526,7 +542,7 @@ sub_fn_2_handler:
     .long     sub_2_fn_3__inc_enemy_AI_and_flying_enemies
     .long     null_fn                           | UNUSED
     .long     sub_2_fn_5__reset_flying_enemies
-    .long     sub_2_fn_6__set_8422
+    .long     sub_2_fn_6__set_bacura_inc_cnt
     .long     sub_2_fn_7__reset_num_bacura
     .long     sub_2_fn_8__fire_freq_mask_derota
     .long     sub_2_fn_9__fire_freq_mask_logram
@@ -545,6 +561,11 @@ sub_fn_2_handler:
     .long     sub_2_fn_22__fire_freq_mask_andor_genesis
     .long     sub_2_fn_23__adjust_AI_level_based_on_score
 
+* add object type only
+* - byte2 is object type
+* - byte3 is offset in RAM
+*
+* @$7F<byte3> = byte2 (type)
 * a0 = ptr byte 3
 sub_2_fb_0__type_only: | $0731
     moveq     #0,d0
@@ -554,10 +575,18 @@ sub_2_fb_0__type_only: | $0731
     lea       obj_tbl,a5
     lea       (a5,d0.w),a5                      | set object base
     move.b    (-1,a0),(_TYPE,a5)
-    adda.w    #1,a0
+    lea       (1,a0),a0
     move.l    a0,(area_obj_ptr)
     rts
     
+* add object type and sprite coordinate
+* - byte2 is object type
+* - byte3 is offset in RAM
+* - byte4 is sprite pixel Y coordinate
+*
+* @$7F<byte3> = <byte2> (type)
+* @$7B<byte3> = <byte4> (spriteY[2:0] x32)
+* @$7B<byte3+1> = <byte4> (spriteY[7:3] /8)
 * a0 = ptr byte 3
 sub_2_fn_1__ground_object: | $073F
     moveq     #0,d0
@@ -571,35 +600,37 @@ sub_2_fn_1__ground_object: | $073F
     move.b    (1,a0),d0                         | spriteY
     lsl.w     #5,d0                             | x32
     move.w    d0,(_Y,a5)
-    adda.w    #2,a0                             | next object
+    lea       (2,a0),a0                         | next object
     move.l    a0,(area_obj_ptr)
     rts
 
-sub_2_fn_6__set_8422: | $075D
+* sets the number of bacura to be added
+* - one added every 1 second
+sub_2_fn_6__set_bacura_inc_cnt: | $075D
     move.b    (a0)+,(bacura_inc_cnt)
     move.l    a0,(area_obj_ptr)
     rts
     
 sub_fn_3__handle_next_area: | $078B
-    jsr       save_PC_to_fn_tbl_and_ret   
+    bsr       save_PC_to_fn_tbl_and_ret   
     cmp.b     #0x0e,(scroll_cntr)               | MSB
-    beq       9f                                | not ready to finish
-    jsr       save_PC_to_fn_tbl_and_ret   
+    beq.b     9f                                | not ready to finish
+    bsr       save_PC_to_fn_tbl_and_ret   
     cmp.b     #0x0e,(scroll_cntr)               | MSB
-    bne       9f                                | not finished
+    bne.b     9f                                | not finished
     move.w    (area),d0
     .ifeq OPT_LOOP_AREA
     addq.w    #1,d0                             | inc area
     .endif
     cmp.w     #16,d0                            | last area?
-    bne       1f                                | no, skip
+    bne.b     1f                                | no, skip
     move.w    #6,d0                             | restart at area 7
 1:  move.w    d0,(area)                         | update area
     lea       area_offset_in_map_tbl,a0
     move.b    (a0,d0.w),(area_offset_in_map)    | update offset
     lea       area_object_tbl_tbl,a0
-    add.w	  d0,d0                               | offset in table
-    add.w	  d0,d0                               | offset in table
+    add.w	    d0,d0                             | offset in table
+    add.w	    d0,d0                             | offset in table
     move.l    (a0,d0.w),(area_obj_ptr)          | new area ptr
     *** show area on screen for debugging
     .ifne OPT_DISPLAY_AREA
@@ -607,29 +638,32 @@ sub_fn_3__handle_next_area: | $078B
     move.w    (area),d1
     addq.w    #1,d1
     moveq     #BANK_FG_VIDEORAM,d2
-    jsr       display_char
+    bsr       display_char
     .endif
-    bra       sub_fn_3__handle_next_area
+    bra.b     sub_fn_3__handle_next_area
 9:  rts
+
+* SUB CPU had a local copy of area_offset_in_map_tbl here
+* - we don't need it for 68K target
             
 sub_fn_6__display_1UP_2UP: | $07CD
     tst.b     (maincpu_inited)
-    beq       9f
+    beq.b     9f
     move.b    (countup_timer_1),d3
     lsr.b     #4,d3
     and.b     #1,d3                             | d3=bit4 of timer (Z80 B)
-    move.w    #0x1800,d0
-    move.w    #0x0500,d1
+    move.w    #0x1800,d0                        | col=24
+    move.w    #0x0500,d1                        | col=5
     moveq     #0,d6
     move.b    (curr_player),d6                  | d6=player(0/1) (Z80 C)
-    beq       1f                                | P1? yes, skip
-    exg       d0,d1
-1:  jsr       flash_1up_2up
-    exg       d0,d1
-    tst.b     (two_player_game)
-    bne       2f
+    beq.b     1f                                | P1? yes, skip
+    exg       d0,d1                             | swap cols
+1:  bsr.b     flash_1up_2up
+    exg       d0,d1                             | swap cols
+    tst.b     (two_player_game)                 | 2P?
+    bne.b     2f                                | yes, go
     moveq     #6,d6
-    bra       3f    
+    bra.b     3f    
 2:  eori.w    #1,d6                             | swap player
 
 display_1up_2up:
@@ -640,7 +674,7 @@ display_1up_2up:
     move.w    #BANK_FG_VIDEORAM,d2
     moveq     #3-1,d7
 4:  move.b    (a0)+,d1
-    jsr       display_char
+    bsr       display_char
     dbf       d7,4b
 9:  rts
 
@@ -649,7 +683,7 @@ flash_1up_2up:
     and.b     (is_real_game),d3                 | timer for flashing
     beq.b     1f
     move.b    #2,d6                             | 3rd string in table ("   ")
-1:  jsr       display_1up_2up   
+1:  bsr       display_1up_2up   
     movem.l   (a7)+,d0/d1/d6
     rts
 
@@ -980,39 +1014,40 @@ xevious_bb_r:
     lsr.w     #1,d3               | d3=(adr_2b>>1)
     move.b    (d3.w,a0),d4        | d4=rom2a[addr_2b>>1]
     btst      #0,d2
-    beq       1f
+    beq.b     1f
     and.b     #0xf0,d4
     lsl.w     #4,d4
-    bra       2f
+    bra.b     2f
 1:  and.b     #0x0f,d4
     lsl.w     #8,d4
 2:  move.b    (d2.w,a1),d5        | d5=rom2b[adr_2b]
     or.b      d5,d4               | d4=dat1
     move      d4,d2
     and.w     #0x1ff,d2
-    lsl.w     #2,d2               | d2=(dat1&0x1ff)<<2
+    add.w     d2,d2
+    add.w     d2,d2               | d2=(dat1&0x1ff)<<2
     move.b    xevious_bs1,d3
     and.b     #0x01,d3
-    lsl.b     #1,d3               | d3=(xevious_bs[1]&1)<<1
+    add.b     d3,d3               | d3=(xevious_bs[1]&1)<<1
     or.b      d3,d2               | d2=...
     move.b    xevious_bs0,d3
     and.b     #0x01,d3
     or.b      d3,d2               | d2=adr_2c
     btst      #10,d4              | (dat1 & 0x400)
-    beq       3f
+    beq.b     3f
     eor.b     #0x01,d2            | (adr_2c ^= 1)
 3:  btst      #9,d4               | (dat1 & 0x200)
-    beq       4f
+    beq.b     4f
     eor.b     #0x02,d2            | (adr_2c ^= 2)
 4:  btst      #0,d6               | (offset & 1)
-    beq       5f
+    beq.b     5f
     or.w      #0x800,d2           | d2=(adr_2c|0x800)
     move.b    (d2.w,a2),d6        | BB1
     movem.l   (a7)+,d0-d1
     rts
 5:  move.b    (d2.w,a2),d6        | dat2=rom2c[adr_2c]
     move.b    d6,d3
-    lsl.b     #1,d3
+    add.b     d3,d3
     and.b     #0x80,d3            | bit6->7
     move.b    d6,d5
     lsr.b     #1,d5
@@ -1021,10 +1056,10 @@ xevious_bb_r:
     or.b      d3,d6
     or.b      d5,d6               | 6,7,5,4,3,2,1,0
     btst      #10,d4              | (dat1 & 0x400)
-    beq       6f
+    beq.b     6f
     eor.b     #0x40,d6
 6:  btst      #9,d4               | (dat1 & 0x200)
-    beq       7f
+    beq.b     7f
     eor.b     #0x80,d6    
 7:  movem.l   (a7)+,d0-d1
     rts

@@ -415,7 +415,7 @@ coined_up:
 3:  move.b    (a0)+,(a1)+                       | init P2 settings
     dbf       d7,3b
     ** TBD sound
-    
+
 main_gameplay_loop: | $0593
     subq.b    #1,(curr_player_solvalou_left)
     move.w    (area),d0
