@@ -3574,8 +3574,8 @@ handle_16_Brag_Zakato_rnd: | $26DF
     
 brag_zakato_16_main: | $26F0
     bsr       pseudo_random_gen                 | rnd shot timer
-    and.w     #0x3f,d0
-    addq.b    #1,d0
+    and.w     #0x3f,d0                          | 0-63
+    addq.b    #1,d0                             | 1-64
     move.b    d0,(_TIMER,a5)                    | init shot timer
     move.b    #0x12,(_CODE,a5)
     lea       angle_dX_dY_tbl,a2
@@ -3676,9 +3676,9 @@ zakato_teleport_sparkles: | $27FB
     cmp.b     #5,d0                             | done animating sparkles?
     bcc.b     9f                                | yes, go
     lea       zakato_teleport_sprite_tbl,a0
-    lsl.w     #1,d0                             | code entry offset
+    add.w     d0,d0                             | code entry offset
     move.b    (a0,d0.w),(_CODE,a5)
-    lsl.b     #2,d1
+    rol.b     #2,d1
     and.w     #0x0c,d1                          | xflip,yflip
     add.b     (1,a0,d0.w),d1                    | combine with bank,size
     move.b    d1,(_ATTR,a5)
@@ -4734,7 +4734,9 @@ found_idle_bullet_slot: | $32BB
 init_radiating_bullet: | $32C4
     bsr.b     set_state_and_copy_obj_coords
     lea       angle_dX_dY_terrazi_torkan_tbl,a2
+    exg       a0,a5                             | copy to bullet
     bsr       cpy_dY_dX_to_obj
+    exg       a0,a5
     move.b    #7,(_TYPE,a0)                     | Garu Zakato bullet
     rts
 
@@ -4742,29 +4744,29 @@ brag_zakato_shoot: | $32D9
     move.b    (_X,a5),d4                        | save MSB
     lea       obj_tbl+_OBJSIZE*0x23,a1          | solvalou
     move.b    (_X,a1),d0                        | MSB
-    sub.b     d4,d0
+    sub.b     d4,d0                             | d0=xdiff
     move.b    (_Y,a5),d4                        | save MSB
     move.b    (_Y,a1),d1                        | MSB
-    sub.b     d4,d1
+    sub.b     d4,d1                             | d1=ydiff
     bsr       get_index_for_angle
     sub.b     #32,d2
-    lsr.b     #3,d2
+    ror.b     #3,d2
     and.w     #0x1f,d2
     moveq     #5-1,d7                           | 5 bullets to shoot
-1:  move.l    d7,-(a7)
+1:  movem.l   d2/d7,-(a7)
     bsr       find_idle_and_init_radiating_bullet
-    move.l    (a7)+,d7
+    movem.l   (a7)+,d2/d7
     addq.b    #2,d2                             | inc angle by 2
-    and.w     #0x1f,d2
+    and.w     #0x1f,d2                          | limit
     dbf       d7,1b
     rts
     
 init_garu_zakato_explosion: | $330A
     moveq     #0,d2                             | start angle
     moveq     #16-1,d7                          | 16 bullets to spawn
-1:  move.l    d7,-(a7)
+1:  movem.l   d2/d7,-(a7)
     bsr       find_idle_and_init_radiating_bullet
-    move.l    (a7)+,d7
+    movem.l   (a7)+,d2/d7
     addq.b    #2,d2                             | inc angle by 2
     and.b     #30,d2                            | wrap at 31
     dbf       d7,1b
