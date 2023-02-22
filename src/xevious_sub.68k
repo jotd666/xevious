@@ -27,13 +27,7 @@
 _start_of_xevious_sub_rom:
 
 xevious_sub_reset: | $0000
-sub_start:
-    lea       sub_fn_jump_tbl_ROM,a0
-    lea       sub_fn_jump_tbl_RAM,a1
-    moveq     #0x20-1,d7
-1:  move.l    (a0)+,(a1)+
-    dbf       d7,1b   
-    rts
+    bra.b     sub_start
     
 * d0 holds col,row
 calc_colour_video_ram_offset: | $0038
@@ -46,23 +40,37 @@ calc_colour_video_ram_offset: | $0038
     or.w      d6,d0
     rts
 
+sub_start: | $0165
+    * Z80 copied area object table from ROM to RAM
+    * so MAIN CPU could access it. No need to do so
+    * on 68K as it's one program.
+    lea       sub_fn_jump_tbl_ROM,a0
+    lea       sub_fn_jump_tbl_RAM,a1            | need a copy to patch in RAM
+    moveq     #0x20-1,d7
+1:  move.l    (a0)+,(a1)+
+    dbf       d7,1b   
+    * Return here after initialisation
+    * main function will call below regularly
+    rts
+    
 xevious_sub_cpu: | $018A
 restart_main_fn_loop:
     tst.b     (vb_semaphore_sub)
-    beq       9f
+    beq.b     9f
     clr.b     (vb_semaphore_sub)
-
+    * don't support FREEZE
+    
     move.w    #0x100F,d0                        | blue
     jsr       osd_debug_hook
 
-    lea       sub_fn_jump_tbl_RAM,a6
+    lea       sub_fn_jump_tbl_RAM,a6            | 32 functions
     moveq     #32-1,d7
 main_fn_loop:   
     move.l    (a6),a0                           | get jump address
     movem.l   d7/a6,-(a7)
     jsr       (a0)                              | call function
     movem.l   (a7)+,d7/a6
-    adda.l    #4,a6                             | next table entry
+    lea       (4,a6),a6                         | next table entry
     dbf       d7,main_fn_loop
 
     move.w    #0x8000,d0                        | black
@@ -109,11 +117,14 @@ sub_fn_jump_tbl_ROM: | $01B6
     .long     sub_fn_31__update_sprite_shadow
         
 sub_fn_0__update_32_sprite_hw: | $01F6
+    * on the Neo Geo we have do disable VBLANK
+    * and possibly on other platforms as well
+    * the other options is to move this into VBLANK
+    * TBD...
     jsr       osd_disable_vblank_interrupt
     move.w    #32,d0                            | start at sprite 32
     jsr       osd_update_32_sprite_hw
     jmp       osd_enable_vblank_interrupt
-
         
 sub_fn_1__update_scroll_hw: | $0218
     move.w    (bg_scroll_x_shadow),d6
@@ -139,7 +150,7 @@ sub_fn_4__handle_credits_and_start: | $0227
     cmp.b     #1,(num_credits)                  | enough for 1P?
     bcs.b     9f                                | no, exit
     moveq     #1,d2                             | 1 credit/player
-    bra       8f
+    bra.b     8f
 2:  btst.b    #1,d0                             | P2START?
     beq.b     9f                                | no, return
     cmp.b     #2,(num_credits)                  | enough for 2P?
@@ -162,23 +173,23 @@ sub_fn_5__handle_pulsing_colours: | $0264
     lsr.b     #1,d0
     and.b     #3,d0
     add.b     #0x25,d0                          | calculate colour
-    movea.l   #obj_tbl+0x27*_OBJSIZE,a5         | bullets
-    moveq     #19-1,d7                          | 19 bulelts
+    lea       obj_tbl+0x27*_OBJSIZE,a5          | bullets
+    moveq     #19-1,d7                          | 19 bullets
 1:  move.b    d0,(_COLOUR,a5)
-    adda.l    #_OBJSIZE,a5
+    lea       (_OBJSIZE,a5),a5                  | next object
     dbf       d7,1b
     move.b    (countup_timer_1),d0
     lsr.b     #3,d0
     and.w     #7,d0
-    movea.l   #colour_lut_801C,a0
+    lea       colour_lut_pulsing_1,a0
     move.b    (a0,d0.w),(pulsing_colour_1)
-    movea.l   #colour_lut_8043,a0
+    lea       colour_lut_pulsing_2,a0
     move.b    (a0,d0.w),(pulsing_colour_2)
 9:  rts
 
-colour_lut_801C:
+colour_lut_pulsing_1:
     .byte 7, 8, 9, 0xA, 0xB, 0xA, 9, 8
-colour_lut_8043:
+colour_lut_pulsing_2:
     .byte 0x10, 0x11, 0x12, 0x13, 0x14, 0x13, 0x12, 0x11
     
 sub_fn_30__handle_scroll: | $02A6
@@ -187,7 +198,7 @@ sub_fn_30__handle_scroll: | $02A6
     bsr.b     get_map_row
     move.w    #0x40,d0
     move.w    (scroll_cntr),d1
-    lsl.w     #1,d0
+    add.w     d0,d0
     add.w     d1,d0
     lsr.w     #5,d0
     and.w     #0x1ff,d0
@@ -198,13 +209,13 @@ get_map_row: | $02D4
     move.w    (scroll_cntr),d0
     move.w    d0,d2                             | copy
     move.w    (scroll_delta),d1
-    lsl.w     #1,d1                             | x2
+    add.w     d1,d1                             | x2
     add.w     d0,d1
     move.w    d1,(scroll_cntr)                  | update
     lsr.w     #8,d1                             | scroll MSB
     lsr.w     #8,d2
     cmp.b     d2,d1                             | same as before?
-    beq       9f                                | yes, return
+    beq.b     9f                                | yes, return
     bmi.b     1f
     add.b     #0x40,d1
 1:  add.b     #0xf2,d1                          | adjustment (map row)
@@ -216,13 +227,13 @@ get_map_row: | $02D4
     move.b    d1,(xevious_bs0)                  | map row
     move.b    d2,(xevious_bs1)                  | map col
     movem.l   d0-d2,-(a7)
-    jsr       calc_colour_video_ram_offset      |
+    bsr.w     calc_colour_video_ram_offset      |
     moveq     #0,d6
-    jsr       xevious_bb_r                      | d6=attr
+    bsr.w     xevious_bb_r                      | d6=attr
     move.w    d6,d1
     jsr       osd_w_bg_colorram
     moveq     #1,d6
-    jsr       xevious_bb_r                      | d6=tile
+    bsr.w     xevious_bb_r                      | d6=tile
     move.w    d6,d1
     jsr       osd_w_bg_videoram
     movem.l   (a7)+,d0-d2
@@ -243,10 +254,10 @@ sub_2_fn_2__set_flying_enemies: | $03BD
     moveq     #0,d0
     move.b    (a0),d0
     ext.w     d0                                | can be -ve
-    adda      #1,a0
-loc_3BF:
+    lea       (1,a0),a0
+update_flying_enemies:
     lea       flying_enemy_type_offset_tbl,a1
-    add.w	  d0,d0
+    add.w	    d0,d0
     move.b    (a1,d0.w),(num_flying_enemies)
     move.b    (1,a1,d0.w),(flying_enemy_type_tbl_offset)
     move.l    a0,(area_obj_ptr)
@@ -260,15 +271,15 @@ sub_2_fn_3__inc_enemy_AI_and_flying_enemies: | $03D1
     move.b    (dswb),d1
     not.b     d1
     rol.b     #3,d1
-    and.w     #3,d1
+    and.w     #3,d1                             | difficulty DIPs
     lea       difficulty_tbl,a1
-    move.b    (a1,d1.w),d0
+    move.b    (a1,d1.w),d0                      | get entry
     add.b     (enemy_AI_level),d0
-    cmp.b     #0x80,d0
-    bcs.b     1f
-    sub.b     #0x40,d0
+    cmp.b     #0x80,d0                          | too high?
+    bcs.b     1f                                | no, skip
+    sub.b     #0x40,d0                          | decrease again
 1:  move.b    d0,(enemy_AI_level)
-    bra       loc_3BF
+    bra       update_flying_enemies
 
 sub_2_fn_5__reset_flying_enemies: | $03FD
     clr.b     (num_flying_enemies)
@@ -276,20 +287,21 @@ sub_2_fn_5__reset_flying_enemies: | $03FD
     move.l    a0,(area_obj_ptr)
     rts
 
+* increments for AI level per difficulty DIP setting
 difficulty_tbl: 
     .byte   2
     .byte   0
     .byte   6
     .byte   0x10
 
-sub_2_fn_23__adjust_AI_level: | $040C
+sub_2_fn_23__adjust_AI_level_based_on_score: | $040C
     move.l    a0,(area_obj_ptr)
-    move.w    (curr_player_score_msb),d1        
+    move.w    (curr_player_score_msb),d1        | thousands, BCD
     move.b    (solvalou_number),d0
-    bsr       avg_score_per_solvalou
-    cmp.w     #16,d1
-    ble.b     1f
-    move.w    #16,d1
+    bsr.b     avg_score_per_solvalou
+    cmp.w     #16,d1                            | less than 16K/solvalou?
+    ble.b     1f                                | yes, skip
+    move.w    #16,d1                            | limit
 1:  add.b     d1,(enemy_AI_level)    
     rts
 
@@ -302,7 +314,7 @@ avg_score_per_solvalou: | $0E23
     move.b    d0,d2
     moveq     #0,d0
     moveq     #16-1,d7
-1:  lsl.w     #1,d1
+1:  add.w     d1,d1
     roxl.b    #1,d0
     bcs.b     2f
     cmp.b     d2,d0
@@ -531,7 +543,7 @@ sub_fn_2_handler:
     .long     sub_2_fn_20__andor_genesis_start
     .long     sub_2_fn_21__andor_genesis_end
     .long     sub_2_fn_22__fire_freq_mask_andor_genesis
-    .long     sub_2_fn_23__adjust_AI_level
+    .long     sub_2_fn_23__adjust_AI_level_based_on_score
 
 * a0 = ptr byte 3
 sub_2_fb_0__type_only: | $0731
@@ -586,8 +598,8 @@ sub_fn_3__handle_next_area: | $078B
     lea       area_offset_in_map_tbl,a0
     move.b    (a0,d0.w),(area_offset_in_map)    | update offset
     lea       area_object_tbl_tbl,a0
-    add.w	  d0,d0                            | offset in table
-    add.w	  d0,d0                            | offset in table
+    add.w	  d0,d0                               | offset in table
+    add.w	  d0,d0                               | offset in table
     move.l    (a0,d0.w),(area_obj_ptr)          | new area ptr
     *** show area on screen for debugging
     .ifne OPT_DISPLAY_AREA
