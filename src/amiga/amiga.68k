@@ -466,7 +466,7 @@ platform_init:
     #move.w #0x0210,bplcon0(a5)  
     move.w #0x0610,bplcon0(a5) | 8 bitplanes, dual playfield
 	
-    move.w #3,fmode(a5)  		| AGA fastest fetch mode
+    move.w #0xf,fmode(a5)  		| AGA fastest fetch mode for bitplanes & sprites
 	
 	* there's a 2-pixel shift between foreground layer
     * and background layer, can be seen in the title
@@ -483,7 +483,6 @@ platform_init:
 	bsr		set_fg_bitplanes
 	bsr		set_bg_bitplanes
 
-	.ifdef	BOZO
 	* test (temp)
 	lea		solvalou_0,a0
 	move.l	a0,d0
@@ -499,17 +498,17 @@ platform_init:
 	move.w	d0,(2,a0)
 	
 	lea		solvalou_1,a0
-	move.w	#20,D0
+	move.w	#80,D0
 	move.w	#20,D1
 	bsr		store_sprite_pos
-	move.w	d0,(2,a0)
+	move.w	d0,(8,a0)
 	swap	d0
 	move.w	d0,(a0)
 	lea		solvalou_0,a0
-	move.w	#20,D0
+	move.w	#80,D0
 	move.w	#20,D1
 	bsr		store_sprite_pos
-	move.w	d0,(2,a0)
+	move.w	d0,(8,a0)
 	swap	d0
 	move.w	d0,(a0)
 	* set AGA palette TODO 
@@ -522,12 +521,12 @@ platform_init:
 	moveq	#0,d0
 	move.w	#64-32,d1
 	moveq	#1,d2
-	bsr		set_aga_color_registers_advanced
+	*bsr		set_aga_color_registers_advanced
 	move.w	#0x200,d0	| LOCT: 1
 	move.w	#64-32,d1
 	moveq	#1,d2
-	bsr		set_aga_color_registers_advanced
-	.endif
+	*bsr		set_aga_color_registers_advanced
+
 
 	* load copperlist
 	
@@ -2280,7 +2279,7 @@ fg_screen_data_1:
 	ds.b	100
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 
-	.align 0x8		| 8 else fmode=3 makes display wrong
+	.align 0x8		| 8 else fmode first bits set (BPAGEM&BLP32) makes display wrong
 fg_screen_data_2:
 	ds.b	FG_SCREEN_SIZE
 	
