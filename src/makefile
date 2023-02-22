@@ -6,6 +6,7 @@ GCC_BIN = C:\amiga-gcc\bin
 ASM = $(GCC_BIN)/m68k-amigaos-as -c 
 MAIN_OBJ = amiga.o
 WHDLOADER = ../$(PROGNAME).slave
+ASSETS = ..\assets\amiga
 
 # those 2 are defined for my PC, should include whdload.i
 # and system includes
@@ -15,10 +16,16 @@ WHDBASE = $(HDBASE)\PROJETS\HDInstall\DONE\WHDLoad
 
 # leave MAIN_OBJ first
 OBJS = $(MAIN_OBJ) sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
-all: $(MAIN) $(WHDLOADER)
+all: amiga/title_palette.68k amiga/sounds.68k $(MAIN) $(WHDLOADER)
 
 clean:
 	del $(OBJS) "$(MAIN)"
+	
+amiga/title_palette.68k: $(ASSETS)/convert_graphics.py $(ASSETS)/xevious_gfx.c
+	cmd /c $(ASSETS)\convert_graphics.py
+
+amiga/sounds.68k: $(ASSETS)/convert_sounds.py
+	cmd /c $(ASSETS)\convert_sounds.py
 	
 $(MAIN): $(OBJS)
 	$(GCC_BIN)/m68k-amigaos-ld -o $(MAIN) $(OBJS)

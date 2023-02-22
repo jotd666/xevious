@@ -1,5 +1,7 @@
 from PIL import Image
-import ast
+import ast,os
+
+this_dir = os.path.dirname(__file__)
 
 original_palette = ast.literal_eval("""[
   { 0x00, 0x00, 0x00 },
@@ -194,7 +196,7 @@ def doit(dump_pics=False):
     color_dict = {k:replacement_dict.get(k,k) for k in reduced}
 
     # title
-    title_tile_palette = sorted(get_colors("bg_data_title.png"))
+    title_tile_palette = sorted(get_colors(os.path.join(this_dir,"bg_data_title.png")))
     title_tile_palette += [black]*(16-len(title_tile_palette))
 
     return {"map_tiles":color_dict,

@@ -3,24 +3,48 @@
 - sprite shadow management: complete?
   probably not for double width/height objects
 - find a way to make up for those shaking ground enemies
-- sprite CLUT missing transparency
 - big boss (section 14): some bullets seem to stick around
 - level 14: tile layout looks wrong (bird drawing)
 
 * can be worked on my own:
 
+- display test sprite properly
+- use sprite for player ship to save blitter bandwidth
+- load sprite palette without access fault
 - sprites for big mothership (allows to use alternate brown/gold colors): set section 14
+  (rebuild the "killed" mothership image, and let only the 4+1 tiles with glowing red as
+  BOBs. The rest should not blit anything
 - rip sounds
 - dump statistics on sprite colors: color used in how many sprites, ...
 - find a way to NOT use color17 so FG color doesn't interfere with sprites
-- black small balls enemies not displayed: make a difference
-  between black and transparent color
 - remove colors only used in "bragza" as there are a lot of them and
-  we can't really afford it (maybe later a sprite for it with changing palette)
+  we can't really afford it: all grays are killed
+  (maybe later a sprite for it with changing palette)
+  "184": [
+    21,
+    25
+  ],
+  "185": [
+    22,
+    26
+  ],
+  "186": [
+    23,
+    27
+  ],
+  "187": [
+    24,
+    28
+  ],
+- if dynamic palette is used with sprites, it HAS to be at start of
+  the copperlist or there will be conflicts with color banks
 - finish to name enemies & objects (useful for color stats)
 - tiles not found at start??? title tiles also with brown color config???
   related to hole in map???
-- fg tiles flashing (nb lives)
+  probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
+  
+- fg tiles flashing, check that there isn't a big "clear" blit because of
+  a tile with height 0 or something like that
 
 further optims:
 
@@ -31,14 +55,17 @@ further optims:
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
   
-  Build process:
+Build process:
 
-- Don't run makefile right away. 
-  Not all .68k files are available as is. Some have to be generated.
-- To create the "graphics.68k" & "palette*.68k" files from "assets/amiga" subdir, 
-  just run the "convert_sprites.py" python script, then use the "convert_sounds.py"
-  python script (audio) to create sound*.68k files.
 - python and sox must be installed to be able to perform the wav2raw conversions
 - get "bitplanelib.py" (asset conversion tool needs it) at https://github.com/jotd666/amiga68ktools.git
+- run "makefile" to generate missing .68k files using python scripts, then build
 
-Binary assets must be created first, then makefile must be called to create the main program
+
+When changing asset-related data (since dependencies aren't good):
+
+- To update the "graphics.68k" & "palette*.68k" files from "assets/amiga" subdir, 
+  just run the "convert_sprites.py" python script, 
+- To update sounds, use "convert_sounds.py"
+  python script (audio) to create sound*.68k files.
+  
