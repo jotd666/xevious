@@ -1112,12 +1112,13 @@ osd_update_sprite_shadow:
 	neg.w	d2
 	add.w	#32*8,d2
 	move.w	d2,(a4)+
+	clr.l	(a4)+		| default: not a sprite, no sprite pointer
 2:
 	lea		(_OBJSIZE,a5),a5
 	dbf				d7,1b
 	rts
 3:
-	addq.w	#8,a4
+	lea	(SPRITE_MEM_SIZE,a4),a4
 	addq.w	#2,a2
 	bra.b	2b
 	
@@ -1205,7 +1206,7 @@ osd_update_32_sprite_hw:
 	movem.l	(a7)+,d3/a5
 11:
 
-	lea		(8,a5),a5
+	lea		(SPRITE_MEM_SIZE,a5),a5
 	dbf		d4,2b
 	movem.l	(a7)+,d2-d5/a0-a2/a5
 
@@ -1271,7 +1272,7 @@ osd_update_32_sprite_hw:
 	.endif
 	
 2:
-	lea		(8,a4),a4		| next sprite
+	lea		(SPRITE_MEM_SIZE,a4),a4		| next sprite
 	dbf		d4,4b
 
 	* now restore all foreground tiles behind the previous
@@ -1279,17 +1280,18 @@ osd_update_32_sprite_hw:
 		
 	* then back up current object state (X,Y,STATE) for next update
 	move.l	(a7)+,a4
-	move.w	#NB_SPRITES_TOTAL/2-1,d0	| 32*8 bytes
+	move.w	#NB_SPRITES_TOTAL/2-1,d0	| 32*SPRITE_MEM_SIZE bytes
 	* d7 is 0 or 32
 	tst.w	d7
 	beq.b	3f
 	* second half of sprite data (*8 bytes, /2)
-	lea		(NB_SPRITES_TOTAL*4,a4),a4
-	lea		(NB_SPRITES_TOTAL*4,a5),a5
+	lea		((NB_SPRITES_TOTAL*SPRITE_MEM_SIZE)/2,a4),a4
+	lea		((NB_SPRITES_TOTAL*SPRITE_MEM_SIZE)/2,a5),a5
 3:
-	* copy one sprite backup structure (8 bytes) 32 times
+	* copy one sprite backup structure (multiple of 4 bytes) 32 times
+	.rept	3   | 12/4 change if SPRITE_MEM_SIZE changes!!
 	move.l	(a4)+,(a5)+
-	move.l	(a4)+,(a5)+
+	.endr
 	dbf		d0,3b
 
 	
@@ -1367,10 +1369,12 @@ sprite_draw_double_height:
 	add.w	#16,d5
 	bra		draw_sprite_part
 	
-* internal routine
+* internal routine to draw sprites
+* either by blitting (BOBs) or positionning sprites (HW sprites)
+*
 * < D0: tile index
 * < D1: color table index
-* < D2: attributes
+* < D2: attributes (ignored if HW sprite)
 * < D3: Y
 * < D5: X
 * < A3: graphical object structure (bobs or sprites)
@@ -2170,7 +2174,7 @@ wait_blit:
 	MUL_TABLE	NB_BYTES_PER_ROW,512
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512
 
-SPRITE_MEM_SIZE = 8
+SPRITE_MEM_SIZE = 12
 current_sprite_state:
 	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 previous_sprite_state_ptr:
