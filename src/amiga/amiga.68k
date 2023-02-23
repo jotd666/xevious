@@ -466,7 +466,7 @@ platform_init:
     #move.w #0x0210,bplcon0(a5)  
     move.w #0x0610,bplcon0(a5) | 8 bitplanes, dual playfield
 	
-    move.w #3,fmode(a5)  		| AGA fastest fetch mode
+    move.w #0xf,fmode(a5)  		| AGA fastest fetch mode for bitplanes & sprites
 	
 	* there's a 2-pixel shift between foreground layer
     * and background layer, can be seen in the title
@@ -498,20 +498,36 @@ platform_init:
 	move.w	d0,(2,a0)
 	
 	lea		solvalou_1,a0
-	move.w	#20,D0
+	move.w	#80,D0
 	move.w	#20,D1
 	bsr		store_sprite_pos
-	move.w	d0,(2,a0)
+	move.w	d0,(8,a0)
 	swap	d0
 	move.w	d0,(a0)
 	lea		solvalou_0,a0
-	move.w	#20,D0
+	move.w	#80,D0
 	move.w	#20,D1
 	bsr		store_sprite_pos
-	move.w	d0,(2,a0)
+	move.w	d0,(8,a0)
 	swap	d0
 	move.w	d0,(a0)
-	
+	* set AGA palette TODO 
+* < a0: source palette
+* < d0: LOCT mask 0 or 0x200
+* < d1: number of colors to set
+* < d2: bank where to start (0: start, 1: color 32...)
+
+	lea	hw_sprite_palette(pc),a0
+	moveq	#0,d0
+	move.w	#64-32,d1
+	moveq	#1,d2
+	*bsr		set_aga_color_registers_advanced
+	move.w	#0x200,d0	| LOCT: 1
+	move.w	#64-32,d1
+	moveq	#1,d2
+	*bsr		set_aga_color_registers_advanced
+
+
 	* load copperlist
 	
 	* set copperlist
@@ -570,14 +586,23 @@ load_first_16_colors:
 * < a0: source palette
 * < d0: LOCT mask 0 or 0x200
 set_aga_color_registers:
+	move.w	#TOTAL_NB_COLORS,d1
+	moveq	#0,d2
+* < a0: source palette
+* < d0: LOCT mask 0 or 0x200
+* < d1: number of colors to set
+* < d2: bank where to start (0: start, 1: color 32...)
+* > a0: pointer on end of data (to be chained with low-nibble
+*       palette if needed or some other palette immediately following
+set_aga_color_registers_advanced:
 	lea		_custom,a5
+	move.w	d2,d7
 	move.w	d0,d2
-    moveq	#0,d7
-    move.w  #TOTAL_NB_COLORS,d1    | number of colors: here only 32, bank system is not used
+	move.w	d1,d0
     lsr.w   #5,d1   | divide by 32
     and.w   #0x1F,d0
     beq.b   1f
-    add.w   #1,d1
+    addq.w   #1,d1  | not a multiple of 32
 1:
     * set AGA color bank
     move.w  d7,d0
@@ -2254,7 +2279,7 @@ fg_screen_data_1:
 	ds.b	100
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 
-	.align 0x8		| 8 else fmode=3 makes display wrong
+	.align 0x8		| 8 else fmode first bits set (BPAGEM&BLP32) makes display wrong
 fg_screen_data_2:
 	ds.b	FG_SCREEN_SIZE
 	

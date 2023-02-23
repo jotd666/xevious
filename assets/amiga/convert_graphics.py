@@ -5,6 +5,8 @@ import gen_color_dict
 
 import collections
 
+this_dir = os.path.dirname(__file__)
+src_dir = os.path.join(this_dir,"../../src/amiga")
 
 
 dump_graphics = True  # uncomment for dry-run
@@ -15,9 +17,10 @@ BT_SPRITE = "BT_SPRITE"
 
 black = (0,0,0)
 white = (255,255,255)
+transparent_color = (255,0,255)
 
 # default hw sprite palette from color 32: all black
-hw_sprite_palette = [black] * (256-32)
+hw_sprite_palette = [black] * (64-32)
 
 sprite_color_count = collections.Counter()
 sprite_color_usage = collections.defaultdict(set)
@@ -201,9 +204,12 @@ def get_reduced_palette(reduced_color_dict):
 # 2) apply quantize on that image
 def quantize_palette_16(rgb_tuples,img_type):
     rgb_configs = set(rgb_tuples)
-    # remove 0, we don't want it quantized
-    rgb_configs.remove(black)
-    rgb_configs.remove(white)
+    # remove black, white, we don't want it quantized
+    immutable_colors = (black,white,transparent_color)
+    for c in immutable_colors:
+        rgb_configs.discard(c)
+
+
     rgb_configs = sorted(rgb_configs)
     dump_graphics = False
     # now compose an image with the colors
@@ -223,8 +229,9 @@ def quantize_palette_16(rgb_tuples,img_type):
     rval = dict(zip(rgb_configs,reduced_palette))
 
     # add black back
-    rval[black] = black
-    rval[white] = white
+    for c in immutable_colors:
+        rval[c] = c
+
 
     if False:  # debug it
         s = clut_img.size
@@ -237,10 +244,9 @@ def quantize_palette_16(rgb_tuples,img_type):
     # return it
     return rval
 
-src_dir = "../../src/amiga"
 
 # hackish convert of c gfx table to dict of lists
-with open("xevious_gfx.c") as f:
+with open(os.path.join(this_dir,"xevious_gfx.c")) as f:
     block = []
     block_name = ""
     start_block = False
@@ -280,9 +286,11 @@ sprite_names = load_names("sprite_names.json")
 # player ship, bomb sights, shots, bombs (colors 16-31)
 #
 
+palette_trans = palette + [transparent_color]
+
 for n in ("bg_tile_clut","sprite_clut"):
     tc = block_dict[n]["data"]
-    block_dict[n]["data"] = [[palette[i] for i in tile_clut] for tile_clut in tc ]
+    block_dict[n]["data"] = [[palette_trans[i] for i in tile_clut] for tile_clut in tc ]
 
 # reorganize palete like we want, leaving 0,0,0 first, keeping the xevious title
 # filling color index unchanged (now that we found the color !) and putting the sprite
@@ -299,7 +307,7 @@ def mkdir(d):
         os.mkdir(d)
 
 if dump_pngs:
-    dump_root = "dumps"
+    dump_root = os.path.join(this_dir,"dumps")
     mkdir(dump_root)
     for d in ["bg_tile","fg_tile","sprite"]:
         mkdir(os.path.join(dump_root,d))
@@ -309,7 +317,9 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
                         reduced_tile_clut,
                         global_palette):
 
-    dumpdir = "dumps/{}".format(img_type)
+    # remove transparent color from palette
+    global_palette = [p for p in global_palette if p != transparent_color]
+    dumpdir = os.path.join(dump_root,img_type)
     if dump_pngs:
         for x in ["orig","reduced"]:
             sd = os.path.join(dumpdir,x)
@@ -338,8 +348,8 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
                     # put dict in each slot
                     row[clut_index] = d
                     if dump_pngs:
-                        ImageOps.scale(d["png"],scale,0).save("dumps/{}/reduced/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index))
-                        ImageOps.scale(d["png_org"],scale,0).save("dumps/{}/orig/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index))
+                        ImageOps.scale(d["png"],scale,0).save(os.path.join(dump_root,"{}/reduced/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index)))
+                        ImageOps.scale(d["png_org"],scale,0).save(os.path.join(dump_root,"{}/orig/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index)))
 
                 except bitplanelib.BitplaneException as e:
                     print("{}:{}: {}".format(tile_index,clut_index,e))
@@ -499,12 +509,13 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
         for x in range(the_tile.size[0]):
             for y in range(the_tile.size[1]):
                 p = the_tile.getpixel((x,y))
-                if p != black:
+                if p != transparent_color:
                     colors_found.add(p)
 
         sprite_nums = real_sprites[tile_index]
         if int((len(colors_found)/3)+0.5) != len(sprite_nums):
-            raise Exception("{}: {} colors for image, expecting max {}".format(tile_index,len(colors_found),len(sprite_nums)*3))
+            raise Exception("{}: {} colors for image, expecting max {}".format(
+                            tile_index,len(colors_found),len(sprite_nums)*3))
         # game configures color banks bplcon=$32
         # odd sprites palette start at color 48, even at 32
         colors_found = iter(sorted(colors_found))
@@ -528,14 +539,13 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                     if p in this_sprite_palette_set:
                         the_partial_sprite.putpixel((x,y),p)
             # we don't need 64 bit wide here ATM
-            sprite_out = bitplanelib.palette_image2sprite(the_partial_sprite,None,this_sprite_palette,fmode=0)
+            sprite_out = bitplanelib.palette_image2sprite(the_partial_sprite,None,this_sprite_palette,sprite_fmode=3)
             elementary_sprites.append(sprite_out)
 
-        with open("../../src/amiga/sprite_test.68k","w") as f:
+        with open(os.path.join(src_dir,"sprite_test.68k"),"w") as f:
             for i,e in enumerate(elementary_sprites):
                 f.write("solvalou_{}:\n".format(i))
-                #f.write("\t.word\t0,0,0,0,0,0,0,0")
-                f.write("\t.word\t0,0")
+                f.write("\t.word\t0,0,0,0,0,0,0,0")
                 dump_asm_bytes(e,f)
                 f.write("\t.long\t0,0,0,0\n")
 
@@ -546,7 +556,8 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
         palette=global_palette,
         forced_nb_planes=nb_planes,
         generate_mask=is_sprite,
-        blit_pad=is_sprite)
+        blit_pad=is_sprite,
+        mask_color=transparent_color)
         rval.append(raw)
 
     return {"bitmap_type":BT_BOB,"png":input_image,"png_org":input_image_orig_palette,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
@@ -589,7 +600,7 @@ if dump_graphics:
         for s in STD_MIRROR_LIST:
             raw_blocks[table].append(d[s])
         if dump_pngs:
-            ImageOps.scale(d["png"],scale,0).save("dumps/fg/img_{:02}.png".format(i))
+            ImageOps.scale(d["png"],scale,0).save(os.path.join(dump_root,"fg_tile/img_{:02}.png".format(i)))
 
     # background data: requires to generate as many copies of each tile that there are used CLUTs on that tile
     # the only way to know which CLUTs are used is to run the game and log them... We can't generate all pics, that
@@ -646,7 +657,7 @@ if dump_graphics:
             sx = 0
             sy += side
     if dump_pngs:
-        img.save("dumps/sprites.png")
+        img.save(os.path.join(dump_root,"sprites.png"))
     used_sprite_cluts = get_used_sprite_cluts()
     sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
 
@@ -655,16 +666,17 @@ if dump_graphics:
     #bitplanelib.palette_dump(sprite_used_colors,"sprites.png",bitplanelib.PALETTE_FORMAT_PNG)
     to_remove = {(174,143,67):(98,)*3,
                 (98,98,67):(98,)*3,
+                (203,159,96):(143,)*3,
                 (143,143,98):(143,)*3,
-                # (174,174,143):(174,)*3,  used in explosion
+                (174,174,143):(174,)*3, # used in explosion
                 (210,210,174):(210,)*3}
-    to_remove = {}
+    #to_remove = {}
     sprite_used_colors = [x for x in sprite_used_colors if x not in to_remove]
     sprite_quantized_rgb = quantize_palette_16(sprite_used_colors,table) #reduced_color_dict["sprites"]
 
-
     reduced_sprite_tile_clut = remap_colors(sprite_tile_clut,sprite_quantized_rgb)
     partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)
+
     # pick a gray for the default fg tile color
     #gray = (0x8F,0x8F,0x79)
     #partial_palette_sprite.remove(gray)
@@ -689,7 +701,7 @@ if dump_graphics:
     color_stats = sorted([{"color":str(color),"used":sorted(sprite_color_usage[color]),"count":count}
     for color,count in sprite_color_count.items()],key=lambda x:x["count"])
 
-    with open("dumps/spritecolors.json","w") as f:
+    with open(os.path.join(dump_root,"spritecolors.json"),"w") as f:
         json.dump(color_stats,f,indent=2)
 
 
