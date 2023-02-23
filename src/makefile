@@ -31,7 +31,7 @@ $(MAIN): $(OBJS)
 	$(GCC_BIN)/m68k-amigaos-ld -o $(MAIN) $(OBJS)
 
 xevious_main.o: xevious_main.68k xevious.inc
-	$(ASM) xevious_main.68k -o xevious_main.o
+	$(ASM) xevious_main.68k --defsym __amiga__=1 -o xevious_main.o
 map_rom.o: map_rom.68k xevious.inc
 	$(ASM) map_rom.68k -o map_rom.o
 xevious_sub.o: xevious_sub.68k xevious.inc
