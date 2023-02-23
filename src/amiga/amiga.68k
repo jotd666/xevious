@@ -484,13 +484,13 @@ platform_init:
 	bsr		set_bg_bitplanes
 
 	* test (temp)
-	lea		solvalou_0,a0
+	lea		solvalou_1,a0
 	move.l	a0,d0
 	lea		sprites,a0
 	move.w	d0,(6,a0)
 	swap	d0
 	move.w	d0,(2,a0)
-	lea		solvalou_1,a0
+	lea		solvalou_0,a0
 	move.l	a0,d0
 	lea		sprites+8,a0
 	move.w	d0,(6,a0)
@@ -512,20 +512,14 @@ platform_init:
 	swap	d0
 	move.w	d0,(a0)
 	* set AGA palette TODO 
-* < a0: source palette
-* < d0: LOCT mask 0 or 0x200
-* < d1: number of colors to set
-* < d2: bank where to start (0: start, 1: color 32...)
 
 	lea	hw_sprite_palette(pc),a0
-	moveq	#0,d0
-	move.w	#64-32,d1
-	moveq	#1,d2
-	*bsr		set_aga_color_registers_advanced
-	move.w	#0x200,d0	| LOCT: 1
-	move.w	#64-32,d1
-	moveq	#1,d2
-	*bsr		set_aga_color_registers_advanced
+	lea	sprite_cols_32_63,a1
+	move.w	#31,D0
+0:
+	move.w	(a0)+,(2,a1)
+	addq.w	#4,a1
+	dbf		d0,0b
 
 
 	* load copperlist
@@ -540,6 +534,9 @@ platform_init:
 	bsr		set_aga_color_registers	
 	
     * init sprite, bitplane, whatever dma
+	* now it's no longer possible to change
+	* palette dynamically because copperlist
+	* changes bancs & LOCT flag on top of the frame
     move.w #0x83E0,dmacon(a5)
 
 	* install keyboard and vblank/copper handler
@@ -2298,14 +2295,27 @@ fg_screen_data_2:
 	.endr
 	.endm
 
+.macro	DECL_32_COLORS
+	.set	colidx,0
+	.rept	32
+	dc.w	color+(colidx*2),0
+	.set	colidx,colidx+1
+	.endr
+	.endm
+	
 copperlist:
 fg_bitplanes:
 	DECL_4_BITPLANES	4
 bg_bitplanes:
 	DECL_4_BITPLANES	0
-
-
-   * reset color 0
+	* dynamic colors for sprites, 32-63
+	dc.w	bplcon3,BASE_BPLCON3_VALUE+(1<<13)
+sprite_cols_32_63:
+	DECL_32_COLORS
+	dc.w	bplcon3,BASE_BPLCON3_VALUE+(1<<13)+0x200
+sprite_cols_32_63_lower:
+	DECL_32_COLORS
+    * reset color 0 & bank 0 & upper nibble
 	dc.w	bplcon3,BASE_BPLCON3_VALUE
 	dc.w color,0
 sprites:

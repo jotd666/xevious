@@ -477,7 +477,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
             sprite_color_count[col] += 1
             sprite_color_usage[col].add(img_name)
         # note down first & last non-black line
-        if col != black:
+        if col != transparent_color:
             if first_non_black_y is None:
                 first_non_black_y = y
             if y > last_non_black_y:
