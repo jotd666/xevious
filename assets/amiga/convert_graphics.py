@@ -354,7 +354,7 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
                 except bitplanelib.BitplaneException as e:
                     print("{}:{}: {}".format(tile_index,clut_index,e))
 
-def write_tiles(t,matrix,f,is_bob):
+def write_tiles(t,matrix,f,is_sprite):
     # background tiles/sprites: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
 
     f.write("\t.global\t{0}_picbase\n\t.global\t_{0}_tile\n_{0}_tile:".format(t))
@@ -363,7 +363,9 @@ def write_tiles(t,matrix,f,is_bob):
     pic_list = []
 
     bob_plane_cache = {}
+    sprite_data = {}
     bob_plane_id = 0
+    sprite_id = 0
 
     for i,row in enumerate(matrix):
         f.write("\n* row {}".format(i))
@@ -392,7 +394,8 @@ def write_tiles(t,matrix,f,is_bob):
     # 2) one table of pointers that point on actual data
     #
 
-    if is_bob:
+    if is_sprite:
+        # sprite or bob (game objects)
         for i,item_data in enumerate(pic_list):
             if i == len(pic_list)//2:
                 # base in the middle of the pics to avoid overflow
@@ -401,37 +404,67 @@ def write_tiles(t,matrix,f,is_bob):
             picname = "{}_pic_{:03d}".format(t,i)
             f.write("{0}:\n".format(picname))
             f.write("\t.word\t{bitmap_type}\n".format(**item_data))
-            for k in STD_MIRROR_LIST:
-                item = item_data[k]
-                f.write("\t.long\t{}_{}\n".format(picname,k))
-            for k in STD_MIRROR_LIST:
-                item = item_data[k]
-                f.write("{}_{}:\n".format(picname,k))
-                if item_data["bitmap_type"] == BT_BOB:
+            if item_data["bitmap_type"] == BT_BOB:
+                # bob
+                for k in STD_MIRROR_LIST:
+                    item = item_data[k]
+                    f.write("\t.long\t{}_{}\n".format(picname,k))
+                for k in STD_MIRROR_LIST:
+                    item = item_data[k]
+                    f.write("{}_{}:\n".format(picname,k))
                     # first y offset & height
                     f.write("\t.word\t{y_offset},{height}   | y_offset,height \n".format(**item_data))
-                    # we know that a lot of images are similar:
-                    # the palettes are different so the bitplanes are identical
-                    # only in a different order. Also, there's a lot of only-zero
-                    # planes as only 8 colors are used
-                    # so the picture (including mask) is a list of pointers on planes
-                    # plane data (32 bytes) are only listed once, and used a lot of times
+                    if item_data["bitmap_type"] == BT_BOB:
+                        # BOB: using a shared palette for all bobs
+                        # we know that a lot of images are similar:
+                        # the palettes are different so the bitplanes are identical
+                        # only in a different order. Also, there's a lot of only-zero
+                        # planes as only 8 colors are used
+                        # so the picture (including mask) is a list of pointers on planes
+                        # plane data (32 bytes) are only listed once, and used a lot of times
 
-                    plane_size = 4*item_data["height"]   # 64 max
+                        plane_size = 4*item_data["height"]   # 64 max
 
-                    for p in range(BG_NB_PLANES+1):  # +1: mask
-                        block = tuple(item[p*plane_size:p*plane_size+plane_size])
-                        block_id = bob_plane_cache.get(block)
-                        if block_id is None:
-                            # block is not in cache
-                            block_id = bob_plane_id
-                            bob_plane_cache[block] = block_id
-                            bob_plane_id += 1
-                        f.write("\tdc.l\tplane_pic_{}\n".format(block_id))
+                        for p in range(BG_NB_PLANES+1):  # +1: mask
+                            block = tuple(item[p*plane_size:p*plane_size+plane_size])
+                            block_id = bob_plane_cache.get(block)
+                            if block_id is None:
+                                # block is not in cache
+                                block_id = bob_plane_id
+                                bob_plane_cache[block] = block_id
+                                bob_plane_id += 1
+                            f.write("\tdc.l\tplane_pic_{}\n".format(block_id))
+            elif item_data["bitmap_type"] == BT_SPRITE:
+                # hardware sprite: each have their own 4 color palette
+                f.write("* {} sprite(s)\n".format(len(item_data["sprite_data"])))
+                for sd in item_data["sprite_data"]:
+                    sprite_palette = sd["palette"]
+                    sprite_bitmap = sd["bitmap"]
+                    sprite_number = sd["number"]
+                    f.write("\t.word\t{}   | sprite number \n".format(sprite_number))
+                    f.write("* palette\n")
+                    bitplanelib.palette_dump(sprite_palette,f,pformat=bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision=True)
+                    f.write("* bitmap\n")
+                    sprite_data_name = "sprite_{:02d}".format(sprite_id)
+                    sprite_id += 1
+                    f.write("\t.long\t{}\n".format(sprite_data_name))
+                    sprite_data[sprite_data_name] = sprite_bitmap
+
+                f.write("\t.word\t-1   | end of sprite(s)\n\n")
+
+
         f.write("\t.datachip\n")
         for k,v in sorted(bob_plane_cache.items(),key=lambda x:x[1]):
             f.write("plane_pic_{}:".format(v))
             dump_asm_bytes(k,f)
+        # sprites
+        for k,v in sorted(sprite_data.items()):
+            f.write("\t.align\t8\n")
+            f.write("{}:\n".format(k))
+            f.write("\t.word\t0,0,0,0,0,0,0,0")
+            dump_asm_bytes(v,f)
+            f.write("\t.long\t0,0,0,0\n")
+
     else:
         f.write("{}_picbase:\n\tdc.w\t0\n".format(t))
         for i,_ in enumerate(pic_list):
@@ -498,8 +531,12 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
         height = side
 
     rval = []
+    sprite_dict = {"png":input_image,"png_org":input_image_orig_palette,
+    "y_offset":y_offset,
+    "height":height}
 
     if is_sprite and tile_index in real_sprites:
+        sprite_dict["bitmap_type"] = BT_SPRITE
         # temp generate sprite data somewhere to test
         # first separate in 3 colors max images
         #for the_tile in [input_image,ImageOps.mirror(input_image)]:
@@ -538,29 +575,26 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                     p = the_tile.getpixel((x,y))
                     if p in this_sprite_palette_set:
                         the_partial_sprite.putpixel((x,y),p)
-            # we don't need 64 bit wide here ATM
             sprite_out = bitplanelib.palette_image2sprite(the_partial_sprite,None,this_sprite_palette,sprite_fmode=3)
-            elementary_sprites.append(sprite_out)
-
-        with open(os.path.join(src_dir,"sprite_test.68k"),"w") as f:
-            for i,e in enumerate(elementary_sprites):
-                f.write("solvalou_{}:\n".format(i))
-                f.write("\t.word\t0,0,0,0,0,0,0,0")
-                dump_asm_bytes(e,f)
-                f.write("\t.long\t0,0,0,0\n")
+            elementary_sprites.append({"bitmap":sprite_out,"number":s,"palette":this_sprite_palette})
 
 
-    # BOB case (not sprite)
-    for the_tile in [input_image,ImageOps.mirror(input_image)]:
-        raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
-        palette=global_palette,
-        forced_nb_planes=nb_planes,
-        generate_mask=is_sprite,
-        blit_pad=is_sprite,
-        mask_color=transparent_color)
-        rval.append(raw)
+        sprite_dict["sprite_data"] = elementary_sprites
 
-    return {"bitmap_type":BT_BOB,"png":input_image,"png_org":input_image_orig_palette,"y_offset":y_offset,"height":height,"standard":rval[0],"mirror":rval[1]}
+    else:
+        sprite_dict["bitmap_type"] = BT_BOB
+        # BOB case (not sprite)
+        for the_tile in [input_image,ImageOps.mirror(input_image)]:
+            raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
+            palette=global_palette,
+            forced_nb_planes=nb_planes,
+            generate_mask=is_sprite,
+            blit_pad=is_sprite,
+            mask_color=transparent_color)
+            rval.append(raw)
+        sprite_dict.update({"standard":rval[0],"mirror":rval[1]})
+
+    return sprite_dict
 
 def dump_asm_bytes(block,f):
     c = 0
@@ -570,6 +604,19 @@ def dump_asm_bytes(block,f):
         else:
             f.write(",")
         f.write("0x{:02x}".format(d))
+        c += 1
+        if c == 8:
+            c = 0
+    f.write("\n")
+
+def dump_asm_words(block,f):
+    c = 0
+    for d in block:
+        if c==0:
+            f.write("\n\t.word\t")
+        else:
+            f.write(",")
+        f.write("0x{:04x}".format(d))
         c += 1
         if c == 8:
             c = 0
@@ -709,7 +756,7 @@ if dump_graphics:
         (gen_color_dict.original_palette,"original_palette.68k"),      # for foreground tiles (dynamic colors)
         (partial_palette_bg+partial_palette_sprite,"palette.68k"),     # bg tiles (0-16) for in-game + bobs (16-32) AGA dual playfield
         (title_tile_palette,"title_palette.68k"),                      # bg tiles (0-16) for title screen (5 unique colors)
-        (hw_sprite_palette,"hw_sprite_palette.68k")                       # hardware sprites to get more colors and/or less blitter ops
+#        (hw_sprite_palette,"hw_sprite_palette.68k")                       # hardware sprites to get more colors and/or less blitter ops
         ):
         bitplanelib.palette_dump(p,os.path.join(src_dir,fn),
                                 bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
@@ -743,8 +790,8 @@ BT_SPRITE = 2
         f.write("\n")
 
 
-        write_tiles("bg",bg_matrix,f,is_bob=False)
+        write_tiles("bg",bg_matrix,f,is_sprite=False)
 
-        # sprites are blitted, so require chipmem
+        # bobs are blitted, so require chipmem, sprites are displayed using chip too
 
-        write_tiles("sprite",sprite_matrix,f,is_bob=True)
+        write_tiles("sprite",sprite_matrix,f,is_sprite=True)

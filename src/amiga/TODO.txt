@@ -8,15 +8,12 @@
 
 * can be worked on my own:
 
-- display test sprite properly
 - use sprite for player ship to save blitter bandwidth
-- load sprite palette without access fault
 - sprites for big mothership (allows to use alternate brown/gold colors): set section 14
   (rebuild the "killed" mothership image, and let only the 4+1 tiles with glowing red as
   BOBs. The rest should not blit anything
 - rip sounds
 - dump statistics on sprite colors: color used in how many sprites, ...
-- find a way to NOT use color17 so FG color doesn't interfere with sprites
 - remove colors only used in "bragza" as there are a lot of them and
   we can't really afford it: all grays are killed
   (maybe later a sprite for it with changing palette)
@@ -36,15 +33,16 @@
     24,
     28
   ],
-- if dynamic palette is used with sprites, it HAS to be at start of
-  the copperlist or there will be conflicts with color banks
 - finish to name enemies & objects (useful for color stats)
 - tiles not found at start??? title tiles also with brown color config???
   related to hole in map???
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
   
+- glitter sprite should be a HW sprite
+- now all tiles are seen as 0!!!
 - fg tiles flashing, check that there isn't a big "clear" blit because of
   a tile with height 0 or something like that
+- increase sprite struct to mark it if no need to clear the area
 
 further optims:
 
