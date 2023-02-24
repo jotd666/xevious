@@ -8,6 +8,8 @@ import collections
 this_dir = os.path.dirname(__file__)
 src_dir = os.path.join(this_dir,"../../src/amiga")
 
+def dump_asm_bytes(*args,**kwargs):
+    bitplanelib.dump_asm_bytes(*args,**kwargs,mit_format=True)
 
 dump_graphics = True  # uncomment for dry-run
 dump_pngs = True  # uncomment for faster operation, pngs aren't needed for asset generation per se
@@ -597,18 +599,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
 
     return sprite_dict
 
-def dump_asm_bytes(block,f):
-    c = 0
-    for d in block:
-        if c==0:
-            f.write("\n\t.byte\t")
-        else:
-            f.write(",")
-        f.write("0x{:02x}".format(d))
-        c += 1
-        if c == 8:
-            c = 0
-    f.write("\n")
+
 
 def dump_asm_words(block,f):
     c = 0

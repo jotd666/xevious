@@ -9,9 +9,13 @@ if not shutil.which("sox"):
 
 #wav_files = glob.glob("sounds/*.wav")
 
-wav_files = ["credit.wav"]
-outfile = "../../src/amiga/sounds.68k"
-sndfile = "../../src/amiga/sound_entries.68k"
+this_dir = os.path.dirname(__file__)
+wav_files = [os.path.join(this_dir,"..","sounds",x) for x in ["credit.wav"]]
+
+this_dir = os.path.dirname(__file__)
+src_dir = os.path.join(this_dir,"../../src/amiga")
+outfile = os.path.join(src_dir,"sounds.68k")
+sndfile = os.path.join(src_dir,"sound_entries.68k")
 
 snd_header = r"""
 FXFREQBASE = 3579564
@@ -39,7 +43,7 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
 
     fw.write("\t.datachip\n")
     for wav_file in wav_files:
-        wav_name = os.path.splitext(wav_file)[0]
+        wav_name = os.path.splitext(os.path.basename(wav_file))[0]
         fw.write("\t.global\t{}_raw\n".format(wav_name))
 
 

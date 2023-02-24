@@ -15,7 +15,7 @@ WHDBASE = $(HDBASE)\PROJETS\HDInstall\DONE\WHDLoad
 
 
 # leave MAIN_OBJ first
-OBJS = $(MAIN_OBJ) sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
+OBJS = $(MAIN_OBJ) andor_genesis.o sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
 all: amiga/title_palette.68k amiga/sounds.68k $(MAIN) $(WHDLOADER)
 
 clean:
@@ -38,6 +38,8 @@ xevious_sub.o: xevious_sub.68k xevious.inc
 	$(ASM) xevious_sub.68k -o xevious_sub.o
 amiga.o: amiga/amiga.68k xevious.inc amiga/ReadJoyPad.i amiga/palette.68k
 	$(ASM) -Iamiga amiga/amiga.68k -o amiga.o
+andor_genesis.o: amiga/andor_genesis.68k
+	$(ASM) amiga/andor_genesis.68k -o andor_genesis.o
 ptplayer.o: amiga/ptplayer.68k
 	$(ASM) -Iamiga amiga/ptplayer.68k -o ptplayer.o
 sounds.o: amiga/sounds.68k
