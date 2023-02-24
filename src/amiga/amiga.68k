@@ -466,7 +466,7 @@ platform_init:
     #move.w #0x0210,bplcon0(a5)  
     move.w #0x0610,bplcon0(a5) | 8 bitplanes, dual playfield
 	
-    move.w #3,fmode(a5)  		| AGA fastest fetch mode
+    move.w #0xf,fmode(a5)  		| AGA fastest fetch mode for bitplanes & sprites
 	
 	* there's a 2-pixel shift between foreground layer
     * and background layer, can be seen in the title
@@ -483,36 +483,6 @@ platform_init:
 	bsr		set_fg_bitplanes
 	bsr		set_bg_bitplanes
 
-	* test (temp)
-	lea		solvalou_0,a0
-	move.l	a0,d0
-	lea		sprites,a0
-	move.w	d0,(6,a0)
-	swap	d0
-	move.w	d0,(2,a0)
-	lea		solvalou_1,a0
-	move.l	a0,d0
-	lea		sprites+8,a0
-	move.w	d0,(6,a0)
-	swap	d0
-	move.w	d0,(2,a0)
-	
-	lea		solvalou_1,a0
-	move.w	#20,D0
-	move.w	#20,D1
-	bsr		store_sprite_pos
-	move.w	d0,(2,a0)
-	swap	d0
-	move.w	d0,(a0)
-	lea		solvalou_0,a0
-	move.w	#20,D0
-	move.w	#20,D1
-	bsr		store_sprite_pos
-	move.w	d0,(2,a0)
-	swap	d0
-	move.w	d0,(a0)
-	
-	* load copperlist
 	
 	* set copperlist
 	move.l	#copperlist,cop1lc(a5)
@@ -524,6 +494,9 @@ platform_init:
 	bsr		set_aga_color_registers	
 	
     * init sprite, bitplane, whatever dma
+	* now it's no longer possible to change
+	* palette dynamically because copperlist
+	* changes bancs & LOCT flag on top of the frame
     move.w #0x83E0,dmacon(a5)
 
 	* install keyboard and vblank/copper handler
@@ -570,14 +543,23 @@ load_first_16_colors:
 * < a0: source palette
 * < d0: LOCT mask 0 or 0x200
 set_aga_color_registers:
+	move.w	#TOTAL_NB_COLORS,d1
+	moveq	#0,d2
+* < a0: source palette
+* < d0: LOCT mask 0 or 0x200
+* < d1: number of colors to set
+* < d2: bank where to start (0: start, 1: color 32...)
+* > a0: pointer on end of data (to be chained with low-nibble
+*       palette if needed or some other palette immediately following
+set_aga_color_registers_advanced:
 	lea		_custom,a5
+	move.w	d2,d7
 	move.w	d0,d2
-    moveq	#0,d7
-    move.w  #TOTAL_NB_COLORS,d1    | number of colors: here only 32, bank system is not used
+	move.w	d1,d0
     lsr.w   #5,d1   | divide by 32
     and.w   #0x1F,d0
     beq.b   1f
-    add.w   #1,d1
+    addq.w   #1,d1  | not a multiple of 32
 1:
     * set AGA color bank
     move.w  d7,d0
@@ -1130,12 +1112,13 @@ osd_update_sprite_shadow:
 	neg.w	d2
 	add.w	#32*8,d2
 	move.w	d2,(a4)+
+	clr.l	(a4)+		| default: not a sprite, no sprite pointer
 2:
 	lea		(_OBJSIZE,a5),a5
 	dbf				d7,1b
 	rts
 3:
-	addq.w	#8,a4
+	lea	(SPRITE_MEM_SIZE,a4),a4
 	addq.w	#2,a2
 	bra.b	2b
 	
@@ -1223,7 +1206,7 @@ osd_update_32_sprite_hw:
 	movem.l	(a7)+,d3/a5
 11:
 
-	lea		(8,a5),a5
+	lea		(SPRITE_MEM_SIZE,a5),a5
 	dbf		d4,2b
 	movem.l	(a7)+,d2-d5/a0-a2/a5
 
@@ -1289,7 +1272,7 @@ osd_update_32_sprite_hw:
 	.endif
 	
 2:
-	lea		(8,a4),a4		| next sprite
+	lea		(SPRITE_MEM_SIZE,a4),a4		| next sprite
 	dbf		d4,4b
 
 	* now restore all foreground tiles behind the previous
@@ -1297,17 +1280,18 @@ osd_update_32_sprite_hw:
 		
 	* then back up current object state (X,Y,STATE) for next update
 	move.l	(a7)+,a4
-	move.w	#NB_SPRITES_TOTAL/2-1,d0	| 32*8 bytes
+	move.w	#NB_SPRITES_TOTAL/2-1,d0	| 32*SPRITE_MEM_SIZE bytes
 	* d7 is 0 or 32
 	tst.w	d7
 	beq.b	3f
 	* second half of sprite data (*8 bytes, /2)
-	lea		(NB_SPRITES_TOTAL*4,a4),a4
-	lea		(NB_SPRITES_TOTAL*4,a5),a5
+	lea		((NB_SPRITES_TOTAL*SPRITE_MEM_SIZE)/2,a4),a4
+	lea		((NB_SPRITES_TOTAL*SPRITE_MEM_SIZE)/2,a5),a5
 3:
-	* copy one sprite backup structure (8 bytes) 32 times
+	* copy one sprite backup structure (multiple of 4 bytes) 32 times
+	.rept	3   | 12/4 change if SPRITE_MEM_SIZE changes!!
 	move.l	(a4)+,(a5)+
-	move.l	(a4)+,(a5)+
+	.endr
 	dbf		d0,3b
 
 	
@@ -1385,18 +1369,19 @@ sprite_draw_double_height:
 	add.w	#16,d5
 	bra		draw_sprite_part
 	
-* internal routine
+* internal routine to draw sprites
+* either by blitting (BOBs) or positionning sprites (HW sprites)
+*
 * < D0: tile index
 * < D1: color table index
-* < D2: attributes
+* < D2: attributes (ignored if HW sprite)
 * < D3: Y
 * < D5: X
-* < A3: graphical object structure (type+2 pointers on bitplanes
-* if bobs, or 2 pointers on sprite data if sprites)
+* < A3: graphical object structure (bobs or sprites)
 * trashed registers: A0
 
 draw_sprite_part:
-	movem.w	d0/d1/d3-d4,-(a7)
+	movem.w	d0-d4,-(a7)
 	* d0 is the tile index, compute clut index in d1
 	and.w	#0x7F,d1	| significant color bits TEMP
 	
@@ -1428,13 +1413,13 @@ draw_sprite_part:
 	beq.b	2f			| skip
 
 	move.w	(a3,d1.w),d4	| object type
-	* ATM ignore type, but soon we'll handle
-	* sprites from there
+	cmp.w	#BT_SPRITE,d4
+	beq.b	4f
 	btst	#7,d2			| X-flip?
 	beq.b	3f
-	add.w	#4,d1		| pointer to mirror planes
+	addq.w	#4,d1		| pointer to mirror planes
 3:
-	move.l	(2,a3,d1.w),a0	| get pointer on bitplane pointer list
+	move.l	(2,a3,d1.w),a0		| get pointer on bitplane pointer list
 	move.w	d5,d0		| restore x
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
@@ -1444,8 +1429,63 @@ draw_sprite_part:
 	* attributes remain in d2
 	bsr	blit_16x_bob
 2:
-	movem.w	(a7)+,d0/d1/d3-d4
+	movem.w	(a7)+,d0-d4
 	rts
+4:
+	* X in D5
+	* Y in D3
+	* sprites
+	lea	(2,a3,d1.w),a0
+5:
+	move.w	(a0)+,d2	| sprite number
+	bmi.b	2b			| end of sprite chain
+	* load palette in the proper copperlist slots for this sprite
+	move.w	d2,d1
+	lsr.w	#1,d1
+	bcc.b	51f
+
+	* odd: select range 48-63 (next shift makes it times 32)
+	add.w	#4,d1
+51:
+	lsl.w	#4,d1	| times 16
+	lea	sprite_cols_32_63,a1
+
+	add.w	d1,a1
+	move.w	#3,d0	| 4 colors
+6:
+	move.w	(a0)+,(2,a1)
+	addq.w	#4,a1
+	dbf		d0,6b
+	* lower part of RGB palette
+	lea	sprite_cols_32_63_lower,a1
+	add.w	d1,a1
+	move.w	#3,d0	| 4 colors
+6:
+	move.w	(a0)+,(2,a1)
+	addq.w	#4,a1
+	dbf		d0,6b
+
+	* get sprite data
+	move.l	(a0)+,a1
+	* compute control words
+	move.w	d5,d0
+	move.w	d3,d1
+	* same position as bobs
+	sub.w	#16,d1
+	sub.w	#8,d0
+	bsr		store_sprite_pos
+	move.w	d0,(8,a1)
+	swap	d0
+	move.w	d0,(a1)
+	* put it in the proper sprite slot (D2: sprite number)
+	move.l	a1,d0
+	lea		sprites,a1
+	lsl.w	#3,d2	| times 8
+	move.w	d0,(6,a1,d2.w)
+	swap	d0
+	move.w	d0,(2,a1,d2.w)
+	* next sprite for this image
+	bra	5b
 	
 *P1 B2 = DSWB bit 0
 *P2 B2 = DWSB bit 4
@@ -1575,7 +1615,8 @@ HW_SpriteYTable:
   .rept 260
 	.set	ys,reptn+0x2c
 	.set	ye,ys+16       | size = 16
-    .byte  ys&255, 0, ye&255, ((ys>>6)&4) | ((ye>>7)&Z)
+    .byte  ys&255, 0, ye&255, ((ys>>6)&4)+((ye>>7)&2)
+	.set	reptn,reptn+1
   .endr
 
 
@@ -2133,7 +2174,7 @@ wait_blit:
 	MUL_TABLE	NB_BYTES_PER_ROW,512
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512
 
-SPRITE_MEM_SIZE = 8
+SPRITE_MEM_SIZE = 12
 current_sprite_state:
 	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 previous_sprite_state_ptr:
@@ -2199,9 +2240,7 @@ title_palette:
 * only used for fg tile color (specially when flashing xevious title)
 original_palette:
 	.include "original_palette.68k"
-* hardware sprite colors (32-256)
-hw_sprite_palette:
-	.include	"hw_sprite_palette.68k"
+
 		.bss
 
 		.align 4
@@ -2254,7 +2293,7 @@ fg_screen_data_1:
 	ds.b	100
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 
-	.align 0x8		| 8 else fmode=3 makes display wrong
+	.align 0x8		| 8 else fmode first bits set (BPAGEM&BLP32) makes display wrong
 fg_screen_data_2:
 	ds.b	FG_SCREEN_SIZE
 	
@@ -2273,14 +2312,27 @@ fg_screen_data_2:
 	.endr
 	.endm
 
+.macro	DECL_32_COLORS
+	.set	colidx,0
+	.rept	32
+	dc.w	color+(colidx*2),0
+	.set	colidx,colidx+1
+	.endr
+	.endm
+	
 copperlist:
 fg_bitplanes:
 	DECL_4_BITPLANES	4
 bg_bitplanes:
 	DECL_4_BITPLANES	0
-
-
-   * reset color 0
+	* dynamic colors for sprites, 32-63
+	dc.w	bplcon3,BASE_BPLCON3_VALUE+(1<<13)
+sprite_cols_32_63:
+	DECL_32_COLORS
+	dc.w	bplcon3,BASE_BPLCON3_VALUE+(1<<13)+0x200
+sprite_cols_32_63_lower:
+	DECL_32_COLORS
+    * reset color 0 & bank 0 & upper nibble
 	dc.w	bplcon3,BASE_BPLCON3_VALUE
 	dc.w color,0
 sprites:
