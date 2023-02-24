@@ -1082,6 +1082,8 @@ osd_update_scroll_hw:
 osd_update_sprite_shadow:
 	lea       sprite_shadow_msb,a2
 	lea		current_sprite_state(pc),a4
+	* a4 is the internal sprite structure which is updated
+	* in this routine. Each sprite structure occupies 16 bytes
 	moveq			#NB_SPRITES_TOTAL-1,d7
 1:
 	move.b	(_STATE,a5),d0
@@ -1112,7 +1114,13 @@ osd_update_sprite_shadow:
 	neg.w	d2
 	add.w	#32*8,d2
 	move.w	d2,(a4)+
-	clr.l	(a4)+		| default: not a sprite, no sprite pointer
+	* default: not a sprite, no sprite pointer
+	* if the sprite code matches a HW sprite,
+	* osd_update_32_sprite_hw will re-set this pointer
+	* to a non-null value
+	* 1 or 2 sprites can be used to form the image
+	clr.l	(a4)+
+	clr.l	(a4)+
 2:
 	lea		(_OBJSIZE,a5),a5
 	dbf				d7,1b
@@ -1157,7 +1165,8 @@ osd_update_32_sprite_hw:
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
 	beq.w	11f
-	* erase previous sprite position
+	* erase previous sprite position (but not if sprite type
+	* is hardware sprite)
 	move.w	(4,a5),d1   | Y
 	* 32 first Y pos aren't displayed
 	* also add -2 y offset to allow proper erase too
@@ -1218,7 +1227,27 @@ osd_update_32_sprite_hw:
 	| sprite loop
 4:
 	cmp.b	#STATE_INACTIVE,(a4)
-	beq.w	2f
+	bne.b	41f
+	* sprite is inactive. Nothing to do unless
+	* sprite is a hardware sprite. In which case we need
+	* to invalidate its position to hide it, then clear
+	* (2 possible hardware sprite for a "logical" sprite
+	move.l	(8,a4),d0
+	beq	2f
+	* hardware sprite
+	move.l	d0,a0
+	clr.w	(a0)
+	clr.w	(8,a0)
+	clr.l	(8,a4)		| remove sprite from list (useful?)
+	move.l	(12,a4),d0
+	beq.b	2f
+	* hardware sprite
+	move.l	d0,a0
+	clr.w	(a0)
+	clr.w	(8,a0)
+	clr.l	(12,a4)		| remove sprite from list (useful?)
+	bra.b	2f
+41:
 	move.w	(4,a4),d1
 	sub.w	#4*8,d1		| apply Y offset
 	* at this point, Y can be negative, but
@@ -1289,7 +1318,7 @@ osd_update_32_sprite_hw:
 	lea		((NB_SPRITES_TOTAL*SPRITE_MEM_SIZE)/2,a5),a5
 3:
 	* copy one sprite backup structure (multiple of 4 bytes) 32 times
-	.rept	3   | 12/4 change if SPRITE_MEM_SIZE changes!!
+	.rept	4   | 16/4 change if SPRITE_MEM_SIZE changes!!
 	move.l	(a4)+,(a5)+
 	.endr
 	dbf		d0,3b
@@ -1340,7 +1369,7 @@ sprite_draw_jump_table:
 * < D3: Y
 * < D5: X
 * < A3: bitplane pointer list
-
+* < A4: logical sprite struct (updated if HW sprite)
 * trashed registers: A0
 sprite_draw_double_width:
 	bsr		draw_sprite_part
@@ -1378,6 +1407,8 @@ sprite_draw_double_height:
 * < D3: Y
 * < D5: X
 * < A3: graphical object structure (bobs or sprites)
+* < A4: logical sprite struct (updated if HW sprite @8 and @12)
+
 * trashed registers: A0
 
 draw_sprite_part:
@@ -1412,6 +1443,7 @@ draw_sprite_part:
 	cmp.w	#1,d1		| test blankptr
 	beq.b	2f			| skip
 
+	
 	move.w	(a3,d1.w),d4	| object type
 	cmp.w	#BT_SPRITE,d4
 	beq.b	4f
@@ -1431,20 +1463,25 @@ draw_sprite_part:
 2:
 	movem.w	(a7)+,d0-d4
 	rts
+21:
+	move.l	(a7)+,a4
+	bra.b	2b
 4:
+	move.l	a4,-(a7)
+	lea		(8,a4),a4	| points to sprite pointers
 	* X in D5
 	* Y in D3
 	* sprites
 	lea	(2,a3,d1.w),a0
 5:
 	move.w	(a0)+,d2	| sprite number
-	bmi.b	2b			| end of sprite chain
+	bmi.b	21b			| end of sprite chain
 	* load palette in the proper copperlist slots for this sprite
 	move.w	d2,d1
 	lsr.w	#1,d1
-	bcc.b	51f
+	bcs.b	51f
 
-	* odd: select range 48-63 (next shift makes it times 32)
+	* even: select range 48-63 (next shift makes it times 32)
 	add.w	#4,d1
 51:
 	lsl.w	#4,d1	| times 16
@@ -1467,6 +1504,8 @@ draw_sprite_part:
 
 	* get sprite data
 	move.l	(a0)+,a1
+	* store it in sprite structure
+	move.l	a1,(a4)+
 	* compute control words
 	move.w	d5,d0
 	move.w	d3,d1
@@ -2174,7 +2213,7 @@ wait_blit:
 	MUL_TABLE	NB_BYTES_PER_ROW,512
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512
 
-SPRITE_MEM_SIZE = 12
+SPRITE_MEM_SIZE = 16
 current_sprite_state:
 	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 previous_sprite_state_ptr:
@@ -2415,7 +2454,5 @@ color_row_30_plus:
 	* padding (workaround for gas bug)
 	ds.b	4
 	
-	.align	8
-	.include	"sprite_test.68k"
 _end_of_ng_data:
 		

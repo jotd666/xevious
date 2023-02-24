@@ -1,5 +1,20 @@
-# decodes memory dump of 8-bytes each sprite structure (8*64)
-# and prints x,y,sprite type...
+# this script handles the special case of andor genesis boss
+#
+# the game code can handle sprites already but here we have to rebuild
+# the massive sprite image from a game dump, so tiles are properly assembled
+#
+# besides, there are several CLUTs for the same graphics, and that is not currently
+# supported by the "convert_graphics.py" main code which would have copied the sprite data
+#
+# instead, here we generate the boss structure in a format that respects the game engine
+# hardware sprite structure, but we hardcode many things. For example we re-use the sprite bitmap
+# across CLUT configs (which could be done generically but would mean feed the generic asset
+# conversion with all CLUT configs and assembled andor genesis. Hardcoding it allows to make it
+# less complex.
+#
+# Also, the generated code provides a truth table that tells the engine which tiles are andor genesis
+# tiles. One tile (the upper left one) in particular triggers the display of the first sprite part
+# and the second tile (upper left + 64X) triggers the display of the second sprite part
 
 import struct,os
 from PIL import Image
@@ -7,20 +22,26 @@ import bitplanelib
 
 this_dir = os.path.dirname(__file__)
 
-andor_table = [False]*320
-for start,stop in ((88,96),(128,159)):
-    andor_table[start:stop+1] = [True]*(stop-start+1)
 
+AS_NONE = 0
+AS_TILE = 1
+AS_FIRST = 2
+AS_SECOND = 3
 
 def doit():
+    andor_table = [AS_NONE]*320
+    for start,stop in ((88,96),(128,159)):
+        andor_table[start:stop+1] = [AS_TILE]*(stop-start+1)
+
     dump_dir = os.path.join(this_dir,"dumps","sprite","raw")
     prefix = "andor_genesis"
-    # reading memory dump from running game
-    with open("sprites","rb") as f:
+    # reading memory dump from running game (old structure, 8 bytes per sprite)
+    with open("andor_genesis_sprite_dump.bin","rb") as f:
         contents = f.read()
 
+
     def is_andor_genesis(code):
-        return andor_table[code]
+        return bool(andor_table[code])
 
     ag_blocks = []
 
@@ -41,6 +62,11 @@ def doit():
     for x,y,sprite_code,sprite_color,sprite_attributes in ag_blocks:
         x -= min_x
         y -= min_y
+        if x==0 and y==0:
+            andor_table[sprite_code] = AS_FIRST
+        if x==64 and y==0:
+            andor_table[sprite_code] = AS_SECOND
+
         offsets = [(1,0),(1,1),(0,0),(0,1)] if sprite_attributes == 3 else [(0,0)]
         for i,(xo,yo) in enumerate(offsets):
             source = os.path.join(dump_dir,"{}_{}_{}.png".format(prefix,sprite_code+i,sprite_color))
@@ -103,6 +129,11 @@ def doit():
         sprites.append([sprite_left,sprite_right])
 
     with open(srcout,"w") as f:
+        f.write("* table:\n")
+        f.write("* 0: no andor tile\n")
+        f.write("* 1: andor tile, do not display\n")
+        f.write("* 2: origin andor tile (first sprite)\n")
+        f.write("* 3: second origin andor tile (second sprite)\n\n")
         f.write("is_andor_genesis_table:")
         bitplanelib.dump_asm_bytes(andor_table,f,mit_format=True)
         f.write("* andor sprites\n")
@@ -110,14 +141,14 @@ def doit():
             f.write("""andor_genesis_{}:
     .word    BT_SPRITE
 * 2 sprite(s)
-    .word    0   | sprite number
+    .word    6   | sprite number
 * palette
 """.format(d))
             bitplanelib.palette_dump(first_half,f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
             f.write("""
 * bitmap
     .long    andor_genesis_00_{}
-    .word    1   | sprite number
+    .word    7   | sprite number
 * palette
 """.format(d))
             bitplanelib.palette_dump(second_half,f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)

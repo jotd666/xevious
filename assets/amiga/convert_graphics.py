@@ -21,8 +21,6 @@ black = (0,0,0)
 white = (255,255,255)
 transparent_color = (255,0,255)
 
-# default hw sprite palette from color 32: all black
-hw_sprite_palette = [black] * (64-32)
 
 sprite_color_count = collections.Counter()
 sprite_color_usage = collections.defaultdict(set)
@@ -41,6 +39,12 @@ title_tiles = {240, 241, 242, 243, 244, 245, 246, 247, 248,
 # since game sprites can have more than 3 colors, we have to combine 2 sprites
 real_sprites = {80:[0,1]   # solvalou
 }
+# bragza: "soul" of the andor genesis
+# only 1 sprite needed but uses a lot of unique colors
+# unseen in other enemies, so it's good that it has its own palette in sprites
+for i in [184,185,186,187]:
+    real_sprites[i] = [2]
+
 # this script uses the original graphics.c with palette & cluts
 # and generates the bitmaps for the amiga version
 #
@@ -211,8 +215,8 @@ def quantize_palette_16(rgb_tuples,img_type):
     for c in immutable_colors:
         rgb_configs.discard(c)
 
-
     rgb_configs = sorted(rgb_configs)
+
     dump_graphics = False
     # now compose an image with the colors
     clut_img = Image.new("RGB",(len(rgb_configs),1))
@@ -220,7 +224,7 @@ def quantize_palette_16(rgb_tuples,img_type):
         #rgb_value = (rgb[0]<<16)+(rgb[1]<<8)+rgb[2]
         clut_img.putpixel((i,0),rgb)
 
-    reduced_colors_clut_img = clut_img.quantize(colors=14,dither=0).convert('RGB')
+    reduced_colors_clut_img = clut_img.quantize(colors=13,dither=0).convert('RGB')
 
     # get the reduced palette
     reduced_palette = [reduced_colors_clut_img.getpixel((i,0)) for i,_ in enumerate(rgb_configs)]
@@ -230,7 +234,7 @@ def quantize_palette_16(rgb_tuples,img_type):
     # now create a dictionary by associating the original & reduced colors
     rval = dict(zip(rgb_configs,reduced_palette))
 
-    # add black back
+    # add black & white & transparent back
     for c in immutable_colors:
         rval[c] = c
 
@@ -320,7 +324,6 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
                         global_palette):
 
     # remove transparent color from palette
-    global_palette = [p for p in global_palette if p != transparent_color]
     dumpdir = os.path.join(dump_root,img_type)
     if dump_pngs:
         for x in ["orig","reduced","raw"]:
@@ -369,6 +372,7 @@ def write_tiles(t,matrix,f,is_sprite):
     sprite_data = {}
     bob_plane_id = 0
     sprite_id = 0
+    end_lines = []
 
     for i,row in enumerate(matrix):
         f.write("\n* row {}".format(i))
@@ -412,11 +416,15 @@ def write_tiles(t,matrix,f,is_sprite):
                 for k in STD_MIRROR_LIST:
                     item = item_data[k]
                     f.write("\t.long\t{}_{}\n".format(picname,k))
+                # we'll store those lines for the end of the section, as it's big enough
+                # to overflow the relative address table which indexes the main table
+                # (no problem since in the main table the pointers are referenced as .long
+                # so they can be anywhere
                 for k in STD_MIRROR_LIST:
                     item = item_data[k]
-                    f.write("{}_{}:\n".format(picname,k))
+                    end_lines.append("{}_{}:\n".format(picname,k))
                     # first y offset & height
-                    f.write("\t.word\t{y_offset},{height}   | y_offset,height \n".format(**item_data))
+                    end_lines.append("\t.word\t{y_offset},{height}   | y_offset,height \n".format(**item_data))
                     if item_data["bitmap_type"] == BT_BOB:
                         # BOB: using a shared palette for all bobs
                         # we know that a lot of images are similar:
@@ -436,7 +444,7 @@ def write_tiles(t,matrix,f,is_sprite):
                                 block_id = bob_plane_id
                                 bob_plane_cache[block] = block_id
                                 bob_plane_id += 1
-                            f.write("\tdc.l\tplane_pic_{}\n".format(block_id))
+                            end_lines.append("\tdc.l\tplane_pic_{}\n".format(block_id))
             elif item_data["bitmap_type"] == BT_SPRITE:
                 # hardware sprite: each have their own 4 color palette
                 f.write("* {} sprite(s)\n".format(len(item_data["sprite_data"])))
@@ -455,6 +463,8 @@ def write_tiles(t,matrix,f,is_sprite):
 
                 f.write("\t.word\t-1   | end of sprite(s)\n\n")
 
+        # write the lines of references to plane BOBs that we have stashed
+        f.writelines(end_lines)
 
         f.write("\t.datachip\n")
         for k,v in sorted(bob_plane_cache.items(),key=lambda x:x[1]):
@@ -510,8 +520,8 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
         input_image_orig_palette.putpixel((x,y),orig_col)
         # statistics / color usage
         if is_sprite:
-            sprite_color_count[col] += 1
-            sprite_color_usage[col].add(img_name)
+            sprite_color_count[orig_col] += 1
+            sprite_color_usage[orig_col].add(img_name)
         # note down first & last non-black line
         if col != transparent_color:
             if first_non_black_y is None:
@@ -562,14 +572,10 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
         elementary_sprites = []
 
         for s in sprite_nums:
-            cstart = s*4
-            if s & 1:
-                cstart += 12
             this_sprite_palette = [black]
             for i in range(3):
                 nc = next(colors_found,black)
                 this_sprite_palette.append(nc)
-                hw_sprite_palette[cstart+i+1] = nc
             # draw a filtered image of pic with only those colors
             the_partial_sprite = Image.new("RGB",the_tile.size)
             this_sprite_palette_set = set(this_sprite_palette)
@@ -700,27 +706,29 @@ if dump_graphics:
     used_sprite_cluts = get_used_sprite_cluts()
     sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
 
-    # what would be tremendous would be to remove mothership colors from palette, then use 2 AGA sprites
-    # (with another palette, of course) to display it
-    #bitplanelib.palette_dump(sprite_used_colors,"sprites.png",bitplanelib.PALETTE_FORMAT_PNG)
-    to_remove = {(174,143,67):(98,)*3,
-                (98,98,67):(98,)*3,
-                (203,159,96):(143,)*3,
-                (143,143,98):(143,)*3,
-                (174,174,143):(174,)*3, # used in explosion
-                (210,210,174):(210,)*3}
-    #to_remove = {}
+    # we remove colors that are used in andor genesis and bragza
+    to_remove = {(98,98,67), # andor
+    (143, 143, 98),
+    (67, 67, 31),  # andor
+    (67, 67, 210) # solvalou
+    }
+    # remove bragza colors! it's a sprite now
+    to_remove.update({(0, 0, 67),(67, 31, 0),(0, 67, 0),(67, 0, 67),(0, 67, 67),
+                (31, 0, 67),(67, 67, 0),(0, 143, 143),(67, 0, 143),
+                 (143, 143, 0),(0, 143, 0),(143, 0, 143),(0, 0, 143),
+                 (143, 67, 0),(0, 255, 255),(143, 0, 255),(0, 0, 255),(0, 255, 0)})
+
+
     sprite_used_colors = [x for x in sprite_used_colors if x not in to_remove]
+
     sprite_quantized_rgb = quantize_palette_16(sprite_used_colors,table) #reduced_color_dict["sprites"]
 
     reduced_sprite_tile_clut = remap_colors(sprite_tile_clut,sprite_quantized_rgb)
     partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)
-
-    # pick a gray for the default fg tile color
-    #gray = (0x8F,0x8F,0x79)
-    #partial_palette_sprite.remove(gray)
-    #partial_palette_sprite.insert(1,gray)
-    # dump the (reduced) palette
+    # make sure that transparent color is first (this color is wasted, we need
+    # black to be at index != 0 else it won't appear)
+    partial_palette_sprite.remove(transparent_color)
+    partial_palette_sprite.insert(0,transparent_color)
 
     sprite_matrix = raw_blocks[table] = [[None]*128 for _ in range(320)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with
@@ -740,15 +748,19 @@ if dump_graphics:
     color_stats = sorted([{"color":str(color),"used":sorted(sprite_color_usage[color]),"count":count}
     for color,count in sprite_color_count.items()],key=lambda x:x["count"])
 
+# bragza alone uses a lot of colors!
+##    for d in color_stats:
+##        if d["used"] == ["bragza"]:
+##            print(d["color"])
+
     with open(os.path.join(dump_root,"spritecolors.json"),"w") as f:
-        json.dump(color_stats,f,indent=2)
+        json.dump({"total_nb_colors":len(sprite_color_count),"stats":color_stats},f,indent=2)
 
 
     for p,fn in (
         (gen_color_dict.original_palette,"original_palette.68k"),      # for foreground tiles (dynamic colors)
         (partial_palette_bg+partial_palette_sprite,"palette.68k"),     # bg tiles (0-16) for in-game + bobs (16-32) AGA dual playfield
         (title_tile_palette,"title_palette.68k"),                      # bg tiles (0-16) for title screen (5 unique colors)
-#        (hw_sprite_palette,"hw_sprite_palette.68k")                       # hardware sprites to get more colors and/or less blitter ops
         ):
         bitplanelib.palette_dump(p,os.path.join(src_dir,fn),
                                 bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)

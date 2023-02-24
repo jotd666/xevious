@@ -8,31 +8,13 @@
 
 * can be worked on my own:
 
-- sprites for big mothership (allows to use alternate brown/gold colors): set section 14
-  (rebuild the "killed" mothership image, and let only the 4+1 tiles with glowing red as
-  BOBs. The rest should not blit anything
+- double sprite for solvalou alignment = 8!!!!
+- sometimes we get a small graphics.68k when running the convert_graphics.py script
+  and bg tiles are almost empty
+- sprites for big mothership
 
 - rip sounds
-- dump statistics on sprite colors: color used in how many sprites, ...
-- remove colors only used in "bragza" as there are a lot of them and
-  we can't really afford it: all grays are killed
-  (use 2 sprites for it it should work for great effect)
-  "184": [
-    21,
-    25
-  ],
-  "185": [
-    22,
-    26
-  ],
-  "186": [
-    23,
-    27
-  ],
-  "187": [
-    24,
-    28
-  ],
+
 - finish to name enemies & objects (useful for color stats)
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
@@ -43,10 +25,10 @@
   a tile with height 0 or something like that
 - increases sprite struct (done) & mark it as sprite if no need to clear the area
   (plus if just went inactive, remove the sprite, so got to have stored the
-   sprite address in copperlist somewhere)
+   sprite address in copperlist somewhere): doesn't work for hw sprites: not cleared!
+- how to display sprites with y<0 (y clip) ? ask EAB?
 - remove quantization replace non-frequent colors by other existing colors
-- transparent (magenta) should be first, black should not (in sprite bitplanes)
-  else black enemies are transparent
+- black enemies still not showing!!
   
 further optims:
 
