@@ -127,8 +127,14 @@ sub_fn_0__update_32_sprite_hw: | $01F6
     jmp       osd_enable_vblank_interrupt
         
 sub_fn_1__update_scroll_hw: | $0218
+    * on the Neo Geo we have do disable VBLANK
+    * and possibly on other platforms as well
+    * the other options is to move this into VBLANK
+    * TBD...
+    jsr       osd_disable_vblank_interrupt
     move.w    (bg_scroll_x_shadow),d6
-    jmp       osd_update_scroll_hw
+    jsr       osd_update_scroll_hw
+    jmp       osd_enable_vblank_interrupt
 
 * handling of reading coins and start buttons
 * is done by the NAMCO chips
