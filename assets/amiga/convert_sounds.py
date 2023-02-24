@@ -9,12 +9,9 @@ if not shutil.which("sox"):
 
 #wav_files = glob.glob("sounds/*.wav")
 
-this_dir = os.path.dirname(__file__)
-src_dir = os.path.join(this_dir,"../../src/amiga")
-
 wav_files = ["credit.wav"]
-outfile = os.path.join(src_dir,"sounds.68k")
-sndfile = os.path.join(src_dir,"sound_entries.68k")
+outfile = "../../src/amiga/sounds.68k"
+sndfile = "../../src/amiga/sound_entries.68k"
 
 snd_header = r"""
 FXFREQBASE = 3579564
@@ -50,12 +47,12 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
         wav_name = os.path.basename(wav_file)
 
         def get_sox_cmd(sr,output):
-            return [sox,"--volume","1.0",os.path.join(this_dir,"..","sounds",wav_file),"--channels","1","--bits","8","-r",str(sr),"--encoding","signed-integer",output]
+            return [sox,"--volume","1.0",wav_file,"--channels","1","--bits","8","-r",str(sr),"--encoding","signed-integer",output]
         used_sampling_rate = sampling_rate
 
         cmd = get_sox_cmd(used_sampling_rate,raw_file)
 
-        subprocess.check_call(cmd,cwd=this_dir)
+        subprocess.check_call(cmd)
         with open(raw_file,"rb") as f:
             contents = f.read()
 
