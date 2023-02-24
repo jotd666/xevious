@@ -321,7 +321,7 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
     global_palette = [p for p in global_palette if p != transparent_color]
     dumpdir = os.path.join(dump_root,img_type)
     if dump_pngs:
-        for x in ["orig","reduced"]:
+        for x in ["orig","reduced","raw"]:
             sd = os.path.join(dumpdir,x)
             if not os.path.isdir(sd):
                 os.mkdir(sd)
@@ -350,6 +350,7 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
                     if dump_pngs:
                         ImageOps.scale(d["png"],scale,0).save(os.path.join(dump_root,"{}/reduced/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index)))
                         ImageOps.scale(d["png_org"],scale,0).save(os.path.join(dump_root,"{}/orig/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index)))
+                        d["png_org"].save(os.path.join(dump_root,"{}/raw/{}_{:02}_{}.png".format(img_type,img_name,tile_index,clut_index)))
 
                 except bitplanelib.BitplaneException as e:
                     print("{}:{}: {}".format(tile_index,clut_index,e))
