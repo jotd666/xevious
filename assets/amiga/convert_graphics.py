@@ -471,8 +471,9 @@ def write_tiles(t,matrix,f,is_sprite):
             f.write("plane_pic_{}:".format(v))
             dump_asm_bytes(k,f)
         # sprites
+        f.write("\t.align\t8\n")
+        f.write("\t.long\t0\n")   # workaround as "as" doesn't seem to align properly
         for k,v in sorted(sprite_data.items()):
-            f.write("\t.align\t8\n")
             f.write("{}:\n".format(k))
             f.write("\t.word\t0,0,0,0,0,0,0,0")
             dump_asm_bytes(v,f)

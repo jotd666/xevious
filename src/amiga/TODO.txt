@@ -3,29 +3,27 @@
 - sprite shadow management: complete?
   probably not for double width/height objects
 - find a way to make up for those shaking ground enemies
-- big boss (section 14): some bullets seem to stick around
 - level 14: tile layout looks wrong (bird drawing)
 
 * can be worked on my own:
 
-- double sprite for solvalou alignment = 8!!!!
-- sprites for big mothership
+- sheonite sprites too fast, seem to fail the sprite erase phase
+- sprites for big mothership: test including sprite clipping
 - rip sounds
-- finish to name enemies & objects (useful for color stats)
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
+- check if tiles missing (wrongly??) in level 1 too!!
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
-  
+- how to rip sprites for soltower & flags
 - glitter sprite (title screen) should be a HW sprite
-- fg tiles flashing, check that there isn't a big "clear" blit because of
-  a tile with height 0 or something like that
 - increases sprite struct (done) & mark it as sprite if no need to clear the area
   (plus if just went inactive, remove the sprite, so got to have stored the
    sprite address in copperlist somewhere): doesn't work for hw sprites: not cleared!
-- how to display sprites with y<0 (y clip) ? ask EAB?
+- how to display sprites with y<0 (y clip): will need manual y clipping DAMN!!
 - remove quantization replace non-frequent colors by other existing colors
-- black enemies still not showing!!
-  
+- black color now white (ground objects) !!!! but okay in pngs...
+- gnu as bug: .align directive doesn't work all the time (sprites!!)
+
 further optims:
 
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)

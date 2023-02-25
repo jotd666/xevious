@@ -76,8 +76,13 @@ mul\value\()_table:
 	.else
 	move.w	(a1,d1.w*2),d1		| times 40
 	.endif
-	and.l	#0xFFFF,d1
-	and.l	#0xFFFF,d0
+	* masks MSW, not needed
+	*swap	d1
+	*clr		d1
+	*swap	d1
+	*swap	d0
+	*clr		d0
+	*swap	d0
 	
 	lsl.w	#3,d1		| times 8
 	lsr.w	#6,d0
@@ -496,7 +501,7 @@ platform_init:
     * init sprite, bitplane, whatever dma
 	* now it's no longer possible to change
 	* palette dynamically because copperlist
-	* changes bancs & LOCT flag on top of the frame
+	* changes banks & LOCT flag on top of the frame
     move.w #0x83E0,dmacon(a5)
 
 	* install keyboard and vblank/copper handler
@@ -529,6 +534,8 @@ load_title_tile_palette:
 load_first_16_colors:
 	movem.l	d0-d1/a1,-(a7)
 	lea		_custom,a5
+	* shut off dma to avoid conflicts with copperlist
+	move.w	#0x4000,dmacon(a5)
     or.w  #BASE_BPLCON3_VALUE,d0
 	move.w	d0,bplcon3(a5)
 	move.w	#15,d0
@@ -537,6 +544,7 @@ load_first_16_colors:
 	move.w	(a0)+,(a1)+
 	dbf		d0,1b
 	move.w	#BASE_BPLCON3_VALUE,bplcon3(a5)
+	move.w	#0x8000,dmacon(a5)
 	movem.l	(a7)+,d0-d1/a1
 	rts
 	
@@ -545,13 +553,6 @@ load_first_16_colors:
 set_aga_color_registers:
 	move.w	#TOTAL_NB_COLORS,d1
 	moveq	#0,d2
-* < a0: source palette
-* < d0: LOCT mask 0 or 0x200
-* < d1: number of colors to set
-* < d2: bank where to start (0: start, 1: color 32...)
-* > a0: pointer on end of data (to be chained with low-nibble
-*       palette if needed or some other palette immediately following
-set_aga_color_registers_advanced:
 	lea		_custom,a5
 	move.w	d2,d7
 	move.w	d0,d2
@@ -753,7 +754,7 @@ update_bg_tile:
 	tst.w	(a0)
 	bne.b	7f
 	* tile is not known with that CLUT configuration: flash
-	move.w	#0,bplcon3+_custom
+	**move.w	#0,bplcon3+_custom
 	**move.w	#0xF00,color+_custom
 	lsr.l	#8,d1
 	lsr.l	#1,d3		| column
@@ -918,7 +919,7 @@ update_fg_tile:
 	and.w	#0xFF,d1
 	
 	cmp.w	#BLANK_FG_TILE_ID,d1
-	bne		0f
+	bne.b		0f
 	move.w	#FG_TILE_CLEAR,d3
 0:
 	lsl.w	#4,d1			| *16 (each tile+mirror tile has 8+8 bytes)
@@ -964,7 +965,7 @@ update_fg_tile:
 	.endif
 	move.w	d2,(a1)			| color palette index
 0:
-	tst	d3
+	cmp.w	#FG_TILE_DRAW_COLOR,d3
 	bne.b	4f
 	* no need to draw tile, called from color change
 	* (saves cycles)
@@ -1155,7 +1156,6 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	move.l	a4,0x300
 	move.l		previous_sprite_state_ptr(pc),a5
 
 	* first restore all background tiles behind the previous
@@ -1174,7 +1174,6 @@ osd_update_32_sprite_hw:
 	bpl.b		3f
 	moveq	#0,d1		| fix issues with non deleted objects at top
 3:
-
 	
 	move.l		fg_drawed_screen_ptr(pc),a1
     move.w  #18,d3	| height
@@ -1340,7 +1339,7 @@ osd_update_32_sprite_hw:
 	cmp.b	#BLANK_FG_TILE_ID,d1
 	beq.b	5f				| no need to OR if blank tile
 	move.b	(a4,d0.w),d2	| fetch tile from color grid
-	* now update tile to reflect the color change
+	* now update tile to redraw what sprites have destroyed
 	movem.l	d0/d3/a4-a5,-(a7)
 	bsr	update_fg_tile
 	movem.l	(a7)+,d0/d3/a4-a5
@@ -1356,7 +1355,8 @@ osd_update_32_sprite_hw:
 zzz:
 			blitz
 			rts
-
+eee:
+	dc.w	40000
 sprite_draw_jump_table:
 	dc.l	draw_sprite_part
 	dc.l	sprite_draw_double_width
@@ -1429,8 +1429,8 @@ draw_sprite_part:
 	move.w	(a0,d1.w),d1	| col offset
 	bne.b	7f
 	* sprite is not known with that CLUT configuration: blue flash
-	move.w	#BASE_BPLCON3_VALUE,bplcon3+_custom
-	move.w	#0xF,color+_custom
+	*move.w	#BASE_BPLCON3_VALUE,bplcon3+_custom
+	*move.w	#0xF,color+_custom
 	tst.b	unknown_sprite_found
 	bne.b	2f
 	st.b	unknown_sprite_found
@@ -1506,6 +1506,7 @@ draw_sprite_part:
 	move.l	(a0)+,a1
 	* store it in sprite structure
 	move.l	a1,(a4)+
+
 	* compute control words
 	move.w	d5,d0
 	move.w	d3,d1
@@ -2268,7 +2269,6 @@ hiscorename:
 _end_of_ng_code:
 		
 		.text
-
 	.align 2
 * bg tiles (game floor) (0-15) + bobs (16-32) in AGA dual playfield
 palette:
@@ -2365,40 +2365,40 @@ fg_bitplanes:
 bg_bitplanes:
 	DECL_4_BITPLANES	0
 	* dynamic colors for sprites, 32-63
-	dc.w	bplcon3,BASE_BPLCON3_VALUE+(1<<13)
+	.word	bplcon3,BASE_BPLCON3_VALUE+(1<<13)
 sprite_cols_32_63:
 	DECL_32_COLORS
-	dc.w	bplcon3,BASE_BPLCON3_VALUE+(1<<13)+0x200
+	.word	bplcon3,BASE_BPLCON3_VALUE+(1<<13)+0x200
 sprite_cols_32_63_lower:
 	DECL_32_COLORS
     * reset color 0 & bank 0 & upper nibble
-	dc.w	bplcon3,BASE_BPLCON3_VALUE
-	dc.w color,0
+	.word	bplcon3,BASE_BPLCON3_VALUE
+	.word	color,0
 sprites:
     * #0
-    dc.w    sprpt+0,0
-    dc.w    sprpt+2,0
+    .word    sprpt+0,0
+    .word    sprpt+2,0
     * #1
-    dc.w    sprpt+4,0
-    dc.w    sprpt+6,0
+    .word    sprpt+4,0
+    .word    sprpt+6,0
     * #2
-    dc.w    sprpt+8,0
-    dc.w    sprpt+10,0
+    .word    sprpt+8,0
+    .word    sprpt+10,0
     * #3
-    dc.w    sprpt+12,0
-    dc.w    sprpt+14,0   
+    .word    sprpt+12,0
+    .word    sprpt+14,0   
     * #4
-    dc.w    sprpt+16,0
-    dc.w    sprpt+18,0
+    .word    sprpt+16,0
+    .word    sprpt+18,0
     * #5
-    dc.w    sprpt+20,0
-    dc.w    sprpt+22,0
+    .word    sprpt+20,0
+    .word    sprpt+22,0
     * #6
-    dc.w    sprpt+24,0
-    dc.w    sprpt+26,0
+    .word    sprpt+24,0
+    .word    sprpt+26,0
     * #7
-    dc.w    sprpt+28,0
-    dc.w    sprpt+30,0
+    .word    sprpt+28,0
+    .word    sprpt+30,0
 end_color_copper:
    * proper sprite priority: above bitplanes
    *dc.w  0x0102,0x0000            ;  BPLCON1 := 0x0000
