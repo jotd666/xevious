@@ -1,2 +1,2 @@
-make -f Makefile_windows.mak clean
+make -f ..\makefile.am clean
 pause

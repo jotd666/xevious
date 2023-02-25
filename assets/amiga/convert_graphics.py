@@ -128,7 +128,7 @@ def save_json_tile_file(filename,rval,old_rval):
 
 def get_used_bg_cluts():
     infile = os.path.join(winuae_dir,"bg_tile_log")
-    bg_json_base = "bg_tile_clut.json"
+    bg_json_base = os.path.join(this_dir,"bg_tile_clut.json")
     # load previously recorded configurations
     rval = load_json_tile_file(bg_json_base)
     copy_rval = {k:v.copy() for k,v in rval.items()}

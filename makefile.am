@@ -1,30 +1,32 @@
 PROGNAME = xevious
-SOURCE = $(PROGNAME)HD.s
 MAIN = ..\$(PROGNAME)
 
+# Bebbo's package usually installs itself there
 GCC_BIN = C:\amiga-gcc\bin
 ASM = $(GCC_BIN)/m68k-amigaos-as -c 
 MAIN_OBJ = amiga.o
-WHDLOADER = ../$(PROGNAME).slave
+WHDLOADER = ..\$(PROGNAME).slave
 ASSETS = ..\assets\amiga
+AMIGASRC = amiga
+SOURCE = $(AMIGASRC)/$(PROGNAME)HD.s
 
 # those 2 are defined for my PC, should include whdload.i
-# and system includes
+# and system includes.
 HDBASE = K:\jff\AmigaHD
 WHDBASE = $(HDBASE)\PROJETS\HDInstall\DONE\WHDLoad
 
 
 # leave MAIN_OBJ first
 OBJS = $(MAIN_OBJ) andor_genesis.o sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
-all: amiga/title_palette.68k amiga/sounds.68k $(MAIN) $(WHDLOADER)
+all: $(AMIGASRC)/graphics.68k $(AMIGASRC)/sounds.68k $(MAIN) $(WHDLOADER)
 
 clean:
 	del $(OBJS) "$(MAIN)"
 	
-amiga/title_palette.68k: $(ASSETS)/convert_graphics.py $(ASSETS)/xevious_gfx.c
+$(AMIGASRC)/graphics.68k: $(ASSETS)/convert_graphics.py $(ASSETS)/xevious_gfx.c
 	cmd /c $(ASSETS)\convert_graphics.py
 
-amiga/sounds.68k: $(ASSETS)/convert_sounds.py
+$(AMIGASRC)/sounds.68k: $(ASSETS)/convert_sounds.py
 	cmd /c $(ASSETS)\convert_sounds.py
 	
 $(MAIN): $(OBJS)
@@ -36,18 +38,18 @@ map_rom.o: map_rom.68k xevious.inc
 	$(ASM) map_rom.68k -o map_rom.o
 xevious_sub.o: xevious_sub.68k xevious.inc
 	$(ASM) xevious_sub.68k -o xevious_sub.o
-amiga.o: amiga/amiga.68k xevious.inc amiga/ReadJoyPad.i amiga/palette.68k
-	$(ASM) -Iamiga amiga/amiga.68k -o amiga.o
-andor_genesis.o: amiga/andor_genesis.68k
-	$(ASM) amiga/andor_genesis.68k -o andor_genesis.o
-ptplayer.o: amiga/ptplayer.68k
-	$(ASM) -Iamiga amiga/ptplayer.68k -o ptplayer.o
-sounds.o: amiga/sounds.68k
-	$(ASM) -Iamiga amiga/sounds.68k -o sounds.o
-ReadJoyPad.o: amiga/ReadJoyPad.68k amiga/ReadJoyPad.i
-	$(ASM) -Iamiga amiga/ReadJoyPad.68k -o ReadJoyPad.o
-graphics.o: amiga/graphics.68k xevious.inc
-	$(ASM) amiga/graphics.68k -o graphics.o
+amiga.o: $(AMIGASRC)/amiga.68k xevious.inc $(AMIGASRC)/ReadJoyPad.i $(AMIGASRC)/palette.68k
+	$(ASM) -Iamiga $(AMIGASRC)/amiga.68k -o amiga.o
+andor_genesis.o: $(AMIGASRC)/andor_genesis.68k
+	$(ASM) $(AMIGASRC)/andor_genesis.68k -o andor_genesis.o
+ptplayer.o: $(AMIGASRC)/ptplayer.68k
+	$(ASM) -I$(AMIGASRC) $(AMIGASRC)/ptplayer.68k -o ptplayer.o
+sounds.o: $(AMIGASRC)/sounds.68k
+	$(ASM) -I$(AMIGASRC) $(AMIGASRC)/sounds.68k -o sounds.o
+ReadJoyPad.o: $(AMIGASRC)/ReadJoyPad.68k amiga/ReadJoyPad.i
+	$(ASM) -I$(AMIGASRC) $(AMIGASRC)/ReadJoyPad.68k -o ReadJoyPad.o
+graphics.o: $(AMIGASRC)/graphics.68k xevious.inc
+	$(ASM) $(AMIGASRC)/graphics.68k -o graphics.o
 
 $(WHDLOADER) : $(SOURCE)
 	wdate.py> datetime
