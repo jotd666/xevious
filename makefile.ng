@@ -20,6 +20,7 @@ GFXCC = gfxcc
 FIXCNV = fixcnv
 CP = cp
 MD = mkdir
+RM = rm
 
 #######################################
 # Path to libraries and include files #
@@ -62,15 +63,16 @@ ARFLAGS = cr
 
 DEBUG = -g
 
-DRIVER = puzzledp
+GUID = 202
 ifeq ($(OUTPUT),cart)
-  GUID = 202
+  DRIVER = puzzledp
   P_SIZE = 1024
 	PRG = $(GUID)-p1.p1
 	SPRITES = $(GUID)-c?.*
 	OUTDIR = roms/$(DRIVER)
 endif
 ifeq ($(OUTPUT),cd)
+  DRIVER = joyjoy
 	PRG = PB_PROG.PRG
 	SPRITES = *.SPR
 	OUTDIR = cds/$(DRIVER)
@@ -116,6 +118,7 @@ $(PRG): $(FQTN) PB_CHR.SPR
 	@copy PB_CHR.SPR cds\$(DRIVER)
 	$(RM) -f cds\$(TARGET).iso
 	mkisofs -iso-level 1 -o cds\$(TARGET).iso -pad -N -V "$(TARGET)" cds\$(DRIVER)
+	chdman createcd -f -i cds\$(TARGET).iso -o "roms/neocd/$(DRIVER)/puzzled (1994)(snk)(jp-us)[joy joy kid].chd"
 
 endif
 
@@ -129,10 +132,10 @@ $(OBJDIR)/%.o : src/%.68k src/xevious.inc makefile
 	$(AS) -a=$*.lst $(ASFLAGS) $< -o $@
 
 clean:
-	rm -f $(OBJDIR)/*.*
-	rm -f $(FQTN)
-	rm -f $(PRG)
-	rm -f $(GUID)-c?.c?
-	rm -f $(OUTDIR)/$(PRG)
-	rm -f $(OUTDIR)/$(SPRITES)
+	$(RM) -f $(OBJDIR)/*.*
+	$(RM) -f $(FQTN)
+	$(RM) -f $(PRG)
+	$(RM) -f $(GUID)-c?.c?
+	$(RM) -f $(OUTDIR)/$(PRG)
+	$(RM) -f $(OUTDIR)/$(SPRITES)
 	

@@ -14,7 +14,7 @@ PROGRESS:
 
 The core transcode is 100% complete. A few bugs remain outstanding. There is also currently no provision for sound in the core (TBD).
 
-The Neo Geo target is playable on an emulator and also on real hardware (tested on an AES with NeoSD cartridge). Current development phase is gameplay bug fixes. Sound will come next.
+The Neo Geo target is playable on an emulator and also on real hardware (tested on an AES with NeoSD cartridge and NGCD). Current development phase is gameplay bug fixes. Sound will come next.
 
 The Amiga target is early WIP.
 

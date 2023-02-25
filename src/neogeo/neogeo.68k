@@ -83,9 +83,9 @@ _sp_config:
     .byte     0xff
     .byte     0xff
     .byte     0x38                | bonus life (20,60,*60)
-    .byte     0x24                | lives (3)
+    .byte     0x04                | lives (3)
     .byte     0x02                | flags award bonus life (yes)
-    .byte     0x14                | difficulty (normal)
+    .byte     0x04                | difficulty (normal)
     .byte     0x02                | cabinet
     .byte     0x00
     .byte     0x00
