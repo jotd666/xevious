@@ -94,19 +94,19 @@ _sp_config:
     .byte     0x00
 * item names are 12 characters    
     .ascii    "BONUS LIFE  "      | item 5
-    .ascii    "10K 40K *40K"
-    .ascii    "10K 50K *50K"
-    .ascii    "20K 50K *50K"
-    .ascii    "20K 60K *60K"
-    .ascii    "20K 70K *70K"
-    .ascii    "20K 80K *80K"
-    .ascii    "20K 60K only"
     .ascii    "NONE        "
+    .ascii    "20K 60K only"
+    .ascii    "20K 80K *80K"
+    .ascii    "20K 70K *70K"
+    .ascii    "20K 50K *50K"
+    .ascii    "10K 50K *50K"
+    .ascii    "10K 40K *40K"
+    .ascii    "20K 60K *60K"
     .ascii    "LIVES       "      | item 6
-    .ascii    "3           "
-    .ascii    "1           "
-    .ascii    "2           "
     .ascii    "5           "
+    .ascii    "2           "
+    .ascii    "1           "
+    .ascii    "3           "
     .ascii    "FLAGS LIFE  "      | item 7
     .ascii    "YES         "
     .ascii    "NO          "
@@ -1060,7 +1060,6 @@ osd_read_dipswitches:
     move.b    7(a0),d2                          | lives
     lsl.b     #5,d2                             | SW=7,6 (bit=6,5)
     or.b      d2,d0
-    not.b     d0
     move.b    8(a0),d1                          | flag awards bonus life
     lsl.b     #1,d1                             | SW=2 (bit=1)
     move.b    9(a0),d2                          | difficulty
