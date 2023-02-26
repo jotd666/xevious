@@ -43,7 +43,7 @@ real_sprites = {80:[0,1]   # solvalou
 # only 1 sprite needed but uses a lot of unique colors
 # unseen in other enemies, so it's good that it has its own palette in sprites
 for i in [184,185,186,187]:
-    real_sprites[i] = [2]
+    real_sprites[i] = [2,3]
 
 # this script uses the original graphics.c with palette & cluts
 # and generates the bitmaps for the amiga version
@@ -159,7 +159,7 @@ def get_used_bg_cluts():
 # this feeds from a log computed at runtime and dumped with WinUAE
 def get_used_sprite_cluts():
     infile = os.path.join(winuae_dir,"sprite_tile_log")
-    sprite_json_base = "sprite_tile_clut.json"
+    sprite_json_base = os.path.join(this_dir,"sprite_tile_clut.json")
 
     rval = load_json_tile_file(sprite_json_base)
     copy_rval = rval.copy()
@@ -472,7 +472,7 @@ def write_tiles(t,matrix,f,is_sprite):
             dump_asm_bytes(k,f)
         # sprites
         f.write("\t.align\t8\n")
-        f.write("\t.long\t0\n")   # workaround as "as" doesn't seem to align properly
+
         for k,v in sorted(sprite_data.items()):
             f.write("{}:\n".format(k))
             f.write("\t.word\t0,0,0,0,0,0,0,0")
@@ -505,6 +505,7 @@ def write_tiles(t,matrix,f,is_sprite):
                 item = item_pack
 
                 dump_asm_bytes(item,f)
+    f.write("\t.align\t8\n")
 
 def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_palette,global_palette,nb_planes,is_sprite):
     input_image = Image.new("RGB",(side,side))
@@ -564,7 +565,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                     colors_found.add(p)
 
         sprite_nums = real_sprites[tile_index]
-        if int((len(colors_found)/3)+0.5) != len(sprite_nums):
+        if int((len(colors_found)/3)+0.5) > len(sprite_nums):
             raise Exception("{}: {} colors for image, expecting max {}".format(
                             tile_index,len(colors_found),len(sprite_nums)*3))
         # game configures color banks bplcon=$32

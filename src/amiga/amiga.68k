@@ -101,7 +101,13 @@ mul\value\()_table:
 * the non shifted version is just so simple...
 * huge thanks to dual playfield and bplcon1 x-shift!
 .macro	SET_FG_BYTE
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	move.b	(a0)+,d0
+	move.b	d0,(offset,a2)
+	move.b	d0,(offset,a1)
+	.else
 	move.b	(a0)+,(offset,a1)
+	.endif
 	.endm
 
 .macro	OR_FG_BYTE
@@ -980,6 +986,12 @@ update_fg_tile:
 	lea		(a1,d0.w),a1
 	cmp.w	#FG_TILE_DRAW_FULL,d3
 	bne.w	5f
+
+	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
+	* like clear, draw in both planes
+	move.l	fg_displayed_screen_ptr(pc),a2
+	lea		(a2,d0.w),a2
+	.endif
 	
 	* draw
 	btst	#7,d4
@@ -1412,6 +1424,7 @@ sprite_draw_double_height:
 
 draw_sprite_part:
 	movem.w	d0-d4,-(a7)
+
 	* d0 is the tile index, compute clut index in d1
 	and.w	#0x7F,d1	| significant color bits TEMP
 	beq.b	2f			| CLUT 0 is all transparent: nothing drawn
@@ -1429,12 +1442,12 @@ draw_sprite_part:
 	move.w	(a0,d1.w),d1	| col offset
 	bne.b	7f
 	* sprite is not known with that CLUT configuration: blue flash
-	*move.w	#BASE_BPLCON3_VALUE,bplcon3+_custom
-	*move.w	#0xF,color+_custom
+	move.w	#BASE_BPLCON3_VALUE,bplcon3+_custom
+	move.w	#0xF,color+_custom
 	tst.b	unknown_sprite_found
 	bne.b	2f
 	st.b	unknown_sprite_found
-	bsr		zzz
+	**bsr		zzz
 	nop
 	
 	bra.b	2f
@@ -2451,8 +2464,9 @@ color_row_30_plus:
     dc.l    -2					
 	
 
-	* padding (workaround for gas bug)
-	ds.b	4
+	* aligning on 8 bytes so .align will work
+	* in the next datachip sections
+	.align	8
 	
 _end_of_ng_data:
 		

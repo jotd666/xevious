@@ -4,10 +4,14 @@
   probably not for double width/height objects
 - find a way to make up for those shaking ground enemies
 - level 14: tile layout looks wrong (bird drawing)
+- sol tower revealing is ok, but in the end tiles are reverted,
+  (something is not clear for double height objects)
 
 * can be worked on my own:
 
-- stop when sprites are missing (blitz)
+- store number of active sprites, know when to skip one frame
+- find approaching colors for "solvalou_exploding" colors
+  (create a routine in bitplanelib for approaching colors)
 - sheonite sprites too fast, seem to fail the sprite erase phase
   workaround (maybe): if sheonite on screen, clear all screen (no biggie
   because nothing else is displayed on screen)
@@ -18,16 +22,16 @@
   related to hole in map???
 - check if tiles missing (wrongly??) in level 1 too!!
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
-- run the game to rip sprites for soltower & flags
 - glitter sprite (title screen) could be a HW sprite
-- increases sprite struct (done) & mark it as sprite if no need to clear the area
+- mark sprite struct as sprite if no need to clear the area
   (plus if just went inactive, remove the sprite, so got to have stored the
    sprite address in copperlist somewhere): doesn't work for hw sprites: not cleared!
 - how to display sprites with y<0 (y clip): will need manual y clipping DAMN!!
 - remove quantization replace non-frequent colors by other existing colors
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist when nothing is displayed...
-- gnu as bug: .align directive doesn't work all the time (sprites!!)
+- running outside whdload: display trashed if started from an already open
+  DOS command (OK from startup, no display enabled)
 
 further optims:
 

@@ -147,20 +147,20 @@ def doit():
             bitplanelib.palette_dump(first_half,f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
             f.write("""
 * bitmap
-    .long    andor_genesis_00_{}
-    .long    andor_genesis_00_{}_databack
+    .long    andor_genesis_00_{0}
+    *.long    andor_genesis_00_{0}_databack
     .word    7   | sprite number
 * palette
 """.format(d))
             bitplanelib.palette_dump(second_half,f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
             f.write("""
 * bitmap
-    .long    andor_genesis_01_{}
+    .long    andor_genesis_01_{0}
+    *.long    andor_genesis_01_{0}_databack
     .word    -1   | end of sprite(s)
 """.format(d))
         f.write("\t.datachip\n")
         f.write("\t.align\t8\n")
-        f.write("\t.long\t0\n")  # workaround for "as" alignment bug?
         for j,d in enumerate(("left","right")):
             for i in range(2):
                 sp = sprites[i][j]
@@ -168,5 +168,6 @@ def doit():
                 f.write("\t.word\t0,0,0,0,0,0,0,0")
                 bitplanelib.dump_asm_bytes(sp,f,mit_format=True)
                 f.write("\t.long\t0,0,0,0\n")
+        f.write("\t.align\t8\n")
 if __name__ == "__main__":
     doit()
