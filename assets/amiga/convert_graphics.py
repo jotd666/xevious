@@ -708,7 +708,24 @@ if dump_graphics:
     used_sprite_cluts = get_used_sprite_cluts()
     sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
 
-    # we remove colors that are used in andor genesis and bragza
+    print("sprites: {} original colors used, some trimming down is required!".format(len(sprite_used_colors)))
+
+    # now the color degrading for sprites
+    # for the bozos who think that the amiga hardware is superior to Xevious hardware,
+    # the used sprites with used cluts use more or less 51 different colors
+    # because of dual playfield (AGA) we need to reduce that to 15 colors or even 14!
+    #
+    # if we do that brutally, that going to be all yellowish shit so
+    #
+    # 1) we remove colors that are used in andor genesis and bragza, we're going to use
+    #    hardware sprites for those, with a completely different & independent palette
+    # 2) player ship (solvalou) also has a unique color: remove it since it's also a sprite
+    # 3) noticing that a lot of colors are solely used in solvalou explosion, just replace those
+    #    (this isn't going to make a big difference). An alternative would be to use a sprite there too
+    #    but it would have to be double height/width and all so not worth my time developing it.
+    #
+    # for that we exploited the statistic file that we dumped in "dumps/spritecolors.json"
+
     to_remove = {(98,98,67), # andor
     (143, 143, 98),
     (67, 67, 31),  # andor
@@ -720,10 +737,26 @@ if dump_graphics:
                  (143, 143, 0),(0, 143, 0),(143, 0, 143),(0, 0, 143),
                  (143, 67, 0),(0, 255, 255),(143, 0, 255),(0, 0, 255),(0, 255, 0)})
 
+    sprite_used_colors = set(sprite_used_colors) - to_remove
 
-    sprite_used_colors = [x for x in sprite_used_colors if x not in to_remove]
+    # colors only used in solvalou explosion
+    solvalou_explosion_colors = {(174, 98, 0),(143, 143, 31),(255, 210, 98),(255, 210, 67),(210, 143, 67),(255, 255, 98),(255, 255, 210)}
+
+    # remove them too
+    sprite_used_colors = sprite_used_colors - solvalou_explosion_colors
 
     sprite_quantized_rgb = quantize_palette_16(sprite_used_colors,table) #reduced_color_dict["sprites"]
+
+    print("sprites: {} colors quantized to {} colors".format(len(sprite_used_colors),len(set(sprite_quantized_rgb.values()))))
+
+    # now we remap solvalou explosion colors to the best quantized colors
+    solv_expl_repl_colors = {c:sprite_quantized_rgb[bitplanelib.closest_color(c,sprite_used_colors)] for c in solvalou_explosion_colors}
+
+    # the conversion palette (about 50+ colors => 15 colors) is as follows
+    #
+    # but in the end, we just had to remap 22 colors to 14 which is a good ratio and barely noticeable
+    #
+    sprite_quantized_rgb.update(solv_expl_repl_colors)
 
     reduced_sprite_tile_clut = remap_colors(sprite_tile_clut,sprite_quantized_rgb)
     partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)

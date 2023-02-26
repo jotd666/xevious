@@ -13,7 +13,15 @@ STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
 	
 OPT_ENABLE_LOGGING = 1
+* double-buffering is really needed here, else blits fail
+* to race the beam and flicker is very frequent
 OPT_ENABLE_DOUBLE_BUFFERING = 1
+
+* empiric values of number of 16x16 bob objects
+* currently displayed. Allows to adapt framerate
+* and avoid flicker/slowdowns
+MEDIUM_SPRITES_THRESHOLD = 16
+HIGH_SPRITES_THRESHOLD = 32
 
 _custom = 0xDFF000
 
@@ -395,22 +403,26 @@ _vblank:
 1:
  	clr.b	no_gfx_update
     move.w  vbl_counter(pc),d0
+	* skip it no matter what, it is going to be updated twice (60Hz emu)
+	cmp.w	#4,d0
+	bne.b	2f
+
 	* 50Hz is too much even for A1200, specially
 	* when there are a lot of objects on screen
-	* just update once out of 2 (25Hz)
-	* (too bad for the start of the game, where things
+	* at start of the game, where things
 	* are pretty light, but in the later stages, this is 
 	* just too much to handle, even for a fast amiga, because
 	* of all the blits
-*	cmp.w	#0,d0	| skip that frame
-*	beq.b	12f
-*	cmp.w	#2,d0	| skip that frame
-*	beq.b	12f
-*	cmp.w	#4,d0	| is going to be updated twice (60Hz emu)
-*	bne.b	2f
-	* optimized to:
-	btst	#0,d0
-	bne.b	2f
+	* so adapt framerate to the currently active sprites
+	
+	cmp.w	#MEDIUM_SPRITES_THRESHOLD,nb_active_sprites
+	bcs.b	2f		| few active sprites
+	cmp.w	#0,d0	| skip that frame
+	beq.b	12f
+	cmp.w	#HIGH_SPRITES_THRESHOLD,nb_active_sprites
+	bcs.b	2f		| some active sprites, but not too many
+	cmp.w	#2,d0	| skip that frame
+	beq.b	12f
 12:
 	st.b	no_gfx_update
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
@@ -483,7 +495,7 @@ platform_init:
     * and background layer, can be seen in the title
 	* screen with XEVIOUS bg/fg tiles
     move.w #2<<4,bplcon1(a5)    | foreground tiles shifted by 2 pixels
-    move.w #0x0044,bplcon2(a5)	| 2nd playfield has priority, sprites have priority
+    move.w #0x005f,bplcon2(a5)	| 2nd playfield has priority, sprites have priority
     move.w #BASE_BPLCON3_VALUE,bplcon3(a5)	| color bank offset for playfield 2
 	move.w	#0x32,bplcon4(a5)	| odd sprites palette start at color 48, even at 32
 	move.w	#-8,d0
@@ -1161,10 +1173,8 @@ out:
 osd_update_32_sprite_hw:
 	tst.b	no_gfx_update
 	bne.b	out
+	clr.w	nb_active_sprites
 	move.w	d0,d7
-	*lsl.w	#8,d0
-	*add.w	#0xc00,d0
-	*move.w	d0,_custom+color
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
@@ -1423,6 +1433,7 @@ sprite_draw_double_height:
 * trashed registers: A0
 
 draw_sprite_part:
+	addq.w	#1,nb_active_sprites
 	movem.w	d0-d4,-(a7)
 
 	* d0 is the tile index, compute clut index in d1
@@ -2247,28 +2258,29 @@ ingame_palette_loaded:
 	dc.b	0
 no_gfx_update:
 	dc.b	0
-	
+nb_active_sprites:
+	.word	0
 scroll_offset:
-	dc.w	0
+	.word	0
 vbl_counter:
-		dc.w	0
+	.word	0
 _resload:
-		dc.l	0
+	.long	0
 _joypad_state:
-		dc.l	0
+	.long	0
 _previous_joypad_state:
-		dc.l	0
+	.long	0
 _previous_joypad_state_2:
-		dc.l	0
+	.long	0
 _gfxbase:
-	dc.l	0
+	.long	0
 fg_drawed_screen_ptr:
-	dc.l	fg_screen_data_1
+	.long	fg_screen_data_1
 fg_displayed_screen_ptr:
 	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	dc.l	fg_screen_data_2
+	.long	fg_screen_data_2
 	.else
-	dc.l	fg_screen_data_1
+	.long	fg_screen_data_1
 	.endif
 	
 	.include	"sound_entries.68k"
@@ -2413,9 +2425,6 @@ sprites:
     .word    sprpt+28,0
     .word    sprpt+30,0
 end_color_copper:
-   * proper sprite priority: above bitplanes
-   *dc.w  0x0102,0x0000            ;  BPLCON1 := 0x0000
-   *dc.w  0x0104,0x0024            ;  BPLCON2 := 
    * dynamic colors for fg tile color each 8 lines
 	.set    beampos,0x1C01
 	.set    fgcol,color+17*2

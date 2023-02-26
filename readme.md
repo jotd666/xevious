@@ -16,7 +16,7 @@ The core transcode is 100% complete. A few bugs remain outstanding. There is als
 
 The Neo Geo target is playable on an emulator and also on real hardware (tested on an AES with NeoSD cartridge and NGCD). Current development phase is gameplay bug fixes. Sound will come next.
 
-The Amiga target is early WIP.
+The Amiga target is playable.
 
 FEATURES:
 
@@ -54,4 +54,23 @@ Build process:
 
 AMIGA:
 
-(TBA)
+Prerequesites:
+
+- Bebbo's amiga gcc compiler
+- Windows
+- python
+- sox
+- "bitplanelib.py" (asset conversion tool needs it) at https://github.com/jotd666/amiga68ktools.git
+
+Build process:
+
+- install above tools & adjust python paths
+- make -f makefile.am
+
+When changing asset-related data (since dependencies aren't good):
+
+- To update the "graphics.68k" & "palette*.68k" files from "assets/amiga" subdir, 
+  just run the "convert_sprites.py" python script, 
+- To update sounds, use "convert_sounds.py"
+  python script (audio) to create sound*.68k files.
+

@@ -1,5 +1,6 @@
 from PIL import Image
 import ast,os
+import bitplanelib
 
 this_dir = os.path.dirname(__file__)
 
@@ -146,16 +147,7 @@ def get_colors(pic):
         pic = Image.open(pic).convert('RGB')
     return {pic.getpixel((x,y)) for y in range(pic.size[1]) for x in range(pic.size[0])}
 
-def closest_color(c1,colorlist):
-    closest = None
-    min_dist = (255*255)*3
-    # not sure this is the best: compute square distance in RGB diff
-    for c in colorlist:
-        dist = sum((x1-x2)*(x1-x2) for x1,x2 in zip(c,c1))
-        if dist < min_dist:
-            min_dist = dist
-            closest = c
-    return closest
+
 
 def doit(dump_pics=False):
     # those are the colors (24) in the map
@@ -191,7 +183,7 @@ def doit(dump_pics=False):
     # compute reduced palette, removing the colors that don't happen too much
     reduced_palette = {k for k,v in reduced.items() if k not in less_than_1000}
     # compute replacement colors for the non frequent colors
-    replacement_dict = {k:closest_color(k,reduced_palette) for k in less_than_1000}
+    replacement_dict = {k:bitplanelib.closest_color(k,reduced_palette) for k in less_than_1000}
     # merge dicts to create 24 entry RGB keys that map to 16 total RGB values
     color_dict = {k:replacement_dict.get(k,k) for k in reduced}
 

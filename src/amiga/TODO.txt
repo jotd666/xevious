@@ -9,9 +9,6 @@
 
 * can be worked on my own:
 
-- store number of active sprites, know when to skip one frame
-- find approaching colors for "solvalou_exploding" colors
-  (create a routine in bitplanelib for approaching colors)
 - sheonite sprites too fast, seem to fail the sprite erase phase
   workaround (maybe): if sheonite on screen, clear all screen (no biggie
   because nothing else is displayed on screen)
@@ -43,17 +40,4 @@ further optims:
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
   
-Build process:
-
-- python and sox must be installed to be able to perform the wav2raw conversions
-- get "bitplanelib.py" (asset conversion tool needs it) at https://github.com/jotd666/amiga68ktools.git
-- run "makefile" to generate missing .68k files using python scripts, then build
-
-
-When changing asset-related data (since dependencies aren't good):
-
-- To update the "graphics.68k" & "palette*.68k" files from "assets/amiga" subdir, 
-  just run the "convert_sprites.py" python script, 
-- To update sounds, use "convert_sounds.py"
-  python script (audio) to create sound*.68k files.
   
