@@ -123,13 +123,15 @@ check_for_extra_solvalou: | $133A
     beq.b     1f                                | 5, skip
     move.w    #1,d0                             | use 2nd table
 1:  lea       bonus_tbl_ptrs,a0
-    lsl.w     #2,d0                             | x4 (entry offset)
+    add.w     d0,d0
+    add.w     d0,d0                             | x4 (entry offset)
     move.l    (a0,d0.w),a0                      | table address
     move.b    (dswa),d0
     not.b     d0
-    lsr.b     #2,d0
+    ror.b     #2,d0
     and.w     #7,d0                             | bonus life setting
-    lsl.w     #2,d0                             | x2 (entry offset)
+main_debug1:
+    add.w     d0,d0                             | x2 (entry offset)
     move.w    (a0,d0.w),d1                      | addition for next bonus
     * this handles the 20K, 60K, every 60K situation
     * when bonus is 20K, and addition is 60K,
@@ -139,19 +141,21 @@ check_for_extra_solvalou: | $133A
     add.w     d1,d0
     bcs.b     update_next_bonus_life_Ks
     * this handles when there is only 2 bonuses    
-    move.b    (dswa),d0
-    not.b     d0
-    and.w     #7,d0
-    cmp.b     #6,d0                             | only 2 bonuses?
+    move.b    (dswa),d2
+    not.b     d2
+    and.w     #7,d2
+    cmp.b     #6,d2                             | only 2 bonuses?
     bne.b     2f                                | no, skip
     move.b    #1,(bonus_life_none)              | flag no more bonuses
-2:  andi      #0x0f,ccr                         | clear X
+2:  move.w    d0,d2
+    lsr.w     #8,d2
+    move.w    d1,d3
+    lsr.w     #8,d3
+    andi      #0x0f,ccr                         | clear X
     abcd      d1,d0
+    abcd      d3,d2
     move.b    d0,(next_bonus_life_Ks+1)         | LSB
-    lsr.w     #8,d1
-    lsr.w     #8,d0
-    abcd      d1,d0
-    move.b    d0,(next_bonus_life_Ks)           | MSB
+    move.b    d2,(next_bonus_life_Ks)           | MSB
 
 award_extra_solvalou: | $1396
     addq.b    #1,(curr_player_solvalou_left)
@@ -333,7 +337,8 @@ attract_mode_main_loop: | $04D6
     move.w    (attract_mode_stage),d0
     subq.w    #1,d0
     lea       attract_mode_jump_tbl,a0
-    lsl.w     #2,d0                             | jump table offset
+    add.w     d0,d0
+    add.w     d0,d0                             | jump table offset
     move.l    (a0,d0.w),a0
     jmp       (a0)                              | go
 
@@ -383,20 +388,22 @@ coined_up:
     move.b    d0,(curr_player_solvalou_left)
     move.w    #OPT_START_AREA-1,(area)
     clr.b     (enemy_AI_level)
+main_debug2:
     move.b    (dswa),d0
-    lsr.b     #5,d0
+    rol.b     #3,d0
     and.w     #3,d0                             | lives setting
     eori.b    #3,d0                             | +ve logic
     beq.b     1f
     moveq     #1,d0
 1:  lea       first_bonus_life_tbls,a0
-    lsl.w     #4,d0                             | table offset
+    add.w     d0,d0
+    add.w     d0,d0                             | table offset
     move.l    (a0,d0.w),a0                      | get table address
     move.b    (dswa),d0
     not.b     d0
     lsr.b     #2,d0
     and.w     #7,d0                             | bonus life setting 
-    lsl.w     #1,d0
+    add.w     d0,d0
     move.w    (a0,d0.w),(next_bonus_life_Ks)
     move.b    #1,(solvalou_number)              | used in AI
     move.b    (dswa),d1
@@ -404,6 +411,7 @@ coined_up:
     ror.b     #2,d1
     moveq     #0,d0
     and.w     #7,d1                             | bonus life setting (again)
+    cmp.b     #7,d1
     bne.b     2f
     addq.b    #1,d0
 2:  move.b    d0,(bonus_life_none)
@@ -423,7 +431,8 @@ main_gameplay_loop: | $0593
     move.b    (a0,d0.w),(area_offset_in_map)
     move.w    #0xd00,(scroll_cntr)
     lea       area_object_tbl_tbl,a0
-    lsl.w     #2,d0                             | offset for area in table
+    add.w     d0,d0
+    add.w     d0,d0                             | offset for area in table
     move.l    (a0,d0.w),(area_obj_ptr)          | init area object ptr
     clr.b     (num_flying_enemies)
     clr.b     (flying_enemy_type_tbl_offset)
@@ -625,7 +634,8 @@ display_player_start_msgs: | $077F
     moveq     #0,d0
     move.b    (curr_player),d0
     lea       player_1_2_str_tbl,a0
-    lsl.w     #2,d0                             | calc offset
+    add.w     d0,d0
+    add.w     d0,d0                             | calc offset
     move.l    (a0,d0.w),a0                      | ptr to P1/P2 string addr
     move.w    #0x1217,d0                        | screen col,row
     moveq     #10,d7                            | 10 bytes to display
@@ -703,7 +713,8 @@ display_1_only_or_1_2_players: | $0823
     beq.b     1f
     clr.w     d0
 1:  lea       one_only_one_or_two_str_tbl,a0
-    lsl.w     #2,d0                             | calc offset
+    add.w     d0,d0
+    add.w     d0,d0                             | calc offset
     movea.l   (a0,d0.w),a0
     move.w    #0x1519,d0                        | screen col,row
     moveq     #18,d7                            | string length
@@ -1162,7 +1173,8 @@ attract_mode_gameplay: | $0D35
     move.w    #0xd00,(scroll_cntr)
     clr.w     d0                                | area 1 (offset=0)
     lea       area_object_tbl_tbl,a0
-    lsl.w     #2,d0                             | redundant
+    add.w     d0,d0
+    add.w     d0,d0                             | redundant
     move.l    (a0,d0.w),(area_obj_ptr)          | init area object ptr
     bsr       clear_fg_to_transparent
     bsr       fill_bg_with_forest
@@ -1216,7 +1228,7 @@ calc_dX_dY_ratio: | $0E23
     move.b    d0,d2                             | save larger diff
     moveq     #0,d0
     moveq     #16-1,d7
-1:  lsl.w     #1,d1
+1:  add.w     d1,d1
     roxl.b    #1,d0
     bcs.b     2f
     cmp.b     d2,d0
@@ -1876,7 +1888,7 @@ animate_solvalou_explosion: | $155E
     lea       solvalou_explosion_tbl,a0
     moveq     #0,d0
     move.b    (_TIMER1,a5),d0
-    lsl.w     #1,d0
+    add.w     d0,d0
     move.b    (countup_timer_1),d1
     and.w     #0x0c,d1                          | cycle yflip,xflip
     add.b     (a0,d0.w),d1
@@ -1922,7 +1934,7 @@ update_solvalou_sprite_XY: | $15C1
     lea       obj_tbl+_OBJSIZE*0x23,a5         | solvalou
     move.w    (_X,a5),d0
     move.w    (_dX,a5),d1
-    lsl.w     #1,d1
+    add.w     d1,d1
     add.w     d1,d0
     cmp.w     #144*32,d0                        | too small?
     bcc.b     1f                                | no, skip
@@ -1933,7 +1945,7 @@ update_solvalou_sprite_XY: | $15C1
 2:  move.w    d0,(_X,a5)
     move.w    (_Y,a5),d0
     move.w    (_dY,a5),d1
-    lsl.w     #1,d1
+    add.w     d1,d1
     add.w     d1,d0
     cmp.w     #16*32,d0                         | too small?
     bcc.b     3f                                | no, skip
@@ -1954,7 +1966,8 @@ handle_solvalou_inputs: | $15FE
     and.w     #0x0f,d0                          | joystick only
 set_solvalou_dXdY:
     lea       dir_delta_tbl,a1
-    lsl.w     #2,d0                             | entry offset
+    add.w     d0,d0
+    add.w     d0,d0                             | entry offset
     lea       obj_tbl+_OBJSIZE*0x23,a5
     move.w    (0,a1,d0.w),(_dX,a5)
     move.w    (2,a1,d0.w),(_dY,a5)
@@ -2224,7 +2237,7 @@ shot_destroyed: | $180D
     
 move_shot: | $184B
     move.w    (_dX,a5),d0
-    lsl.w     #1,d0
+    add.w     d0,d0
     add.w     (_X,a5),d0                        | update spriteX
     move.w    d0,(_X,a5)                        | need a copy in d0
     rts
@@ -2292,12 +2305,12 @@ init_bombing: | $188C
     move.b    d0,(_COLOUR,a1)                   | bomb colour
     subq.w    #2,(_dX,a1)
     move.w    (_dX,a1),d0
-    lsl.w     #1,d0                             | x2
+    add.w     d0,d0                             | x2
     add.w     d0,(_X,a1)                        | add new dX
     lea       obj_tbl+_OBJSIZE*0x20,a0          | bomb target
     move.w    (scroll_delta),d0
     neg.w     d0
-    lsl.w     #1,d0
+    add.w     d0,d0
     add.w     d0,(_X,a0)                        | scroll bomb target
     bsr.b     check_bomb_finished
     bcs.b     9f
@@ -3644,7 +3657,7 @@ zakato_explode: | $27A8
     cmp.b     #5,d0                             | done exploding?
     bcc.b     9f                                | yes, exit
     lea       zakato_exploding_sprite_tbl,a0
-    lsl.w     #1,d0                             | code entry offset
+    add.w     d0,d0                             | code entry offset
     move.b    (a0,d0.w),(_CODE,a5)
     lsl.b     #2,d1
     and.w     #0x0c,d1                          | xflip,yflip
@@ -4503,7 +4516,8 @@ add_obj_handler: | $3079
     beq.b     9f                                | no, return
     lea       obj_handler_tbl,a0
     subq.w    #1,d0                             | 1st entry is object #1
-    lsl.w     #2,d0                             | offset for object
+    add.w     d0,d0
+    add.w     d0,d0                             | offset for object
     move.l    (a0,d0.w),(a6)                    | patch table with handler function
 9:  rts
 
@@ -4615,7 +4629,7 @@ handle_bomb_explosion: | $3186
     bne.b     2f
     bsr.b     adj_for_small_explosion_frame2
 2:  movea.l   #bomb_explosion_animation_tbl,a0
-    lsl.w     #1,d0
+    add.w     d0,d0
     move.b    (a0,d0.w),(_CODE,a5)
     move.b    (1,a0,d0.w),(_ATTR,a5)
 3:  bsr       scroll_sprite_X
