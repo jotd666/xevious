@@ -1144,9 +1144,8 @@ osd_update_sprite_shadow:
 	* osd_update_32_sprite_hw will re-set this pointer
 	* to a non-null value
 	* 1 or 2 sprites can be used to form the image
-	clr.l	(a4)+
-	clr.l	(a4)+
-2:
+	addq.w	#8,a4
+2:	
 	lea		(_OBJSIZE,a5),a5
 	dbf				d7,1b
 	rts

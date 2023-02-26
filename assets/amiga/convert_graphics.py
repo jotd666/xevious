@@ -42,8 +42,12 @@ real_sprites = {80:[0,1]   # solvalou
 # bragza: "soul" of the andor genesis
 # only 1 sprite needed but uses a lot of unique colors
 # unseen in other enemies, so it's good that it has its own palette in sprites
-for i in [184,185,186,187]:
+for i in range(184,188):
     real_sprites[i] = [2,3]
+
+# shining object for Xevious title
+for i in range(304,320):
+    real_sprites[i] = [1]
 
 # this script uses the original graphics.c with palette & cluts
 # and generates the bitmaps for the amiga version

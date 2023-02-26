@@ -22,6 +22,10 @@
 - mark sprite struct as sprite if no need to clear the area
   (plus if just went inactive, remove the sprite, so got to have stored the
    sprite address in copperlist somewhere): doesn't work for hw sprites: not cleared!
+   works for spark at start
+   doesn't work for ship as sprite tile CHANGES from sprite type to
+   blitter type
+   
 - how to display sprites with y<0 (y clip): will need manual y clipping DAMN!!
 - remove quantization replace non-frequent colors by other existing colors
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
