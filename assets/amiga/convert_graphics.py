@@ -823,6 +823,10 @@ if dump_graphics:
         f.write("""BT_BOB = 1
 BT_SPRITE = 2
 """)
+        # dump the list of tiles that are real sprites
+        f.write("\t.global\t{0}\n{0}:".format("real_sprite_tiles"))
+        dump_asm_words(list(real_sprites)+[0xFFFF],f)
+
         t = "fg_tile"
         # foreground tiles: just write the 1-bitplane tiles and their mirrored counterpart
         f.write("\t.global\t_{0}\n_{0}:".format(t))

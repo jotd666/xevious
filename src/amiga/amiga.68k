@@ -42,6 +42,7 @@ FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 
 NB_SPRITES_TO_UPDATE = 64
 NB_SPRITES_TOTAL = 64
+REMAINING_SPRITE_STRUCT_BITS = 5
 
 BLANK_FG_TILE_ID = 0x24
 
@@ -1139,12 +1140,6 @@ osd_update_sprite_shadow:
 	neg.w	d2
 	add.w	#32*8,d2
 	move.w	d2,(a4)+
-	* default: not a sprite, no sprite pointer
-	* if the sprite code matches a HW sprite,
-	* osd_update_32_sprite_hw will re-set this pointer
-	* to a non-null value
-	* 1 or 2 sprites can be used to form the image
-	addq.w	#8,a4
 2:	
 	lea		(_OBJSIZE,a5),a5
 	dbf				d7,1b
@@ -1247,26 +1242,7 @@ osd_update_32_sprite_hw:
 	| sprite loop
 4:
 	cmp.b	#STATE_INACTIVE,(a4)
-	bne.b	41f
-	* sprite is inactive. Nothing to do unless
-	* sprite is a hardware sprite. In which case we need
-	* to invalidate its position to hide it, then clear
-	* (2 possible hardware sprite for a "logical" sprite)
-	move.l	(8,a4),d0
-	beq	2f
-	* hardware sprite
-	move.l	d0,a0
-	clr.w	(a0)
-	clr.w	(8,a0)
-	clr.l	(8,a4)		| remove sprite from list (useful?)
-	move.l	(12,a4),d0
 	beq.b	2f
-	* hardware sprite
-	move.l	d0,a0
-	clr.w	(a0)
-	clr.w	(8,a0)
-	clr.l	(12,a4)		| remove sprite from list (useful?)
-	bra.b	2f
 41:
 	move.w	(4,a4),d1
 	sub.w	#4*8,d1		| apply Y offset
@@ -1338,10 +1314,11 @@ osd_update_32_sprite_hw:
 	lea		((NB_SPRITES_TOTAL*SPRITE_MEM_SIZE)/2,a5),a5
 3:
 	* copy one sprite backup structure (multiple of 4 bytes) 32 times
-	.rept	4   | 16/4 change if SPRITE_MEM_SIZE changes!!
+	.rept	2   | 8/4 change if SPRITE_MEM_SIZE changes!!
 	move.l	(a4)+,(a5)+
 	.endr
 	dbf		d0,3b
+
 
 	
 	* in the end, redraw all foreground tiles
@@ -1369,6 +1346,37 @@ osd_update_32_sprite_hw:
 	cmp.w	#FG_DIRTY_TILES_SIZE,d0
 	bne.b	4b
 
+
+	* after displaying real hardware sprite, we scan the possible sprites
+	* and decrease the life counter.
+	* if the life counter is zero, clear the sprite positions
+	* this is required because we cannot rely on the previous state to know that
+	* a HW sprite isn't displayed anymore. It works in some cases, but in some other
+	* cases (ship explosion), the sprite slot in the structure is just reused with
+	* a different tile
+	lea		real_sprite_display_table(pc),a0
+	lea		real_sprite_tiles,a1
+	LOGPC	300
+10:
+	move.w	(a1)+,d0
+	bmi.b	20f
+	lsl.w	#REMAINING_SPRITE_STRUCT_BITS,d0	| times 32 (stays within 16 bits, sprite max number is 320)
+	tst.w	(a0,d0.w)
+	beq.b	10b		| not active
+	subq.w	#1,(a0,d0.w)
+	bne.b	10b		| display it a little longer
+	* end of life for that sprite
+	move.l	(4,a0,d0.w),a2
+	clr.w	(a2)
+	clr.w	(8,a2)
+	* other sprite is optional, can be zero
+	move.l	(8,a0,d0.w),d0
+	beq.b	10b
+	move.l	d0,a2
+	clr.w	(a2)
+	clr.w	(8,a2)	
+	bra.b	10b
+20:
 	.endif  | OPT_DISABLE_SPRITES
 	*clr.w	_custom+color
 	
@@ -1389,7 +1397,7 @@ sprite_draw_jump_table:
 * < D3: Y
 * < D5: X
 * < A3: bitplane pointer list
-* < A4: logical sprite struct (updated if HW sprite)
+
 * trashed registers: A0
 sprite_draw_double_width:
 	bsr		draw_sprite_part
@@ -1427,7 +1435,6 @@ sprite_draw_double_height:
 * < D3: Y
 * < D5: X
 * < A3: graphical object structure (bobs or sprites)
-* < A4: logical sprite struct (updated if HW sprite @8 and @12)
 
 * trashed registers: A0
 
@@ -1436,7 +1443,7 @@ draw_sprite_part:
 	movem.w	d0-d4,-(a7)
 
 	* d0 is the tile index, compute clut index in d1
-	and.w	#0x7F,d1	| significant color bits TEMP
+	and.w	#0x7F,d1	| significant color bits
 	beq.b	2f			| CLUT 0 is all transparent: nothing drawn
 	
 	* now d1 is the index, mul by 4 to get row pointer offset
@@ -1490,11 +1497,29 @@ draw_sprite_part:
 	move.l	(a7)+,a4
 	bra.b	2b
 4:
+	* case of hardware sprite
+	* D0 contains sprite tile code times 256
+	* we could have backuped the register somewhere else
+	* but anyways we need tile code times 32
+	*
+	* (damn it's time that this project ends, the code is trickier
+	* and trickier!)
+	
+	lsr.l	#8-REMAINING_SPRITE_STRUCT_BITS,d0
 	move.l	a4,-(a7)
-	lea		(8,a4),a4	| points to sprite pointers
 	* X in D5
 	* Y in D3
-	* sprites
+	* set a lifetime in sprite table
+	lea		real_sprite_display_table(pc),a4
+	add.w	d0,a4
+	* now A4 is a pointer on the sprite display table
+	* add a lifetime of 2 updates each time called, we'll
+	* update with the pointer on the sprite structure later
+	move.w	#2,(a4)		
+	* TODO handle y clipping
+	
+	addq.w	#4,a4
+	
 	lea	(2,a3,d1.w),a0
 5:
 	move.w	(a0)+,d2	| sprite number
@@ -1527,7 +1552,7 @@ draw_sprite_part:
 
 	* get sprite data
 	move.l	(a0)+,a1
-	* store it in sprite structure
+	* store it in sprite table structure
 	move.l	a1,(a4)+
 
 	* compute control words
@@ -2237,7 +2262,7 @@ wait_blit:
 	MUL_TABLE	NB_BYTES_PER_ROW,512
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512
 
-SPRITE_MEM_SIZE = 16
+SPRITE_MEM_SIZE = 8
 current_sprite_state:
 	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 previous_sprite_state_ptr:
@@ -2281,7 +2306,19 @@ fg_displayed_screen_ptr:
 	.else
 	.long	fg_screen_data_1
 	.endif
-	
+
+* table accounting for sprites that the engine asked to display
+* 32 bytes per sprite is more than enough but makes access simple
+* by shifting
+* we need:
+* - 2 bytes for lifetime
+* - 2 bytes for y clipping offset
+* - 8 bytes to save max 2 sprite pointers
+* - 16 bytes to save the line that sprite position bytes overwrites
+*   when clipping sprites y-wise
+
+real_sprite_display_table:
+	ds.l	320*(1<<REMAINING_SPRITE_STRUCT_BITS)
 	.include	"sound_entries.68k"
 	
 *graphicsname:

@@ -18,16 +18,7 @@
   related to hole in map???
 - check if tiles missing (wrongly??) in level 1 too!!
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
-- glitter sprite (title screen) could be a HW sprite
-- mark sprite struct as sprite if no need to clear the area
-  (plus if just went inactive, remove the sprite, so got to have stored the
-   sprite address in copperlist somewhere): doesn't work for hw sprites: not cleared!
-   works for spark at start
-   doesn't work for ship as sprite tile CHANGES from sprite type to
-   blitter type
-   
 - how to display sprites with y<0 (y clip): will need manual y clipping DAMN!!
-- remove quantization replace non-frequent colors by other existing colors
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist when nothing is displayed...
 - running outside whdload: display trashed if started from an already open
