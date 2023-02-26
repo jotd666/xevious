@@ -224,7 +224,7 @@ def quantize_palette_16(rgb_tuples,img_type):
         #rgb_value = (rgb[0]<<16)+(rgb[1]<<8)+rgb[2]
         clut_img.putpixel((i,0),rgb)
 
-    reduced_colors_clut_img = clut_img.quantize(colors=13,dither=0).convert('RGB')
+    reduced_colors_clut_img = clut_img.quantize(colors=12,dither=0).convert('RGB')
 
     # get the reduced palette
     reduced_palette = [reduced_colors_clut_img.getpixel((i,0)) for i,_ in enumerate(rgb_configs)]
@@ -728,8 +728,15 @@ if dump_graphics:
     partial_palette_sprite = get_reduced_palette(sprite_quantized_rgb)
     # make sure that transparent color is first (this color is wasted, we need
     # black to be at index != 0 else it won't appear)
+    # another not useable color is color 17: it is the color of the FG tiles
+    # we _could_ use it with a hack in the FG row copperlist when nothing is displayed...
+    partial_palette_sprite.remove(black)
     partial_palette_sprite.remove(transparent_color)
     partial_palette_sprite.insert(0,transparent_color)
+    partial_palette_sprite.insert(0,transparent_color)
+    if len(partial_palette_sprite) != 16:
+        raise Exception("Sprite palette len not exactly 16: {}".format(len(partial_palette_sprite)))
+
 
     sprite_matrix = raw_blocks[table] = [[None]*128 for _ in range(320)]
     # compute the RGB configuration used for each used tile. Generate a lookup table with

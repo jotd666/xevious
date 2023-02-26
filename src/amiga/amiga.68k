@@ -1230,7 +1230,7 @@ osd_update_32_sprite_hw:
 	* sprite is inactive. Nothing to do unless
 	* sprite is a hardware sprite. In which case we need
 	* to invalidate its position to hide it, then clear
-	* (2 possible hardware sprite for a "logical" sprite
+	* (2 possible hardware sprite for a "logical" sprite)
 	move.l	(8,a4),d0
 	beq	2f
 	* hardware sprite
@@ -1355,8 +1355,7 @@ osd_update_32_sprite_hw:
 zzz:
 			blitz
 			rts
-eee:
-	dc.w	40000
+
 sprite_draw_jump_table:
 	dc.l	draw_sprite_part
 	dc.l	sprite_draw_double_width
@@ -1401,7 +1400,7 @@ sprite_draw_double_height:
 * internal routine to draw sprites
 * either by blitting (BOBs) or positionning sprites (HW sprites)
 *
-* < D0: tile index
+* < D0: sprite index
 * < D1: color table index
 * < D2: attributes (ignored if HW sprite)
 * < D3: Y
@@ -1415,6 +1414,7 @@ draw_sprite_part:
 	movem.w	d0-d4,-(a7)
 	* d0 is the tile index, compute clut index in d1
 	and.w	#0x7F,d1	| significant color bits TEMP
+	beq.b	2f			| CLUT 0 is all transparent: nothing drawn
 	
 	* now d1 is the index, mul by 4 to get row pointer offset
 	* (there are 2 versions of the sprite normal,mirror for each
@@ -1434,7 +1434,7 @@ draw_sprite_part:
 	tst.b	unknown_sprite_found
 	bne.b	2f
 	st.b	unknown_sprite_found
-	**bsr		zzz
+	bsr		zzz
 	nop
 	
 	bra.b	2f
