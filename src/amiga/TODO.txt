@@ -15,7 +15,6 @@
 - sheonite sprites too fast, seem to fail the sprite erase phase
   workaround (maybe): if sheonite on screen, clear all screen (no biggie
   because nothing else is displayed on screen)
-- updating score fails with OR because of double buffering
 - sprites for big mothership: test including sprite clipping
 - rip sounds
 - title tiles missing (level 14) title tiles also with brown color config???
@@ -32,6 +31,8 @@
   we _could_ use it with a hack in the FG row copperlist when nothing is displayed...
 - running outside whdload: display trashed if started from an already open
   DOS command (OK from startup, no display enabled)
+- dip switches screen
+- pause
 
 further optims:
 
