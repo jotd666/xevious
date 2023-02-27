@@ -416,11 +416,11 @@ _vblank:
 	* of all the blits
 	* so adapt framerate to the currently active sprites
 	
-	cmp.w	#MEDIUM_SPRITES_THRESHOLD,nb_active_sprites
+	cmp.w	#MEDIUM_SPRITES_THRESHOLD,nb_active_bobs
 	bcs.b	2f		| few active sprites
 	cmp.w	#0,d0	| skip that frame
 	beq.b	12f
-	cmp.w	#HIGH_SPRITES_THRESHOLD,nb_active_sprites
+	cmp.w	#HIGH_SPRITES_THRESHOLD,nb_active_bobs
 	bcs.b	2f		| some active sprites, but not too many
 	cmp.w	#2,d0	| skip that frame
 	bne.b	2f
@@ -1165,19 +1165,26 @@ out:
 * just store the previous positions only by half (because the
 * others aren't updated anyway)
 
-	
+AS_NONE = 0
+AS_OTHER = 4
+AS_TILE = 8
+AS_FIRST = 12
+AS_SECOND = 16
+
+
 osd_update_32_sprite_hw:
 	tst.b	no_gfx_update
 	bne.b	out
-	clr.w	nb_active_sprites
+	clr.w	nb_active_bobs
 	move.w	d0,d7
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	lea		ag_sprites(pc),a4
+	**lea		ag_sprites(pc),a4
 
 	move.l		previous_sprite_state_ptr(pc),a5
-
+	lea			is_hw_sprite_table,a6
+	
 	* first restore all background tiles behind the previous
 	* positions of the previously active objects
 	movem.l	d2-d5/a0-a2/a5,-(a7)
@@ -1185,6 +1192,10 @@ osd_update_32_sprite_hw:
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
 	beq.w	11f
+	clr		d0
+	move.b	(2,a5),d0
+	tst.b	(a6,d0.w)
+	bne.w	11f		| real sprite: skip erase
 	* erase previous sprite position (but not if sprite type
 	* is hardware sprite)
 	move.w	(4,a5),d1   | Y
@@ -1246,7 +1257,7 @@ osd_update_32_sprite_hw:
 	| sprite loop
 4:
 	cmp.b	#STATE_INACTIVE,(a4)
-	beq.b	2f
+	beq		2f
 41:
 	move.w	(4,a4),d1
 	sub.w	#4*8,d1		| apply Y offset
@@ -1269,7 +1280,35 @@ osd_update_32_sprite_hw:
 	swap	d0
 	clr.w	d0
 	swap	d0
+
+	clr.w	d6
+	* tile type (bob, sprite and which sprite type)
+	move.b	(a6,d0.w),d6
 	
+	cmp.b	#AS_TILE,d6
+	beq.b	2f
+	bcs.b	51f
+	* andor genesis sprite
+	* left or right part
+	* color indices are zeroed ATM
+	lsl.w	#5,d0
+	moveq	#0,d1
+	move.w	(6,a4),d5	| prepare X
+	move.l	a3,-(a7)
+	cmp.b	#AS_FIRST,d6
+	bne.b	50f
+	* first left part
+	lea		andor_genesis_left,a3
+	bsr		draw_hw_sprite
+	move.l	(a7)+,a3
+	bra.b	2f
+50:
+	* second right part
+	lea		andor_genesis_right,a3
+	bsr		draw_hw_sprite
+	move.l	(a7)+,a3
+	bra.b	2f
+51:
 	.ifne  OPT_ENABLE_LOGGING
 	* log the sprite, use start address in 0x104 then
 	* S sprite_tile_log <address> !128*!320
@@ -1322,8 +1361,6 @@ osd_update_32_sprite_hw:
 	move.l	(a4)+,(a5)+
 	.endr
 	dbf		d0,3b
-
-
 	
 	* in the end, redraw all foreground tiles
 	* this is much faster and simpler than marking the
@@ -1442,7 +1479,6 @@ sprite_draw_double_height:
 * trashed registers: A0
 
 draw_sprite_part:
-	addq.w	#1,nb_active_sprites
 	movem.w	d0-d4,-(a7)
 
 	* d0 is the tile index, compute clut index in d1
@@ -1480,6 +1516,10 @@ draw_sprite_part:
 	move.w	(a3,d1.w),d4	| object type
 	cmp.w	#BT_SPRITE,d4
 	beq.b	4f
+
+	* count a BOB sprite
+	addq.w	#1,nb_active_bobs
+
 	btst	#7,d2			| X-flip?
 	beq.b	3f
 	addq.w	#4,d1		| pointer to mirror planes
@@ -1495,10 +1535,7 @@ draw_sprite_part:
 	bsr	blit_16x_bob
 2:
 	movem.w	(a7)+,d0-d4
-	rts
-21:
-	move.l	(a7)+,a4
-	bra.b	2b
+	rts	
 4:
 	* case of hardware sprite
 	* D0 contains sprite tile code times 256
@@ -1509,6 +1546,16 @@ draw_sprite_part:
 	* and trickier!)
 	
 	lsr.l	#8-REMAINING_SPRITE_STRUCT_BITS,d0
+	bsr		draw_hw_sprite
+	bra.b	2b
+	
+* < D0: sprite index times 32 (for lifetime table)
+* < D1: color table index
+* < D3: Y
+* < D5: X
+* < A3: graphical object structure (sprites)
+
+draw_hw_sprite:
 	move.l	a4,-(a7)
 	* X in D5
 	* Y in D3
@@ -1526,7 +1573,7 @@ draw_sprite_part:
 	lea	(2,a3,d1.w),a0
 5:
 	move.w	(a0)+,d2	| sprite number
-	bmi.b	21b			| end of sprite chain
+	bmi.b	21f			| end of sprite chain
 	* load palette in the proper copperlist slots for this sprite
 	move.w	d2,d1
 	lsr.w	#1,d1
@@ -1577,6 +1624,9 @@ draw_sprite_part:
 	move.w	d0,(2,a1,d2.w)
 	* next sprite for this image
 	bra	5b
+21:
+	move.l	(a7)+,a4
+	rts
 	
 *P1 B2 = DSWB bit 0
 *P2 B2 = DWSB bit 4
@@ -2285,7 +2335,7 @@ ingame_palette_loaded:
 	dc.b	0
 no_gfx_update:
 	dc.b	0
-nb_active_sprites:
+nb_active_bobs:
 	.word	0
 scroll_offset:
 	.word	0

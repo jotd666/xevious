@@ -2,6 +2,7 @@ import os,re,bitplanelib,ast,json
 from PIL import Image,ImageOps
 
 import gen_color_dict
+import sprite_specific
 
 import collections
 
@@ -541,7 +542,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
     "y_offset":y_offset,
     "height":height}
 
-    if is_sprite and tile_index in real_sprites:
+    if is_sprite and tile_index in sprite_specific.real_sprites:
         sprite_dict["bitmap_type"] = BT_SPRITE
         # temp generate sprite data somewhere to test
         # first separate in 3 colors max images
@@ -555,7 +556,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                 if p != transparent_color:
                     colors_found.add(p)
 
-        sprite_nums = real_sprites[tile_index]
+        sprite_nums = sprite_specific.real_sprites[tile_index]
         if int((len(colors_found)/3)+0.5) > len(sprite_nums):
             raise Exception("{}: {} colors for image, expecting max {}".format(
                             tile_index,len(colors_found),len(sprite_nums)*3))
@@ -812,7 +813,7 @@ BT_SPRITE = 2
 """)
         # dump the list of tiles that are real sprites
         f.write("\t.global\t{0}\n{0}:".format("real_sprite_tiles"))
-        dump_asm_words(list(real_sprites)+[0xFFFF],f)
+        dump_asm_words(list(sprite_specific.real_sprites)+[0xFFFF],f)
 
         t = "fg_tile"
         # foreground tiles: just write the 1-bitplane tiles and their mirrored counterpart

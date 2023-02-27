@@ -7,6 +7,8 @@
 
 * can be worked on my own:
 
+- glitter sprite is flashing. revert to BOB ??
+- andor genesis only 16 height!!
 - sol tower revealing is ok, but in the end tiles are reverted,
   (something is not clear for double height objects: handle with special case
   and that's it? check a video
@@ -30,6 +32,7 @@
 - rip sounds
 - dynamic sprite priority change for 2 upper lines (score) for andor genesis
   andor genesis sprites should be below other ships
+- do not include bitmaps for andor genesis or other sprites
 
 further optims:
 

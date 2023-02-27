@@ -24,10 +24,10 @@ this_dir = os.path.dirname(__file__)
 
 
 AS_NONE = 0
-AS_TILE = 1
-AS_FIRST = 2
-AS_SECOND = 3
 AS_OTHER = 4
+AS_TILE = 8
+AS_FIRST = 12
+AS_SECOND = 16
 
 
 # dictionary of sprites which aren't bobs but sprites
@@ -46,9 +46,11 @@ for i in range(304,320):
 
 
 def doit():
-    andor_table = [AS_NONE]*320
+    sprite_table = [AS_NONE]*320
     for start,stop in ((88,96),(128,159)):
-        andor_table[start:stop+1] = [AS_TILE]*(stop-start+1)
+        sprite_table[start:stop+1] = [AS_TILE]*(stop-start+1)
+    for r in real_sprites:
+        sprite_table[r] = AS_OTHER
 
     dump_dir = os.path.join(this_dir,"dumps","sprite","raw")
     prefix = "andor_genesis"
@@ -58,7 +60,7 @@ def doit():
 
 
     def is_andor_genesis(code):
-        return bool(andor_table[code])
+        return bool(sprite_table[code] in [AS_TILE,AS_FIRST,AS_SECOND])
 
     ag_blocks = []
 
@@ -80,9 +82,9 @@ def doit():
         x -= min_x
         y -= min_y
         if x==0 and y==0:
-            andor_table[sprite_code] = AS_FIRST
+            sprite_table[sprite_code] = AS_FIRST
         if x==64 and y==0:
-            andor_table[sprite_code] = AS_SECOND
+            sprite_table[sprite_code] = AS_SECOND
 
         offsets = [(1,0),(1,1),(0,0),(0,1)] if sprite_attributes == 3 else [(0,0)]
         for i,(xo,yo) in enumerate(offsets):
@@ -135,7 +137,7 @@ def doit():
     # 2 (64x96) sprites, 2 (32x96 sprites)
     first_half.insert(0,transparent)
     second_half.insert(0,transparent)
-    srcout = os.path.join(this_dir,"../../src/amiga/andor_genesis.68k")
+    srcout = os.path.join(this_dir,"../../src/amiga/sprite_specific.68k")
 
     sprites = []
     for pal,img in [(first_half,img1),(second_half,img2)]:
@@ -148,32 +150,34 @@ def doit():
     with open(srcout,"w") as f:
         f.write("* table:\n")
         f.write("* 0: no andor tile\n")
-        f.write("* 1: andor tile, do not display\n")
-        f.write("* 2: origin andor tile (first sprite)\n")
-        f.write("* 3: second origin andor tile (second sprite)\n\n")
-        f.write("\t.global\t{0}\n\n{0}:".format("is_hw_sprite_table"))
-        bitplanelib.dump_asm_bytes(andor_table,f,mit_format=True)
-        f.write("* andor sprites\n")
+        f.write("* 4: other sprite (non andor)\n")
+        f.write("* 8: andor tile, do not display\n")
+        f.write("* 12: origin andor tile (first sprite)\n")
+        f.write("* 16: second origin andor tile (second sprite)\n")
         for d in ("left","right"):
-            f.write("""andor_genesis_{}:
+            f.write("\t.global\tandor_genesis_{}\n".format(d))
+        f.write("\t.global\t{0}\n\n{0}:".format("is_hw_sprite_table"))
+
+        bitplanelib.dump_asm_bytes(sprite_table,f,mit_format=True)
+        f.write("* andor sprites\n")
+        for i,d in enumerate(("left","right")):
+            f.write("""andor_genesis_{0}:
     .word    BT_SPRITE
 * 2 sprite(s)
-    .word    6   | sprite number
+    .word    {1}   | sprite number
 * palette
-""".format(d))
+""".format(d,i*2+4))
             bitplanelib.palette_dump(first_half,f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
             f.write("""
 * bitmap
     .long    andor_genesis_00_{0}
-    *.long    andor_genesis_00_{0}_databack
-    .word    7   | sprite number
+    .word    {1}   | sprite number
 * palette
-""".format(d))
+""".format(d,i*2+5))
             bitplanelib.palette_dump(second_half,f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
             f.write("""
 * bitmap
     .long    andor_genesis_01_{0}
-    *.long    andor_genesis_01_{0}_databack
     .word    -1   | end of sprite(s)
 """.format(d))
         f.write("\t.datachip\n")
