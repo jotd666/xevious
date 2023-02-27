@@ -27,6 +27,23 @@ AS_NONE = 0
 AS_TILE = 1
 AS_FIRST = 2
 AS_SECOND = 3
+AS_OTHER = 4
+
+
+# dictionary of sprites which aren't bobs but sprites
+# since game sprites can have more than 3 colors, we have to combine 2 sprites
+real_sprites = {80:[0,1]   # solvalou
+}
+# bragza: "soul" of the andor genesis
+# only 1 sprite needed but uses a lot of unique colors
+# unseen in other enemies, so it's good that it has its own palette in sprites
+for i in range(184,188):
+    real_sprites[i] = [2,3]
+
+# shining object for Xevious title
+for i in range(304,320):
+    real_sprites[i] = [1]
+
 
 def doit():
     andor_table = [AS_NONE]*320
@@ -134,7 +151,7 @@ def doit():
         f.write("* 1: andor tile, do not display\n")
         f.write("* 2: origin andor tile (first sprite)\n")
         f.write("* 3: second origin andor tile (second sprite)\n\n")
-        f.write("is_andor_genesis_table:")
+        f.write("\t.global\t{0}\n\n{0}:".format("is_hw_sprite_table"))
         bitplanelib.dump_asm_bytes(andor_table,f,mit_format=True)
         f.write("* andor sprites\n")
         for d in ("left","right"):

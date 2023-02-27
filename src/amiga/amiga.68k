@@ -406,7 +406,7 @@ _vblank:
     move.w  vbl_counter(pc),d0
 	* skip it no matter what, it is going to be updated twice (60Hz emu)
 	cmp.w	#4,d0
-	bne.b	2f
+	beq.b	12f
 
 	* 50Hz is too much even for A1200, specially
 	* when there are a lot of objects on screen
@@ -423,7 +423,7 @@ _vblank:
 	cmp.w	#HIGH_SPRITES_THRESHOLD,nb_active_sprites
 	bcs.b	2f		| some active sprites, but not too many
 	cmp.w	#2,d0	| skip that frame
-	beq.b	12f
+	bne.b	2f
 12:
 	st.b	no_gfx_update
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
@@ -1149,6 +1149,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
+	.include	"ag_test.68k"
 
 out:
 	rts
@@ -1164,6 +1165,7 @@ out:
 * just store the previous positions only by half (because the
 * others aren't updated anyway)
 
+	
 osd_update_32_sprite_hw:
 	tst.b	no_gfx_update
 	bne.b	out
@@ -1172,6 +1174,8 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
+	lea		ag_sprites(pc),a4
+
 	move.l		previous_sprite_state_ptr(pc),a5
 
 	* first restore all background tiles behind the previous
@@ -1356,7 +1360,6 @@ osd_update_32_sprite_hw:
 	* a different tile
 	lea		real_sprite_display_table(pc),a0
 	lea		real_sprite_tiles,a1
-	LOGPC	300
 10:
 	move.w	(a1)+,d0
 	bmi.b	20f

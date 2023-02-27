@@ -35,19 +35,6 @@ title_tiles = {240, 241, 242, 243, 244, 245, 246, 247, 248,
  486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497,
  498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511}
 
-# dictionary of sprites which aren't bobs but sprites
-# since game sprites can have more than 3 colors, we have to combine 2 sprites
-real_sprites = {80:[0,1]   # solvalou
-}
-# bragza: "soul" of the andor genesis
-# only 1 sprite needed but uses a lot of unique colors
-# unseen in other enemies, so it's good that it has its own palette in sprites
-for i in range(184,188):
-    real_sprites[i] = [2,3]
-
-# shining object for Xevious title
-for i in range(304,320):
-    real_sprites[i] = [1]
 
 # this script uses the original graphics.c with palette & cluts
 # and generates the bitmaps for the amiga version
