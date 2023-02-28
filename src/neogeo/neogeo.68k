@@ -37,6 +37,8 @@
     .global osd_read_p2_inputs
     .global osd_read_coin
     .global osd_read_start
+    .global osd_sound_start
+    .global osd_sound_stop
     .global osd_read_high_scores
     .global osd_write_high_scores
     .global osd_debug_hook
@@ -82,8 +84,8 @@ _sp_config:
     .word     0xffff
     .byte     0xff
     .byte     0xff
-    .byte     0x38                | bonus life (20,60,*60)
-    .byte     0x04                | lives (3)
+    .byte     0x78                | bonus life (20,60,*60)
+    .byte     0x34                | lives (3)
     .byte     0x02                | flags award bonus life (yes)
     .byte     0x04                | difficulty (normal)
     .byte     0x02                | cabinet
@@ -1188,6 +1190,14 @@ patch_high_score_table:
     dbf       d7,0b
     rts
 
+* d0 = sound ordinal
+osd_sound_start:
+    rts
+    
+* d0 = sound ordinal
+osd_sound_stop:
+    rts
+    
 osd_read_high_scores:
     * try to read from BRAM first
     * - any memory card saves will overwrite

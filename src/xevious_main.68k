@@ -130,7 +130,6 @@ check_for_extra_solvalou: | $133A
     not.b     d0
     ror.b     #2,d0
     and.w     #7,d0                             | bonus life setting
-main_debug1:
     add.w     d0,d0                             | x2 (entry offset)
     move.w    (a0,d0.w),d1                      | addition for next bonus
     * this handles the 20K, 60K, every 60K situation
@@ -159,7 +158,8 @@ main_debug1:
 
 award_extra_solvalou: | $1396
     addq.b    #1,(curr_player_solvalou_left)
-    ** TBD sound
+    moveq     #EXTRA_SOLVALOU_SND,d0
+    jsr       osd_sound_start
     bra       display_solvalou_left
 
 9:  rts
@@ -388,7 +388,6 @@ coined_up:
     move.b    d0,(curr_player_solvalou_left)
     move.w    #OPT_START_AREA-1,(area)
     clr.b     (enemy_AI_level)
-main_debug2:
     move.b    (dswa),d0
     rol.b     #3,d0
     and.w     #3,d0                             | lives setting
@@ -422,7 +421,8 @@ main_debug2:
     move.w    #64-1,d7                          | 64 bytes to copy
 3:  move.b    (a0)+,(a1)+                       | init P2 settings
     dbf       d7,3b
-    ** TBD sound
+    moveq     #ORDINAL_1_SND,d0
+    jsr       osd_sound_start
 
 main_gameplay_loop: | $0593
     subq.b    #1,(curr_player_solvalou_left)
@@ -448,7 +448,8 @@ main_gameplay_loop: | $0593
     lea       main_fn_1__handle_solvalou,a0
     move.l    a0,(main_fn_tbl_RAM+4*1)          | reset entry point
     clr.b     (scroll_disabled)
-    ** TBD sound
+    moveq     #ORDINAL_1_SND,d0
+    jsr       osd_sound_start
     move.b    #0xa0,(countdown_timer_1)
     bsr       display_player_start_msgs
     bsr       save_PC_to_fn_tbl_and_ret
@@ -1537,6 +1538,13 @@ score_lower_than_entry: | $1191
     move.w    d1,(name_entry_curr_char_screen_offset)
     move.l    a0,(name_entry_ptr_curr_char)
     bsr       save_PC_to_fn_tbl_and_ret
+    *** something with $A000 here...
+    *** ... jumps to name_entry_finished!
+    moveq     #HIGHEST_SCORE_SND,d0
+    tst.b     (new_high_score_entry_index)
+    beq       5f
+    moveq     #HIGH_SCORE_SND,d0
+5:  jsr       osd_sound_start
     lea       P1_inputs,a0
     * looks like bit 4 is a debounced version of bit 5
     * = at least that's the way to get input to work
@@ -1583,7 +1591,11 @@ name_entry_append_char: | $124A
     bne.b     9f                                | no, return
     
 name_entry_finished: | $1262
-    * some writes to $A00X addresses, sound???
+    moveq     #HIGHEST_SCORE_SND,d0
+    jsr       osd_sound_stop
+    moveq     #HIGH_SCORE_SND,d0 
+    jsr       osd_sound_stop
+    * $A016, $A017 too
 .ifne OPT_ENABLE_HIGH_SCORE_IO
     * added for 68K transcode
     lea       high_score_1st_msb,a0
@@ -1830,8 +1842,8 @@ main_fn_1__handle_solvalou: | $14BB
     bne.b     main_fn_1__handle_solvalou
     tst.w     (attract_mode_stage)
     bne.b     update_solvalou
-    ** TBD SOUND
-    nop
+    moveq     #SOLVALOU_SND,d0
+    jsr       osd_sound_start
 
 update_solvalou: | $14F7
     bsr       handle_solvalou_inputs
@@ -1845,7 +1857,8 @@ update_solvalou: | $14F7
     rts
 .endif  
     * solvalou hit/dead
-    ** TBD SOUND
+    moveq     #SOLVALOU_SND,d0
+    jsr       osd_sound_stop
     tst.w     (attract_mode_stage)
     bne.b     explode_solvalou
     * there was some 06XX stuff here
@@ -2183,7 +2196,8 @@ main_fn_30_shot_fn: | $17A2
     move.b    #2,(_STATE,a5)
     move.b    #2,(_EXTRA,a5)                    | temp state
     move.w    #0xffa0,(_dX,a5)
-    * (TBD) start shot sound
+    moveq     #SHOT_SND,d0
+    jsr       osd_sound_start
     lea       obj_tbl+_OBJSIZE*0x23,a0          | solvalou
     move.w    (_X,a0),(_X,a5)                   | copy spriteX to shot
     move.w    (_Y,a0),(_Y,a5)                   | copy spriteY to shot
@@ -2279,7 +2293,8 @@ init_bombing: | $188C
     clr.w     (_dX,a1)                          | bomb dX
     clr.b     (_TIMER,a1)
     clr.b     (_TIMER1,a1)
-    * (TBD) start bomb sound
+    moveq     #BOMB_SND,d0
+    jsr       osd_sound_start
     move.w    #0x0280,d0                        | state=2, bank=1
     move.w    d0,(_STATE,a1)                    | bomb
     move.w    d0,(_STATE,a0)                    | bomb target
@@ -2323,7 +2338,9 @@ check_bomb_finished: | $190B
     move.w    (_X,a0),d0
     sub.w     (_X,a1),d0                        | same?
     bcs.b     9f                                | no, return
-    * (TBD) stop bomb sound
+    moveq     #BOMB_SND,d0
+    jsr       osd_sound_stop
+    * $A020 as well
     bsr       handle_bombed_obj_and_award_points
     clr.b     (_STATE,a1)                       | bomb object
     clr.b     (_STATE,a0)                       | bomb target
@@ -2350,7 +2367,8 @@ check_flying_enemies_shot: | $1928
     movem.l   d7/a1/a3,-(a7) 
     bsr       add_to_score
     movem.l   (a7)+,d7/a1/a3
-    ** TBD sound  
+    moveq     #FLYING_ENEMY_HIT_SND,d0
+    jsr       osd_sound_start
     
 loc_1972: | 1972
     lea       (_OBJSIZE,a1),a1                  | next enemy
@@ -2371,7 +2389,8 @@ loc_1972: | 1972
 
 deactivate_shot: | $1997
     move.b    #3,(_STATE,a5)
-    ** TBD sound
+    moveq     #BACURA_HIT_SND,d0
+    jsr       osd_sound_start
     rts
 
 * d3=shot spriteY, d4=shot_spriteX, 
@@ -2963,6 +2982,8 @@ inc_num_solvalou: | $1FB7
 remove_bonus_flag: | $1FC3
     clr.b     (_STATE,a5)
     clr.b     (_TYPE,a5)
+    moveq     #BONUS_FLAG_SND,d0
+    jsr       osd_sound_start
     bra       add_obj_handler
     
 check_flag_collected: | $1FD6
@@ -3717,7 +3738,8 @@ init_teleport: | $2826
     add.b     #1,(_Y,a5)                        | MSB
     move.b    #0x24,(_COLOUR,a5)
     move.b    #0xff,(_TIMER,a5)                 | init timer
-    *** TBD sound
+    moveq     #TELEPORT_SND,d0
+    jsr       osd_sound_start
     rts
     
 * Garu Zakota (Bullseye) 1,000/500 pts
@@ -3745,7 +3767,8 @@ handle_18_Garu_Zakato: | $284C
 
 garu_zakato_explode: | $2897
     bsr.w     init_garu_zakato_explosion
-    *** TBD sound
+    moveq     #GARU_ZAKATO_SND,d0
+    jsr       osd_sound_start
     clr.b     (_TYPE,a5)
     clr.b     (_STATE,a5)
     bra       add_obj_handler
@@ -3838,7 +3861,8 @@ r_sheonite_retreat: | $29B1
     move.w    (_Y,a1),(_Y,a5)                   | set object spriteY
     clr.w     (_dY,a5)
     move.w    #0xFFA0,(_dX,a5)
-    *** TBD sound
+    moveq     #SHEONITE_SND,d0
+    jsr       osd_sound_start
     SET_REENTRY_ADDR_HERE
     lea       r_sheonite_code_tbl_1,a0
     move.b    (countup_timer_1),d0
@@ -4973,7 +4997,8 @@ handle_4B_Andor_Genesis_obj_15: | $3481
     move.b    #0x10,d0
     cmp.b     (_X,a5),d0                        | MSB, stop descending?
     beq.b     1f                                | yes, go
-    *** TBD sound
+    moveq     #ANDOR_GENESIS_SND,d0
+    jsr       osd_sound_start
     move.w    #0x10,d0
     add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | update spriteX
@@ -4984,7 +5009,8 @@ handle_4B_Andor_Genesis_obj_15: | $3481
     bne.b     andor_genesis_leave               | yes, go
     cmp.b     #3,(obj_tbl+_OBJSIZE*0x0E+_STATE) | object 14 destroyed?
     beq.b     andor_genesis_destroyed           | yes, go
-    *** TBD sound
+    moveq     #ANDOR_GENESIS_SND,d0
+    jsr       osd_sound_start
     bra       cycle_andor_genesis_colour
 
 * a5=object 15
@@ -5015,7 +5041,8 @@ andor_genesis_leave: | $34F5
     move.w    #0xfff8,d0
     add.w     d0,d0                             | x2
     add.w     d0,(_X,a5)                        | update spriteX
-    *** TBD sound
+    moveq     #ANDOR_GENESIS_SND,d0
+    jsr       osd_sound_start
     bra       cycle_andor_genesis_colour
 
 remove_andor_genesis: | $351B

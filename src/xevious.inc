@@ -59,7 +59,23 @@
     .equ  BANK_FG_VIDEORAM,   (2<<2)
     .equ  BANK_BG_VIDEORAM,   (3<<2)
 
+* sound ordinals
 
+    .equ  ORDINAL_1_SND,          0x01
+    .equ  HIGHEST_SCORE_SND,      0x02
+    .equ  HIGH_SCORE_SND,         0x03
+    .equ  EXTRA_SOLVALOU_SND,     0x04
+    .equ  FLYING_ENEMY_HIT_SND,   0x05
+    .equ  GARU_ZAKATO_SND,        0x06
+    .equ  ANDOR_GENESIS_SND,      0x07
+    .equ  SHEONITE_SND,           0x08
+    .equ  TELEPORT_SND,           0x09
+    .equ  BACURA_HIT_SND,         0x0a
+    .equ  SHOT_SND,               0x0b
+    .equ  BOMB_SND,               0x0c
+    .equ  BONUS_FLAG_SND,         0x0d
+    .equ  SOLVALOU_SND,           0x0e
+    
 ***
 *** global variables
 ***
