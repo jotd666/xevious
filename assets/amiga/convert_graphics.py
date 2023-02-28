@@ -837,3 +837,6 @@ BT_SPRITE = 2
         # bobs are blitted, so require chipmem, sprites are displayed using chip too
 
         write_tiles("sprite",sprite_matrix,f,is_sprite=True)
+
+    # generate special sprite tables & andor genesis huge sprites
+    sprite_specific.doit()

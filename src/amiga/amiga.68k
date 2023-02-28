@@ -456,6 +456,23 @@ _vblank:
     rte
 
 osd_sound_start:
+	cmp.w	#ORDINAL_1_SND,d0		| temp
+	beq.b	1f
+	cmp.w	#SOLVALOU_SND,d0		| temp
+	beq.b	1f
+	movem.l	d0/a0/a6,-(a7)
+	lea		sound_table(pc),a0
+	.ifdef	NO68020
+	add.w	d0,d0
+	add.w	d0,d0
+	move.l	(a0,d0.w),a0
+	.else
+	move.l	(a0,d0.w*4),a0
+	.endif
+	lea		_custom,a6
+	jsr		_mt_playfx
+	movem.l	(a7)+,d0/a0/a6
+1:
 	rts
 	
 osd_sound_loop:
@@ -1161,7 +1178,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-	.include	"ag_test.68k"
+	**.include	"ag_test.68k"
 
 out:
 	rts
@@ -1192,7 +1209,7 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	lea		ag_sprites(pc),a4
+	**lea		ag_sprites(pc),a4
 
 	move.l		previous_sprite_state_ptr(pc),a5
 	lea			is_hw_sprite_table,a6
@@ -1878,9 +1895,10 @@ osd_read_coin:
 	bne.b	1f
 0:
 	clr.b	(5,a0)		| ack key
-	lea		credit_sound,a0
-	lea		_custom,a6
-	jsr		_mt_playfx
+	move.l	d0,-(a7)
+	moveq	#0,d0
+	bsr		osd_sound_start
+	move.l	(a7)+,d0
 	bset	#0,d0
 1:
 	move.l	d1,_previous_joypad_state
