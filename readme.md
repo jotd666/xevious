@@ -12,9 +12,9 @@ In theory the core can be ported easily to any 68K target that can support the r
 
 PROGRESS:
 
-The core transcode is 100% complete. A few bugs remain outstanding. There is also currently no provision for sound in the core (TBD).
+The core transcode is 100% complete. One known gameplay bug remains outstanding. Hooks for sound have been added to the core (WIP).
 
-The Neo Geo target is playable on an emulator and also on real hardware (tested on an AES with NeoSD cartridge and NGCD). Current development phase is gameplay bug fixes. Sound will come next.
+The Neo Geo target is playable on an emulator and also on real hardware (tested on an AES with NeoSD cartridge and NGCD). Current development phase is gameplay bug fixes. Sound is also WIP.
 
 The Amiga target is playable.
 
