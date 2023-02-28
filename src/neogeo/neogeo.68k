@@ -110,13 +110,13 @@ _sp_config:
     .ascii    "1           "
     .ascii    "3           "
     .ascii    "FLAGS LIFE  "      | item 7
-    .ascii    "YES         "
     .ascii    "NO          "
+    .ascii    "YES         "
     .ascii    "DIFFICULTY  "      | item 8
-    .ascii    "NORMAL      "
-    .ascii    "EASY        "
-    .ascii    "HARD        "
     .ascii    "HARDEST     "
+    .ascii    "HARD        "
+    .ascii    "EASY        "
+    .ascii    "NORMAL      "
     .ascii    "CABINET     "      | item 9
     .ascii    "VERTICAL    "
     .ascii    "HORIZONTAL  "
@@ -1056,12 +1056,14 @@ osd_update_32_sprite_hw:
 * d0=DSWA, d1=DSWB
 osd_read_dipswitches:
     lea       BIOS_GAME_DIP,a0
+    *** DSWA
     * coinage 2,1 (1,0)
     move.b    6(a0),d0                          | bonus life
     lsl.b     #2,d0                             | SW=5,4,3 (bit=4,3,2)
     move.b    7(a0),d2                          | lives
     lsl.b     #5,d2                             | SW=7,6 (bit=6,5)
     or.b      d2,d0
+    *** DSWB
     move.b    8(a0),d1                          | flag awards bonus life
     lsl.b     #1,d1                             | SW=2 (bit=1)
     move.b    9(a0),d2                          | difficulty
@@ -1075,7 +1077,8 @@ osd_read_dipswitches:
     and.b     #(1<<5),d2                        | B2 only
     lsr.b     #5,d2                             | 0=B2
     or.b      d2,d1                             | add to DSWB
-    not.b     d1
+    * invert inputs, not dipswitches
+    eori.b    #0b10011101,d1
     rts
 
 * - neogeo   5=B2, 4=B1, 3=right, 2=left, 1=down,  0=up
