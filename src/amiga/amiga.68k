@@ -177,6 +177,9 @@ out\@:
 		.global osd_write_high_scores
 		.global osd_read_coin
 		.global osd_read_start
+		.global osd_sound_stop
+		.global osd_sound_loop
+		.global osd_sound_start
 
 * debugging only
     .global osd_debug1
@@ -452,6 +455,15 @@ _vblank:
 	
     rte
 
+osd_sound_start:
+	rts
+	
+osd_sound_loop:
+	rts
+	
+osd_sound_stop:
+	rts
+	
 osd_kick_wdog:
     rts
 	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
@@ -1180,7 +1192,7 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	**lea		ag_sprites(pc),a4
+	lea		ag_sprites(pc),a4
 
 	move.l		previous_sprite_state_ptr(pc),a5
 	lea			is_hw_sprite_table,a6
@@ -1295,6 +1307,7 @@ osd_update_32_sprite_hw:
 	moveq	#0,d1
 	move.w	(6,a4),d5	| prepare X
 	move.l	a3,-(a7)
+	move.w	#96,d2	| height	
 	cmp.b	#AS_FIRST,d6
 	bne.b	50f
 	* first left part
@@ -1546,17 +1559,19 @@ draw_sprite_part:
 	* and trickier!)
 	
 	lsr.l	#8-REMAINING_SPRITE_STRUCT_BITS,d0
+	move.w	#16,d2		| 16 height (standard 16x16)
 	bsr		draw_hw_sprite
 	bra.b	2b
 	
 * < D0: sprite index times 32 (for lifetime table)
 * < D1: color table index
+* < D2: sprite height
 * < D3: Y
 * < D5: X
 * < A3: graphical object structure (sprites)
 
 draw_hw_sprite:
-	move.l	a4,-(a7)
+	movem.l	d6/a4,-(a7)
 	* X in D5
 	* Y in D3
 	* set a lifetime in sprite table
@@ -1572,10 +1587,10 @@ draw_hw_sprite:
 	
 	lea	(2,a3,d1.w),a0
 5:
-	move.w	(a0)+,d2	| sprite number
+	move.w	(a0)+,d6	| sprite number
 	bmi.b	21f			| end of sprite chain
 	* load palette in the proper copperlist slots for this sprite
-	move.w	d2,d1
+	move.w	d6,d1
 	lsr.w	#1,d1
 	bcs.b	51f
 
@@ -1615,17 +1630,17 @@ draw_hw_sprite:
 	move.w	d0,(8,a1)
 	swap	d0
 	move.w	d0,(a1)
-	* put it in the proper sprite slot (D2: sprite number)
+	* put it in the proper sprite slot (d6: sprite number)
 	move.l	a1,d0
 	lea		sprites,a1
-	lsl.w	#3,d2	| times 8
-	move.w	d0,(6,a1,d2.w)
+	lsl.w	#3,d6	| times 8
+	move.w	d0,(6,a1,d6.w)
 	swap	d0
-	move.w	d0,(2,a1,d2.w)
+	move.w	d0,(2,a1,d6.w)
 	* next sprite for this image
 	bra	5b
 21:
-	move.l	(a7)+,a4
+	movem.l	(a7)+,d6/a4
 	rts
 	
 *P1 B2 = DSWB bit 0
@@ -1719,13 +1734,19 @@ direction_table:
 
 * < d0.w: x
 * < d1.w: y
+* < d2.w: sprite height: 16, 32, 64, 96 are supported
 * > d0.L: control word
 store_sprite_pos:
-    movem.l  a0/a1,-(a7)
+    movem.l  d2/a0/a1,-(a7)
 
     lea	HW_SpriteXTable(pc),a0
-    lea	HW_SpriteYTable(pc),a1
-
+    lea	sprite_y_tables(pc),a1
+	lsr.w	#2,d2
+	subq.w	#4,d2
+	and.w	#0xFC,d2
+	* pick proper table depending on height
+	move.l	(a1,d2.w),a1
+	
 	.ifdef	NO68020
     add.w	d0,d0
     add.w	d0,d0
@@ -1739,7 +1760,7 @@ store_sprite_pos:
     move.l	(a0,d0.w*4),d0
     or.l	(a1,d1.w*4),d0	
 	.endc
-    movem.l  (a7)+,a0/a1
+    movem.l  (a7)+,d2/a0/a1
     rts
 	
 HW_SpriteXTable:
@@ -1750,17 +1771,32 @@ HW_SpriteXTable:
     .byte  0,x>>1,0,x&1
   .endr
 
-
-HW_SpriteYTable:
+	.macro DEF_HW_SPRITE_Y_TABLE	height
+HW_SpriteYTable_\height:
   .set	reptn,0
   .rept 260
 	.set	ys,reptn+0x2c
-	.set	ye,ys+16       | size = 16
+	.set	ye,ys+\height       | size = 16
     .byte  ys&255, 0, ye&255, ((ys>>6)&4)+((ye>>7)&2)
 	.set	reptn,reptn+1
   .endr
+	.endm
 
+	DEF_HW_SPRITE_Y_TABLE	16
+	DEF_HW_SPRITE_Y_TABLE	32
+	DEF_HW_SPRITE_Y_TABLE	48
+	DEF_HW_SPRITE_Y_TABLE	64
+	DEF_HW_SPRITE_Y_TABLE	72
+	DEF_HW_SPRITE_Y_TABLE	96
 
+sprite_y_tables:
+	.long	HW_SpriteYTable_16
+	.long	HW_SpriteYTable_32
+	.long	HW_SpriteYTable_48
+	.long	HW_SpriteYTable_64
+	.long	HW_SpriteYTable_72
+	.long	HW_SpriteYTable_96
+	
 * set_bitplanes
 * what: sets bitplanes in copperlist
 
