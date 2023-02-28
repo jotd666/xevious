@@ -55,7 +55,7 @@ def doit():
     dump_dir = os.path.join(this_dir,"dumps","sprite","raw")
     prefix = "andor_genesis"
     # reading memory dump from running game (old structure, 8 bytes per sprite)
-    with open("andor_genesis_sprite_dump.bin","rb") as f:
+    with open(os.path.join(this_dir,"andor_genesis_sprite_dump.bin","rb")) as f:
         contents = f.read()
 
 
