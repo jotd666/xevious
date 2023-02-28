@@ -17,6 +17,24 @@ src_dir = os.path.join(this_dir,"../../src/amiga")
 outfile = os.path.join(src_dir,"sounds.68k")
 sndfile = os.path.join(src_dir,"sound_entries.68k")
 
+sound_dict = {"ORDINAL_1_SND"          :0x01,
+"HIGHEST_SCORE_SND"      :0x02,
+"HIGH_SCORE_SND"         :0x03,
+"EXTRA_SOLVALOU_SND"     :0x04,
+"FLYING_ENEMY_HIT_SND"   :0x05,
+"GARU_ZAKATO_SND"        :0x06,
+"ANDOR_GENESIS_SND"      :0x07,
+"SHEONITE_SND"           :0x08,
+"TELEPORT_SND"           :0x09,
+"BACURA_HIT_SND"         :0x0a,
+"SHOT_SND"               :0x0b,
+"BOMB_SND"               :0x0c,
+"BONUS_FLAG_SND"         :0x0d,
+"SOLVALOU_SND"           :0x0e,}
+
+
+
+
 snd_header = r"""
 FXFREQBASE = 3579564
 SOUNDFREQ = 22050
