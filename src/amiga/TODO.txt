@@ -5,14 +5,12 @@
 - find a way to make up for those shaking ground enemies
 - level 14: tile layout looks wrong (bird drawing)
 - music is played each frame: must be fixed in main
-
+- sol tower revealing is ok, but in the end tiles are reverted,
+  (something is not clear with the graphics)
+  
 * can be worked on my own:
 
-- generate all andor sprite color configs (glowing reds)
 - glitter sprite is flashing. revert to BOB ??
-- sol tower revealing is ok, but in the end tiles are reverted,
-  (something is not clear for double height objects: handle with special case
-  and that's it? check a video
 - test mode to include andor_sprites_dump_2/andor_sprites_dump_1
   to display those sprites: done, complete it
 - sprites for big mothership: test including sprite clipping
@@ -30,12 +28,13 @@
   because nothing else is displayed on screen)
 - dynamic sprite priority change for andor genesis
   andor genesis sprites should be below other ships
-- do not include bitmaps for andor genesis or other sprites
-- 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
-  we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
+- do not include bitmaps for andor genesis or other tiles that are 
+  actually hardware sprites
 
 further optims:
 
+- 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
+  we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
 - cookie cut with fixed 0 source if plane_pic_0 (saves bandwidth)
 - generate NOT tables for FG tiles to optimize tile refresh

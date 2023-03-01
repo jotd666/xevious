@@ -156,7 +156,6 @@ out\@:
 	  .global _user
 		.global _player_start
 		.global _demo_end
-		.global _coin_sound
 
 * osd layer		
 		.global osd_enable_vblank_interrupt
@@ -388,10 +387,7 @@ _player_start:
 _demo_end:
 * we're not doing things the NeoGeo way
 		rts
-				
-_coin_sound:
-* we're not doing things the NeoGeo way
-		rts
+	
 				
 _vblank:
     movem.l d0-d7/a0-a6,-(a7)
@@ -1319,9 +1315,9 @@ osd_update_32_sprite_hw:
 	bcs.b	51f
 	* andor genesis sprite
 	* left or right part
-	* color indices are zeroed ATM
+	* D1 is the color code
+	
 	lsl.w	#5,d0
-	moveq	#0,d1
 	move.w	(6,a4),d5	| prepare X
 	move.l	a3,-(a7)
 	move.w	#96,d2	| height	
@@ -1329,13 +1325,13 @@ osd_update_32_sprite_hw:
 	bne.b	50f
 	* first left part
 	lea		andor_genesis_left,a3
-	bsr		draw_hw_sprite
+	bsr		draw_andor_sprite
 	move.l	(a7)+,a3
 	bra.b	2f
 50:
 	* second right part
 	lea		andor_genesis_right,a3
-	bsr		draw_hw_sprite
+	bsr		draw_andor_sprite
 	move.l	(a7)+,a3
 	bra.b	2f
 51:
@@ -1455,6 +1451,18 @@ zzz:
 			blitz
 			rts
 
+* < A3: sprite structure
+* < D1: color code
+draw_andor_sprite:
+	* before drawing sprite, adjust red color
+	lea	red_color_table,a0
+	* update red color MSB/LSB (third color)
+	lea	(a0,d1.w*2),a0
+	move.b	(a0)+,(8,a3)
+	move.b	(a0)+,(16,a3)
+	clr.w	d1			* fake color config 0 (we change it dynamically just above)
+	bra	draw_hw_sprite
+	
 sprite_draw_jump_table:
 	dc.l	draw_sprite_part
 	dc.l	sprite_draw_double_width
@@ -1895,10 +1903,7 @@ osd_read_coin:
 	bne.b	1f
 0:
 	clr.b	(5,a0)		| ack key
-	move.l	d0,-(a7)
-	moveq	#0,d0
-	bsr		osd_sound_start
-	move.l	(a7)+,d0
+
 	bset	#0,d0
 1:
 	move.l	d1,_previous_joypad_state

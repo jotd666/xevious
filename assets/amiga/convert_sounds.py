@@ -20,7 +20,7 @@ sndfile = os.path.join(src_dir,"sound_entries.68k")
 hq_sample_rate = 22050
 lq_sample_rate = 8000
 
-sound_dict = {"CREDIT_SND":{"index":0,"channel":0,"sample_rate":hq_sample_rate},
+sound_dict = {"CREDIT_SND":{"index":0x10,"channel":0,"sample_rate":hq_sample_rate},
 "ORDINAL_1_SND"          :{"index":0x01,"channel":0,"sample_rate":lq_sample_rate},
 "HIGHEST_SCORE_SND"      :{"index":0x02,"channel":0,"sample_rate":lq_sample_rate,"loop":True},
 "HIGH_SCORE_SND"         :{"index":0x03,"channel":0,"sample_rate":lq_sample_rate,"loop":True},
@@ -37,8 +37,9 @@ sound_dict = {"CREDIT_SND":{"index":0,"channel":0,"sample_rate":hq_sample_rate},
 "SOLVALOU_SND"           :{"index":0x0e,"channel":0,"sample_rate":lq_sample_rate,"loop":True},
 }
 
-sound_table = [""]*len(sound_dict)
-sound_table_simple = [""]*len(sound_dict)
+max_sound = max(x["index"] for x in sound_dict.values())+1
+sound_table = [""]*max_sound
+sound_table_simple = ["\t.long\t0\n"]*max_sound
 
 
 

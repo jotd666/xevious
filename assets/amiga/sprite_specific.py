@@ -55,7 +55,7 @@ def doit():
     dump_dir = os.path.join(this_dir,"dumps","sprite","raw")
     prefix = "andor_genesis"
     # reading memory dump from running game (old structure, 8 bytes per sprite)
-    with open(os.path.join(this_dir,"andor_genesis_sprite_dump.bin","rb")) as f:
+    with open(os.path.join(this_dir,"andor_genesis_sprite_dump.bin"),"rb") as f:
         contents = f.read()
 
 
@@ -156,7 +156,10 @@ def doit():
         f.write("* 16: second origin andor tile (second sprite)\n")
         for d in ("left","right"):
             f.write("\t.global\tandor_genesis_{}\n".format(d))
-        f.write("\t.global\t{0}\n\n{0}:".format("is_hw_sprite_table"))
+        f.write("\n\t.global\t{0}\n\n{0}:\n".format("red_color_table"))
+        for i,r in enumerate([0,0,255,174,143,88,0]):
+            f.write("\t.byte\t0x{:x},0x{:x}  | config #{}\n".format((r>>4),r&0xF,i))
+        f.write("\n\t.global\t{0}\n\n{0}:".format("is_hw_sprite_table"))
 
         bitplanelib.dump_asm_bytes(sprite_table,f,mit_format=True)
         f.write("* andor sprites\n")
