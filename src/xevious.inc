@@ -75,6 +75,8 @@
     .equ  BOMB_SND,               0x0c
     .equ  BONUS_FLAG_SND,         0x0d
     .equ  SOLVALOU_SND,           0x0e
+    ** unknown origin
+    .equ  COIN_SND,               0x10
     
 ***
 *** global variables

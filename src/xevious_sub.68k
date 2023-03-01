@@ -147,6 +147,8 @@ sub_fn_4__handle_credits_and_start: | $0227
     move.b    (num_credits),d1
     abcd      d0,d1
     move.b    d1,(num_credits)
+    moveq     #COIN_SND,d0
+    jsr       osd_sound_start
     * process 1P, 2P
 1:  moveq     #0,d2
     jsr       osd_read_start
