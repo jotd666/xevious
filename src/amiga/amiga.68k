@@ -677,12 +677,21 @@ osd_w_bg_colorram:
 osd_w_fg_videoram:
     .ifeq OPT_DISABLE_FG_LAYER
 	movem.l	d0-d5/a0-a2,-(a7)
-	lea		fg_colorram,a1
 	lea		fg_videoram,a2
+	* optimization: if wants to write the same tile, just don't
+	* also avoids that sprites are (too much) trashed on the top row
+	* because of perpetually redrawing "1UP" line
+	*
+	* color changes are handled in colorram routine (and use dynamic color 17)
+	*
+	cmp.b	(a2,d0.w),d1
+	beq.b	1f
 	move.b	d1,(a2,d0.w)	| update logical grid
+	lea		fg_colorram,a1
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
 	moveq	#FG_TILE_DRAW_FULL,d3
-	**bsr		update_fg_tile
+	bsr		update_fg_tile
+1:
 	movem.l	(a7)+,d0-d5/a0-a2
     .endif | OPT_DISABLE_FG_LAYER
 	rts
