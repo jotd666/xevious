@@ -36,7 +36,7 @@ NB_PLAYFIELD_LINES = 512
 * scrollable planes
 BG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_PLAYFIELD_LINES*2
 BG_SCREEN_SIZE =  BG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
-* non-scrollable planes
+* non-scrollable planes, add a few lines for safety
 FG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*(NB_LINES+16)
 FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 
@@ -682,7 +682,7 @@ osd_w_fg_videoram:
 	move.b	d1,(a2,d0.w)	| update logical grid
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
 	moveq	#FG_TILE_DRAW_FULL,d3
-	bsr		update_fg_tile
+	**bsr		update_fg_tile
 	movem.l	(a7)+,d0-d5/a0-a2
     .endif | OPT_DISABLE_FG_LAYER
 	rts
@@ -1008,6 +1008,7 @@ update_fg_tile:
 	move.l	(a1,d1.w*4),a1	
 	.endif
 	move.w	d2,(a1)			| color palette index
+	
 0:
 	cmp.w	#FG_TILE_DRAW_COLOR,d3
 	bne.b	4f
@@ -1392,7 +1393,7 @@ osd_update_32_sprite_hw:
 	* this is much faster and simpler than marking the
 	* "dirty" tiles, because if the tile is empty nothing
 	* is done anyway
-	
+	.ifeq	OPT_DISABLE_FG_LAYER
 	moveq	#0,d0
 	lea		fg_colorram,a4
 	lea		fg_videoram,a5
@@ -1412,7 +1413,8 @@ osd_update_32_sprite_hw:
 	addq.w	#1,d0
 	cmp.w	#FG_DIRTY_TILES_SIZE,d0
 	bne.b	4b
-
+	.endif
+	
 
 	* after displaying real hardware sprite, we scan the possible sprites
 	* and decrease the life counter.
@@ -1460,7 +1462,7 @@ draw_andor_sprite:
 	lea	(a0,d1.w*2),a0
 	move.b	(a0)+,(8,a3)
 	move.b	(a0)+,(16,a3)
-	clr.w	d1			* fake color config 0 (we change it dynamically just above)
+	clr.w	d1			| fake color config 0 (we change it dynamically just above)
 	bra	draw_hw_sprite
 	
 sprite_draw_jump_table:
@@ -1484,6 +1486,7 @@ sprite_draw_double_width:
 	bra		draw_sprite_part
 	
 sprite_draw_double_width_and_height:
+	and.w	#0xFC,d0	| mask 2 lower bits
 	add.w	#16,d3
 	addq	#3,d0
 	bsr		draw_sprite_part

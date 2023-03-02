@@ -5,11 +5,12 @@
 - find a way to make up for those shaking ground enemies
 - level 14: tile layout looks wrong (bird drawing)
 - music is played each frame: must be fixed in main
-- sol tower revealing is ok, but in the end tiles are reverted,
-  (something is not clear with the graphics)
   
 * can be worked on my own:
 
+- colors of sprites not correct at the top of screen sometimes (top right, wrong color
+  on first 8 pixels (conflict with fg tiles draw on first row, even if empty...)
+- andor sprite remains on the bottom of the screen once destroyed
 - glitter sprite is flashing. revert to BOB ??
 - test mode to include andor_sprites_dump_2/andor_sprites_dump_1
   to display those sprites: done, complete it
