@@ -42,7 +42,7 @@ FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 
 NB_SPRITES_TO_UPDATE = 64
 NB_SPRITES_TOTAL = 64
-REMAINING_SPRITE_STRUCT_BITS = 5
+REMAINING_SPRITE_STRUCT_BITS = 6
 
 BLANK_FG_TILE_ID = 0x24
 
@@ -521,7 +521,9 @@ platform_init:
     * and background layer, can be seen in the title
 	* screen with XEVIOUS bg/fg tiles
     move.w #2<<4,bplcon1(a5)    | foreground tiles shifted by 2 pixels
-    move.w #0x005f,bplcon2(a5)	| 2nd playfield has priority, sprites have priority
+	* 2nd (foreground tiles & sprites) playfield has priority
+	* solvalou sprites (0-1) have priority on sprites, others (andor/bragza) don't
+    move.w #0x004f,bplcon2(a5)
     move.w #BASE_BPLCON3_VALUE,bplcon3(a5)	| color bank offset for playfield 2
 	move.w	#0x32,bplcon4(a5)	| odd sprites palette start at color 48, even at 32
 	move.w	#-8,d0
@@ -1184,7 +1186,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-	**.include	"ag_test.68k"
+	**.include	"ag_test_clip.68k"
 
 out:
 	rts
@@ -1279,11 +1281,9 @@ osd_update_32_sprite_hw:
 	move.l	(a7)+,d4
 	movem.l	(a7)+,d3/a5
 11:
-
 	lea		(SPRITE_MEM_SIZE,a5),a5
 	dbf		d4,2b
 	movem.l	(a7)+,d2-d5/a0-a2/a5
-
 
 	* then update the active sprites
 	lea		sprite_picbase,a3
@@ -1299,8 +1299,6 @@ osd_update_32_sprite_hw:
 	* at this point, Y can be negative, but
 	* we allow this as blitter routine is able
 	* to perform Y-clipping in that case
-	cmp.w	#NB_LINES-15,d1
-	bgt.w	2f		| too low
 	
 	move.w	d1,d3			| save y
 	clr.w	d0
@@ -1321,19 +1319,31 @@ osd_update_32_sprite_hw:
 	move.b	(a6,d0.w),d6
 	
 	cmp.b	#AS_TILE,d6
-	beq.b	2f
+	beq		2f
 	bcs.b	51f
+
 	* andor genesis sprite
 	* left or right part
 	* D1 is the color code
 	
-	lsl.w	#5,d0
+	* for the sprite lifetime/backup table
+	lsl.w	#REMAINING_SPRITE_STRUCT_BITS,d0
 	move.w	(6,a4),d5	| prepare X
 	move.l	a3,-(a7)
-	move.w	#96,d2	| height	
+
+	moveq	#0,d2	| default: no y clipping offset
+	cmp.w	#0x700,d3
+	bcs.b	49f		| okay, upper tile in screen
+	sub.w	#0x7F6,d3	| empiric
+	* now the value is negative Y, make it a positive offset
+	neg.w	d3
+	move.w	d3,d2
+	move.w	#16,d3		| and displays clipped at y = 0 TEMP 16!!!
+49:
 	cmp.b	#AS_FIRST,d6
 	bne.b	50f
 	* first left part
+	* may be off screen (too high)
 	lea		andor_genesis_left,a3
 	bsr		draw_andor_sprite
 	move.l	(a7)+,a3
@@ -1345,6 +1355,11 @@ osd_update_32_sprite_hw:
 	move.l	(a7)+,a3
 	bra.b	2f
 51:
+
+	* BOB (not a hardware sprite)
+	cmp.w	#NB_LINES-15,d3
+	bgt.w	2f		| too low
+
 	.ifne  OPT_ENABLE_LOGGING
 	* log the sprite, use start address in 0x104 then
 	* S sprite_tile_log <address> !128*!320
@@ -1437,7 +1452,7 @@ osd_update_32_sprite_hw:
 10:
 	move.w	(a1)+,d0
 	bmi.b	20f
-	lsl.w	#REMAINING_SPRITE_STRUCT_BITS,d0	| times 32 (stays within 16 bits, sprite max number is 320)
+	lsl.w	#REMAINING_SPRITE_STRUCT_BITS,d0	| times 64
 	tst.w	(a0,d0.w)
 	beq.b	10b		| not active
 	subq.w	#1,(a0,d0.w)
@@ -1447,7 +1462,7 @@ osd_update_32_sprite_hw:
 	clr.w	(a2)
 	clr.w	(8,a2)
 	* other sprite is optional, can be zero
-	move.l	(8,a0,d0.w),d0
+	move.l	(8+16,a0,d0.w),d0
 	beq.b	10b
 	move.l	d0,a2
 	clr.w	(a2)
@@ -1463,8 +1478,13 @@ zzz:
 			rts
 
 * < A3: sprite structure
+* < D0: sprite index times 32 (for lifetime table)
 * < D1: color code
+* < D2: y offset for clipping (0 if no clipping)
+* < D3: Y
+* < D5: X
 draw_andor_sprite:
+	move.w	d4,-(a7)
 	* before drawing sprite, adjust red color
 	lea	red_color_table,a0
 	* update red color MSB/LSB (third color)
@@ -1472,7 +1492,11 @@ draw_andor_sprite:
 	move.b	(a0)+,(8,a3)
 	move.b	(a0)+,(16,a3)
 	clr.w	d1			| fake color config 0 (we change it dynamically just above)
-	bra	draw_hw_sprite
+	move.w	d2,d4	| y-clipping in D4
+	move.w	#96,d2	| same height for both parts
+	bsr	draw_hw_sprite
+	move.w	(a7)+,d4
+	rts
 	
 sprite_draw_jump_table:
 	dc.l	draw_sprite_part
@@ -1597,35 +1621,31 @@ draw_sprite_part:
 	
 	lsr.l	#8-REMAINING_SPRITE_STRUCT_BITS,d0
 	move.w	#16,d2		| 16 height (standard 16x16)
+	moveq	#0,d4		| no clipping
 	bsr		draw_hw_sprite
 	bra.b	2b
 	
-* < D0: sprite index times 32 (for lifetime table)
+* < D0: sprite index times 64 (for lifetime table)
 * < D1: color table index
 * < D2: sprite height
 * < D3: Y
+* < D4: Y-offset (for clipping in the top area)
 * < D5: X
 * < A3: graphical object structure (sprites)
 
 draw_hw_sprite:
-	movem.l	d6/a4,-(a7)
+	movem.l	d6/a2/a4-a6,-(a7)
 	* X in D5
 	* Y in D3
 	* set a lifetime in sprite table
 	lea		real_sprite_display_table(pc),a4
 	add.w	d0,a4
-	* now A4 is a pointer on the sprite display table
-	* add a lifetime of 2 updates each time called, we'll
-	* update with the pointer on the sprite structure later
-	move.w	#2,(a4)		
-	* TODO handle y clipping
-	
-	addq.w	#4,a4
-	
+	lea		(4,a4),a6	| start of sprite pointer & row backup zone (header: (4+16)*2)
+	*clr.l	(20,a6)		| remove second sprite pointer preventively
 	lea	(2,a3,d1.w),a0
 5:
 	move.w	(a0)+,d6	| sprite number
-	bmi.b	21f			| end of sprite chain
+	bmi		21f			| end of sprite chain
 	* load palette in the proper copperlist slots for this sprite
 	move.w	d6,d1
 	lsr.w	#1,d1
@@ -1655,7 +1675,43 @@ draw_hw_sprite:
 	* get sprite data
 	move.l	(a0)+,a1
 	* store it in sprite table structure
-	move.l	a1,(a4)+
+	* A4 is a pointer on the sprite display table
+	* add a lifetime of 2 updates each time called, we'll
+	* update with the pointer on the sprite structure later
+	move.w	#2,(a4)
+	move.w	(2,a4),d0	| previous y clipping offset
+	beq.b	7f			| no clipping to restore from previous
+	cmp.w	d4,d0
+	beq.b	7f			| no need to save or restore: sprite has the same pos
+	* restore previous sprite bitmap line
+	lea	(4,a6),a2	| source
+	lsl.w	#4,d0
+	lea		(a1,d0.w),a5	| destination
+	* copy 16 bytes back to restore sprite line
+	move.l	(a2)+,(a5)+
+	move.l	(a2)+,(a5)+
+	move.l	(a2)+,(a5)+
+	move.l	(a2),(a5)
+7:	
+	tst.w	d4
+	beq.b	8f
+	* must move sprite start & put position here
+	* first we back up sprite data
+	move.w	d4,(2,a4)  | store previous offset
+	lsl.w	#4,d4
+	lea	(4,a6),a5			| destination
+	* add offset to sprite pointer to start by that line
+	add.w	d4,a1
+	move.l	a1,a2	| source
+	* copy 16 bytes to sprite line backup space
+	* and zero that sprite line so 
+	* it can be used as X/Y sprite first line
+	.rept	4
+	move.l	(a2),(a5)+
+	clr.l	(a2)+
+	.endr
+8:	
+	move.l	a1,(a6)
 
 	* compute control words
 	move.w	d5,d0
@@ -1675,9 +1731,11 @@ draw_hw_sprite:
 	swap	d0
 	move.w	d0,(2,a1,d6.w)
 	* next sprite for this image
+	* (needs adding 20 to a6, pointer + backup/restore sprite zone)
+	lea		(20,a6),a6
 	bra	5b
 21:
-	movem.l	(a7)+,d6/a4
+	movem.l	(a7)+,d6/a2/a4-a6
 	rts
 	
 *P1 B2 = DSWB bit 0
@@ -1811,7 +1869,7 @@ HW_SpriteXTable:
 	.macro DEF_HW_SPRITE_Y_TABLE	height
 HW_SpriteYTable_\height:
   .set	reptn,0
-  .rept 260
+  .rept 288
 	.set	ys,reptn+0x2c
 	.set	ye,ys+\height       | size = 16
     .byte  ys&255, 0, ye&255, ((ys>>6)&4)+((ye>>7)&2)
@@ -2432,17 +2490,20 @@ fg_displayed_screen_ptr:
 	.endif
 
 * table accounting for sprites that the engine asked to display
-* 32 bytes per sprite is more than enough but makes access simple
+* 64 bytes per sprite is more than enough but makes access simple
 * by shifting
 * we need:
 * - 2 bytes for lifetime
 * - 2 bytes for y clipping offset
-* - 8 bytes to save max 2 sprite pointers
+* then 1 or 2 times:
+* - 4 bytes to save sprite pointer
 * - 16 bytes to save the line that sprite position bytes overwrites
 *   when clipping sprites y-wise
 
 real_sprite_display_table:
 	ds.l	320*(1<<REMAINING_SPRITE_STRUCT_BITS)
+	
+	
 	.include	"sound_entries.68k"
 	
 *graphicsname:

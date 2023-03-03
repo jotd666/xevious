@@ -8,18 +8,15 @@
   
 * can be worked on my own:
 
-- colors of sprites not correct at the top of screen sometimes (top right, wrong color
-  on first 8 pixels (conflict with fg tiles draw on first row, even if empty...)
-- andor sprite remains on the bottom of the screen once destroyed
-- glitter sprite is flashing. revert to BOB ??
+- andor sprite remains on the bottom of the screen once destroyed: re-test
+- glitter sprite is flashing. revert to BOB
 - test mode to include andor_sprites_dump_2/andor_sprites_dump_1
-  to display those sprites: done, complete it
+  to display those sprites: done, complete it: sprite clipping doesn't work at all
 - sprites for big mothership: test including sprite clipping
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
 - check if tiles missing (wrongly??) in level 1 too!!
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
-- how to display sprites with y<0 (y clip): will need manual y clipping DAMN!!
 - running outside whdload: display trashed if started from an already open
   DOS command (OK from startup, no display enabled)
 - dip switches screen
@@ -27,8 +24,6 @@
 - sheonite sprites too fast, seem to fail the sprite erase phase
   workaround (maybe): if sheonite on screen, clear all screen (no biggie
   because nothing else is displayed on screen)
-- dynamic sprite priority change for andor genesis
-  andor genesis sprites should be below other ships
 - do not include bitmaps for andor genesis or other tiles that are 
   actually hardware sprites
 

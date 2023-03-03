@@ -191,6 +191,10 @@ def doit():
                 f.write("andor_genesis_{:02d}_{}:\n".format(i,d))
                 f.write("\t.word\t0,0,0,0,0,0,0,0")
                 bitplanelib.dump_asm_bytes(sp,f,mit_format=True)
+                f.write("* add 96 blank rows so the clipping works\n")
+                f.write("\t.rept\t96*2\n")
+                f.write("\t.byte    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00\n")
+                f.write("\t.endr\n")
                 f.write("\t.long\t0,0,0,0\n")
         f.write("\t.align\t8\n")
 if __name__ == "__main__":
