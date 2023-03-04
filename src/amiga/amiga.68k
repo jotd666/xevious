@@ -6,6 +6,7 @@
 .include "../src/xevious.inc"
 .include "custom.i"
 .include "exec_lvos.i"
+.include "dos_lvos.i"
 .include "graphics_lvos.i"
 
 STATE_ACTIVE = 2
@@ -276,17 +277,17 @@ _user:
 .standard:
     * open dos library, graphics library
     move.l  0x4.W,a6
-    *lea dosname(pc),a1
-    *moveq.l #0,d0
-    *jsr _LVOOpenLibrary(a6)
-    *move.l  d0,_dosbase
-    *lea graphicsname(pc),a1
-    *moveq.l #0,d0
-    *jsr _LVOOpenLibrary(a6)
-    *move.l  d0,_gfxbase
-    *move.l	d0,a6
-	*sub.l	a1,a1
-	*jsr	_LVOLoadView(a6)
+    lea dosname(pc),a1
+    moveq.l #0,d0
+    jsr _LVOOpenLibrary(a6)
+    move.l  d0,_dosbase
+    lea graphicsname(pc),a1
+    moveq.l #0,d0
+    jsr _LVOOpenLibrary(a6)
+    move.l  d0,_gfxbase
+    move.l	d0,a6
+	sub.l	a1,a1
+	jsr	_LVOLoadView(a6)
 	*jsr	_LVOWaitTOF(a6)
 	*jsr	_LVOWaitTOF(a6)
 	*move.l  0x4.W,a6
@@ -294,18 +295,18 @@ _user:
 
     * check if "floppy" file is here
     
-    *move.l  _dosbase(pc),a6
-    *move.l   #floppy_file,d1
-    *move.l  #MODE_OLDFILE,d2
-    *jsr     _LVOOpen(a6)
-    *move.l  d0,d1
-    *beq.b   .no_floppy
+    move.l  _dosbase(pc),a6
+    move.l   #floppy_file,d1
+    move.l  #1005,d2   | MODE_OLDFILE
+    jsr     _LVOOpen(a6)
+    move.l  d0,d1
+    beq.b   .no_floppy
     
     * "floppy" file found
-    *jsr     _LVOClose(a6)
+    jsr     _LVOClose(a6)
     * wait 2 seconds for floppy drive to switch off
-    *move.l  #100,d1
-    *jsr     _LVODelay(a6)
+    move.l  #100,d1
+    jsr     _LVODelay(a6)
 .no_floppy:
 	* stop cdtv device if found, avoids that cd device
 	* sends spurious interrupts
@@ -452,14 +453,50 @@ _vblank:
     rte
 
 osd_sound_start:
-	cmp.w	#ORDINAL_1_SND,d0		| temp
-	beq.b	1f
-	cmp.w	#SOLVALOU_SND,d0		| temp
-	beq.b	1f
 	movem.l	d0/a0/a6,-(a7)
-	lea		sound_table(pc),a0
+	lea		repeating_sounds(pc),a6
 	.ifdef	NO68020
 	add.w	d0,d0
+	tst.b	(a6,d0.w)
+	.else
+	tst.b	(a6,d0.w*2)
+	.endif
+	beq.b	0f		| not looped play no matter what
+	.ifdef	NO68020
+	tst.b	(1,a6,d0.w)
+	.else
+	tst.b	(1,a6,d0.w*2)
+	.endif
+	bne.b	intro_already_playing		| already playing
+	.ifdef	NO68020
+	st.b	(1,a6,d0.w)
+	.else
+	st.b	(1,a6,d0.w*2)
+	.endif
+	lea		_custom,a6
+	lea		sound_table(pc),a0
+	.ifdef	NO68020
+	*add.w	d0,d0
+	add.w	d0,d0
+	move.l	(a0,d0.w),a0
+	.else
+	move.l	(a0,d0.w*4),a0
+	.endif	
+	jsr		_mt_loopfx
+	bra.b	1f
+0:
+	cmp.w	#ORDINAL_1_SND,d0
+	bne.b	2f
+	* special case: we have to lock solvalou
+	* looped music until this one has ended
+	clr.w	intro_music_counter
+	* prevent solvalou loop from playing right now
+	* it would override the intro music
+	st.b	(SOLVALOU_SND*2+1,a6)
+2:
+	lea		sound_table(pc),a0
+	.ifdef	NO68020
+	*add.w	d0,d0
 	add.w	d0,d0
 	move.l	(a0,d0.w),a0
 	.else
@@ -467,15 +504,66 @@ osd_sound_start:
 	.endif
 	lea		_custom,a6
 	jsr		_mt_playfx
-	movem.l	(a7)+,d0/a0/a6
 1:
+	movem.l	(a7)+,d0/a0/a6
 	rts
+
+intro_already_playing:
+	addq.w	#1,intro_music_counter
+	cmp.w	#0x163,intro_music_counter
+	bne.b	1b
+	clr.b	(SOLVALOU_SND*2+1,a6)
+	bra.b	1b
 	
 osd_sound_loop:
 	rts
 	
 osd_sound_stop:
+	movem.l	d0/a6,-(a7)
+	lea		repeating_sounds(pc),a6
+	.ifdef	NO68020
+	add.w	d0,d0
+	tst.b	(1,a6,d0.w)
+	.else
+	tst.b	(1,a6,d0.w*2)
+	.endif
+	beq.b	0f		| not playing
+	.ifdef	NO68020
+	clr.b	(1,a6,d0.w)
+	.else
+	clr.b	(1,a6,d0.w*2)
+	.endif
+	moveq	#0,d0
+	lea		_custom,a6
+	jsr	_mt_stopfx
+0:
+	movem.l	(a7)+,d0/a6
 	rts
+	
+intro_music_counter:
+	.word	0
+	
+	* 2 bytes. If first one is 1, then sound must be stopped
+	* else it cannot be played again. It also loops
+repeating_sounds:
+	.byte	0,0
+    .byte	0,0		| ORDINAL_1_SND,          0x01
+    .byte	1,0		| HIGHEST_SCORE_SND,      0x02
+    .byte	1,0		| HIGH_SCORE_SND,         0x03
+    .byte	0,0		| EXTRA_SOLVALOU_SND,     0x04
+    .byte	0,0		| FLYING_ENEMY_HIT_SND,   0x05
+    .byte	0,0		| GARU_ZAKATO_SND,        0x06
+    .byte	0,0		| ANDOR_GENESIS_SND,      0x07
+    .byte	0,0		| SHEONITE_SND,           0x08
+    .byte	0,0		| TELEPORT_SND,           0x09
+    .byte	0,0		| BACURA_HIT_SND,         0x0a
+    .byte	0,0		| SHOT_SND,               0x0b
+    .byte	0,0		| BOMB_SND,               0x0c
+    .byte	0,0		| BONUS_FLAG_SND,         0x0d
+    .byte	1,0		| SOLVALOU_SND,           0x0e
+    .byte	0,0
+    ** unknown origin
+    .byte	0,0		| COIN_SND,               0x10
 	
 osd_kick_wdog:
     rts
@@ -504,7 +592,6 @@ switch_screen_buffers:
 	.endif
 	
 platform_init:
-	
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
 	* restrict borders: we don't see bobs on the borders!
@@ -702,17 +789,20 @@ osd_w_fg_videoram:
 osd_w_bg_videoram:
     .ifeq OPT_DISABLE_BG_LAYER
 	movem.l	d0-d5/a0-a2,-(a7)
-	lea		bg_colorram,a1
 	lea		bg_videoram,a2
 	* dump both tables (color+char): S bg_data <address@0x110> $1000
 	move.l	a1,0x110		| temp
-	
+	cmp.b	(a2,d0.w),d1
+	beq.b	0f				| already the proper value
 	move.b	d1,(a2,d0.w)	| update logical grid
+	lea		bg_colorram,a1
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
 	bsr		update_bg_tile
+0:
 	movem.l	(a7)+,d0-d5/a0-a2
     .endif | OPT_DISABLE_BG_LAYER
 	rts
+
 	
 .macro	CLEAR_TILE
 	.set	offset,0
@@ -2480,6 +2570,8 @@ _previous_joypad_state_2:
 	.long	0
 _gfxbase:
 	.long	0
+_dosbase:
+	.long	0
 fg_drawed_screen_ptr:
 	.long	fg_screen_data_1
 fg_displayed_screen_ptr:
@@ -2506,11 +2598,17 @@ real_sprite_display_table:
 	
 	.include	"sound_entries.68k"
 	
-*graphicsname:
-*	.ascii	"graphics.library"
-*	.byte	0
+dosname:
+	.ascii	"dos.library"
+	.byte	0
+graphicsname:
+	.ascii	"graphics.library"
+	.byte	0
 hiscorename:
 	.ascii	"xevious.high"
+	.byte	0
+floppy_file:
+	.ascii	"floppy"
 	.byte	0
 _end_of_ng_code:
 		

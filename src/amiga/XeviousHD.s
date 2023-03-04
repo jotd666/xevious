@@ -2,7 +2,7 @@
 	INCDIR	Include:
 	INCLUDE	whdload.i
 	INCLUDE	whdmacros.i
-CHIP_ONLY
+;CHIP_ONLY
 	IFD	CHIP_ONLY
 CHIPMEMSIZE = $200000
 EXPMEMSIZE = 0
@@ -109,7 +109,7 @@ _Relocate	movem.l	d0-d1/a0-a2,-(sp)
 ;        pea     WHDLTAG_LOADSEG
         move.l  #$400,-(a7)       ;chip area
         pea     WHDLTAG_CHIPPTR        
-        pea     16                       ;8 byte alignment
+        pea     8                       ;8 byte alignment
         pea     WHDLTAG_ALIGN
         move.l  a7,a1                   ;tags		move.l	_resload(pc),a2
 		jsr	resload_Relocate(a2)

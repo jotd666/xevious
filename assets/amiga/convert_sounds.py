@@ -20,10 +20,12 @@ sndfile = os.path.join(src_dir,"sound_entries.68k")
 hq_sample_rate = 22050
 lq_sample_rate = 8000
 
-sound_dict = {"CREDIT_SND":{"index":0x10,"channel":0,"sample_rate":hq_sample_rate},
-"ORDINAL_1_SND"          :{"index":0x01,"channel":0,"sample_rate":lq_sample_rate},
-"HIGHEST_SCORE_SND"      :{"index":0x02,"channel":0,"sample_rate":lq_sample_rate,"loop":True},
-"HIGH_SCORE_SND"         :{"index":0x03,"channel":0,"sample_rate":lq_sample_rate,"loop":True},
+loop_channel = 0
+
+sound_dict = {"CREDIT_SND":{"index":0x10,"channel":1,"sample_rate":hq_sample_rate},
+"ORDINAL_1_SND"          :{"index":0x01,"channel":loop_channel,"sample_rate":lq_sample_rate},
+"HIGHEST_SCORE_SND"      :{"index":0x02,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
+"HIGH_SCORE_SND"         :{"index":0x03,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
 "EXTRA_SOLVALOU_SND"     :{"index":0x04,"channel":3,"sample_rate":hq_sample_rate},
 "FLYING_ENEMY_HIT_SND"   :{"index":0x05,"channel":2,"sample_rate":hq_sample_rate},
 "GARU_ZAKATO_SND"        :{"index":0x06,"channel":3,"sample_rate":hq_sample_rate},
@@ -34,7 +36,7 @@ sound_dict = {"CREDIT_SND":{"index":0x10,"channel":0,"sample_rate":hq_sample_rat
 "SHOT_SND"               :{"index":0x0b,"channel":1,"sample_rate":hq_sample_rate},
 "BOMB_SND"               :{"index":0x0c,"channel":1,"sample_rate":hq_sample_rate},
 "BONUS_FLAG_SND"         :{"index":0x0d,"channel":3,"sample_rate":hq_sample_rate},
-"SOLVALOU_SND"           :{"index":0x0e,"channel":0,"sample_rate":lq_sample_rate,"loop":True},
+"SOLVALOU_SND"           :{"index":0x0e,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
 }
 
 max_sound = max(x["index"] for x in sound_dict.values())+1

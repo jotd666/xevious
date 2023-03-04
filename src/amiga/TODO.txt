@@ -3,11 +3,18 @@
 - sprite shadow management: complete?
   probably not for double width/height objects
 - find a way to make up for those shaking ground enemies
-- level 14: tile layout looks wrong (bird drawing)
-- music is played each frame: must be fixed in main
-  
+- sound playing in attract mode
+- optimize main/sub code more
+
 * can be worked on my own:
 
+- music is played each frame: add flags for music looped stuff
+- real machine: retry without loadview (no whdload)
+- real machine: flickering, rchange frameskip / number of enemies
+- real machine: fg tile refresh on "XEVIOUS" title slows down a lot
+  maybe create a big BOB and blit it instead, skip that fg
+  tile write completely since nothing else is ever written there?
+- generate NOT tables for FG tiles to optimize tile refresh
 - andor sprite remains on the bottom of the screen once destroyed: re-test
 - glitter sprite is flashing. revert to BOB
 - test mode to include andor_sprites_dump_2/andor_sprites_dump_1
@@ -21,6 +28,7 @@
   DOS command (OK from startup, no display enabled)
 - dip switches screen
 - pause
+- level 14: tile layout looks wrong (bird drawing)
 - sheonite sprites too fast, seem to fail the sprite erase phase
   workaround (maybe): if sheonite on screen, clear all screen (no biggie
   because nothing else is displayed on screen)
@@ -33,7 +41,6 @@ further optims:
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
 - cookie cut with fixed 0 source if plane_pic_0 (saves bandwidth)
-- generate NOT tables for FG tiles to optimize tile refresh
 - don't generate mirror X-sprites if log doesn't tell game is using it
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
