@@ -21,8 +21,8 @@ OPT_ENABLE_DOUBLE_BUFFERING = 1
 * empiric values of number of 16x16 bob objects
 * currently displayed. Allows to adapt framerate
 * and avoid flicker/slowdowns
-MEDIUM_SPRITES_THRESHOLD = 16
-HIGH_SPRITES_THRESHOLD = 32
+MEDIUM_SPRITES_THRESHOLD = 12
+HIGH_SPRITES_THRESHOLD = 24
 
 _custom = 0xDFF000
 
@@ -396,9 +396,16 @@ _vblank:
 	btst	#5,d0
 	beq.b	1f
 
+	move.l	_joypad_state(pc),d1
 	moveq	#1,d0
 	jsr	_read_joystick
 	move.l	d0,_joypad_state
+	btst	#JPB_BTN_PLAY,d0
+	beq.b	0f
+	btst	#JPB_BTN_PLAY,d1
+	bne.b	0f
+	bsr		toggle_pause
+0:
 	move.w	#0x20,_custom+intreq	
 	bra.b	3f
 1:
@@ -415,6 +422,8 @@ _vblank:
 	* just too much to handle, even for a fast amiga, because
 	* of all the blits
 	* so adapt framerate to the currently active sprites
+	tst.b	pause_flag
+	bne.b	23f
 	
 	cmp.w	#MEDIUM_SPRITES_THRESHOLD,nb_active_bobs
 	bcs.b	2f		| few active sprites
@@ -440,12 +449,13 @@ _vblank:
     move.w  vbl_counter(pc),d0
     addq.w  #1,d0
     cmp.w   #5,d0
-    bne.b   .normal
+    bne.b   22f
     * update a second time, simulate 60Hz
     jsr	xevious_im1_irq
     clr.w d0    
-.normal:
+22:
     move.w  d0,vbl_counter
+23:
 	move.w	#0x10,_custom+intreq		
 3:
     movem.l (a7)+,d0-d7/a0-a6
@@ -455,6 +465,7 @@ _vblank:
 osd_sound_start:
 	movem.l	d0/a0/a6,-(a7)
 	lea		repeating_sounds(pc),a6
+
 	.ifdef	NO68020
 	add.w	d0,d0
 	tst.b	(a6,d0.w)
@@ -1276,7 +1287,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-	**.include	"ag_test_clip.68k"
+	*.include	"ag_test_clip.68k"
 
 out:
 	rts
@@ -1440,6 +1451,7 @@ osd_update_32_sprite_hw:
 	bra.b	2f
 50:
 	* second right part
+	LOGPC	200
 	lea		andor_genesis_right,a3
 	bsr		draw_andor_sprite
 	move.l	(a7)+,a3
@@ -1792,6 +1804,7 @@ draw_hw_sprite:
 	lea	(4,a6),a5			| destination
 	* add offset to sprite pointer to start by that line
 	add.w	d4,a1
+	lsr.w	#4,d4	| restore d4 value for next loop
 	move.l	a1,a2	| source
 	* copy 16 bytes to sprite line backup space
 	* and zero that sprite line so 
@@ -2164,14 +2177,13 @@ level2_interrupt:
 	rte
 	
 toggle_pause:
-	movem.l	d0/a6,-(a7)
-	bsr.b		0f
-	movem.l	(a7)+,d0/a6
+	* pause only within game
+	tst.b	ingame_palette_loaded
+	beq.b	0f
+	eor.b   #1,pause_flag
+0:
 	rts
 	
-0:
-	eor.b   #1,pause_flag
-
 keyboard_table:
 	ds.b	0x100
 

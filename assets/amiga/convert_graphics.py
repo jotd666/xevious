@@ -12,8 +12,12 @@ src_dir = os.path.join(this_dir,"../../src/amiga")
 def dump_asm_bytes(*args,**kwargs):
     bitplanelib.dump_asm_bytes(*args,**kwargs,mit_format=True)
 
-dump_graphics = True  # uncomment for dry-run
-dump_pngs = True  # uncomment for faster operation, pngs aren't needed for asset generation per se
+# uncomment for dry-run,
+dump_graphics = True
+# uncomment for faster operation
+# pngs weren't needed for asset generation per se but now
+# this will crash when creating andor sprite if files aren't present
+dump_pngs = True
 
 BT_BOB = "BT_BOB"
 BT_SPRITE = "BT_SPRITE"
@@ -404,7 +408,6 @@ def write_tiles(t,matrix,f,is_sprite):
             f.write("{0}:\n".format(picname))
             f.write("\t.word\t{bitmap_type}\n".format(**item_data))
             if item_data["bitmap_type"] == BT_BOB:
-                # bob
                 for k in STD_MIRROR_LIST:
                     item = item_data[k]
                     f.write("\t.long\t{}_{}\n".format(picname,k))
@@ -538,11 +541,13 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
         height = side
 
     rval = []
-    sprite_dict = {"png":input_image,"png_org":input_image_orig_palette,
+    sprite_dict = {"tile_index":tile_index,"png":input_image,"png_org":input_image_orig_palette,
     "y_offset":y_offset,
     "height":height}
 
+
     if is_sprite and tile_index in sprite_specific.real_sprites:
+        # not a special sprite
         sprite_dict["bitmap_type"] = BT_SPRITE
         # temp generate sprite data somewhere to test
         # first separate in 3 colors max images
@@ -586,16 +591,22 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
 
     else:
         sprite_dict["bitmap_type"] = BT_BOB
-        # BOB case (not sprite)
-        for the_tile in [input_image,ImageOps.mirror(input_image)]:
-            raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
-            palette=global_palette,
-            forced_nb_planes=nb_planes,
-            generate_mask=is_sprite,
-            blit_pad=is_sprite,
-            mask_color=transparent_color)
-            rval.append(raw)
-        sprite_dict.update({"standard":rval[0],"mirror":rval[1]})
+        if is_sprite and sprite_specific.sprite_table[tile_index] >= sprite_specific.AS_TILE:
+            # fake it, special sprite, overrides normal engine
+            raw = bytes(2)
+            sprite_dict.update({"standard":raw,"mirror":raw})
+        else:
+
+            # BOB case (not sprite)
+            for the_tile in [input_image,ImageOps.mirror(input_image)]:
+                raw = bitplanelib.palette_image2raw(the_tile,output_filename=None,
+                palette=global_palette,
+                forced_nb_planes=nb_planes,
+                generate_mask=is_sprite,
+                blit_pad=is_sprite,
+                mask_color=transparent_color)
+                rval.append(raw)
+            sprite_dict.update({"standard":rval[0],"mirror":rval[1]})
 
     return sprite_dict
 

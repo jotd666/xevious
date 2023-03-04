@@ -6,6 +6,7 @@ GCC_BIN = C:\amiga-gcc\bin
 ASM = $(GCC_BIN)/m68k-amigaos-as -c 
 MAIN_OBJ = amiga.o
 WHDLOADER = ..\$(PROGNAME).slave
+WHDLOADER_CHIP = ..\$(PROGNAME)_chip.slave
 ASSETS = ..\assets\amiga
 AMIGASRC = amiga
 SOURCE = $(AMIGASRC)/$(PROGNAME)HD.s
@@ -14,11 +15,12 @@ SOURCE = $(AMIGASRC)/$(PROGNAME)HD.s
 # and system includes.
 HDBASE = K:\jff\AmigaHD
 WHDBASE = $(HDBASE)\PROJETS\HDInstall\DONE\WHDLoad
+WHDASM = vasmm68k_mot -DDATETIME -I$(HDBASE)/amiga39_JFF_OS/include -I$(WHDBASE)\Include -I$(WHDBASE) -devpac -nosym -Fhunkexe
 
 
 # leave MAIN_OBJ first
 OBJS = $(MAIN_OBJ) sprite_specific.o sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
-all: $(AMIGASRC)/graphics.68k $(AMIGASRC)/sounds.68k $(MAIN) $(WHDLOADER)
+all: $(AMIGASRC)/graphics.68k $(AMIGASRC)/sounds.68k $(MAIN) $(WHDLOADER) $(WHDLOADER_CHIP)
 
 clean:
 	del $(OBJS) "$(MAIN)"
@@ -53,4 +55,8 @@ graphics.o: $(AMIGASRC)/graphics.68k xevious.inc
 
 $(WHDLOADER) : $(SOURCE)
 	wdate.py> datetime
-	vasmm68k_mot -DDATETIME -I$(HDBASE)/amiga39_JFF_OS/include -I$(WHDBASE)\Include -I$(WHDBASE) -devpac -nosym -Fhunkexe -o $(WHDLOADER) $(SOURCE)
+	$(WHDASM) -o $(WHDLOADER) $(SOURCE)
+	
+$(WHDLOADER_CHIP) : $(SOURCE)
+	wdate.py> datetime
+	$(WHDASM) -DCHIP_ONLY -o $(WHDLOADER_CHIP) $(SOURCE)

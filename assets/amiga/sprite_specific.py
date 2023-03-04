@@ -44,13 +44,15 @@ for i in range(184,188):
 for i in range(304,320):
     real_sprites[i] = [1]
 
+# table gathering ALL sprites, the ones handled by the engine, and
+# special ones (andor genesis)
+sprite_table = [AS_NONE]*320
+for start,stop in ((88,96),(128,159)):
+    sprite_table[start:stop+1] = [AS_TILE]*(stop-start+1)
+for r in real_sprites:
+    sprite_table[r] = AS_OTHER
 
 def doit():
-    sprite_table = [AS_NONE]*320
-    for start,stop in ((88,96),(128,159)):
-        sprite_table[start:stop+1] = [AS_TILE]*(stop-start+1)
-    for r in real_sprites:
-        sprite_table[r] = AS_OTHER
 
     dump_dir = os.path.join(this_dir,"dumps","sprite","raw")
     prefix = "andor_genesis"
