@@ -526,7 +526,7 @@ platform_init:
     lea       VRAM_RW.l,a0
     move.w    #1,(2,a0)                         | VRAM_MOD=1
     lea       splash,a1
-    move.w    #FIXMAP+(37*32),d1
+    move.w    #FIXMAP+(38*32),d1
     lea       splash_attr,a2
 1:  move.w    d1,(-2,a0)                        | VRAM_ADDR
     move.w    #FG_ASCII_OPAQUE_BASE,d0          | tile base
@@ -592,6 +592,8 @@ splash:
     .ascii    "  supported via the soft DIP    "
     .ascii    "  settings.                     "
     .ascii    "                                "
+    .ascii    "  NGFX Soundbuilder by Blastar  "
+    .ascii    "                                "
     .ascii    "     Copyright 2023 tcdev       "
     .ascii    "    retroports.blogspot.com     "
     .byte     0
@@ -602,7 +604,7 @@ splash_attr:
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
-    .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
+    .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
     .word     0x2000, 0x2000
             
 * 60Hz VBLANK interrupt
