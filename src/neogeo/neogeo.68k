@@ -491,6 +491,11 @@ platform_init:
     addq.w    #1,d7
     cmp.w     #512,d7
     blt       7b
+
+    lea       snd_playing,a0
+    moveq     #0x20-1,d7
+8:  clr.b     (a0)+
+    dbf       d7,8b
     
 * CD hardware only
 .ifdef __cd__
@@ -521,7 +526,7 @@ platform_init:
     lea       VRAM_RW.l,a0
     move.w    #1,(2,a0)                         | VRAM_MOD=1
     lea       splash,a1
-    move.w    #FIXMAP+(37*32),d1
+    move.w    #FIXMAP+(38*32),d1
     lea       splash_attr,a2
 1:  move.w    d1,(-2,a0)                        | VRAM_ADDR
     move.w    #FG_ASCII_OPAQUE_BASE,d0          | tile base
@@ -587,6 +592,8 @@ splash:
     .ascii    "  supported via the soft DIP    "
     .ascii    "  settings.                     "
     .ascii    "                                "
+    .ascii    "  NGFX Soundbuilder by Blastar  "
+    .ascii    "                                "
     .ascii    "     Copyright 2023 tcdev       "
     .ascii    "    retroports.blogspot.com     "
     .byte     0
@@ -597,7 +604,7 @@ splash_attr:
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
-    .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
+    .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
     .word     0x2000, 0x2000
             
 * 60Hz VBLANK interrupt
@@ -1166,6 +1173,43 @@ osd_read_start:
     or.b      d6,d0                             | bit0=P1, bit1=P2
 9:  rts
 
+* d0 = sound ordinal
+osd_sound_start:
+    lea       snd_playing,a0
+    cmp.b     #ORDINAL_1_SND,d0
+    beq       9f
+    cmp.b     #SOLVALOU_SND,d0
+    beq.b     1f
+    cmp.b     #HIGH_SCORE_SND,d0
+    bgt.b     2f
+1:  tst.b     (a0,d0.w)                         | already playing?
+    bne.b     9f                                | yes, exit
+    move.b    #1,(a0,d0.w)
+2:  add.w     #0x1f,d0                          | calc sound command
+    move.b    d0,(REG_SOUND)
+9:  rts
+
+*
+* 00-02,0E (high score, solvalou) B loop
+*
+    
+* d0 = sound ordinal
+osd_sound_stop:
+    lea       snd_playing,a0
+    * ADPCMA_LOOP_STOP
+    cmp.b     #BOMB_SND,d0
+    bne       1f
+    move.b    #0x19,(REG_SOUND)
+    rts
+    * ADPCMB_LOOP_STOP
+1:  cmp.b     #SOLVALOU_SND,d0
+    beq.b     2f
+    cmp.b     #HIGH_SCORE_SND,d0
+    bgt.b     9f
+2:  clr.b     (a0,d0.w)
+    move.b    #0x1a,(REG_SOUND)
+9:  rts
+    
 ***
 *** high score format
 *** - high score table (a0) $50 bytes
@@ -1193,14 +1237,6 @@ patch_high_score_table:
     dbf       d7,0b
     rts
 
-* d0 = sound ordinal
-osd_sound_start:
-    rts
-    
-* d0 = sound ordinal
-osd_sound_stop:
-    rts
-    
 osd_read_high_scores:
     * try to read from BRAM first
     * - any memory card saves will overwrite
@@ -1331,6 +1367,8 @@ bg_scroll_x_r:                ds.w    1
 
 p1_input_r:                   ds.b    1
 p2_input_r:                   ds.b    1
+
+snd_playing:                  ds.b    0x20
 
     .align 4
 memcard_buf:
