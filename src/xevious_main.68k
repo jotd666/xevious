@@ -331,6 +331,7 @@ main_thread_main_loop: | $04BB
     tst.b     (num_credits)                     | zero?
     bne       coined_up                         | no, skip
     move.w    #2,(attract_mode_stage)
+    jsr       osd_sound_mute
     bsr       save_PC_to_fn_tbl_and_ret
 
 attract_mode_main_loop: | $04D6
@@ -350,6 +351,7 @@ check_credits: | $04E6
 coined_up:    
     bsr       zero_obj_state_tbl
     clr.w     (attract_mode_stage)
+    jsr       osd_sound_unmute
     move.b    #1,(scroll_disabled)              | disable
     bsr       clear_fg_to_transparent
     bsr       clear_bg_to_black
@@ -1861,7 +1863,8 @@ update_solvalou: | $14F7
     jsr       osd_sound_stop
     tst.w     (attract_mode_stage)
     bne.b     explode_solvalou
-    * there was some 06XX stuff here
+    moveq     #SOLVALOU_EXPLOSION_SND,d0
+    jsr       osd_sound_start
     nop
     
 explode_solvalou: | $151C
@@ -2445,6 +2448,8 @@ handle_bombed_obj_and_award_points: | $19EE
     lea       (a0,d0.w),a0                      | get entry for points
     movem.l   d3/d4/d7/a0/a1/a3,-(a7) 
     bsr       add_to_score
+    moveq     #GROUND_EXPLOSION_SND,d0
+    jsr       osd_sound_start
     movem.l   (a7)+,d3/d4/d7/a0/a1/a3
 loc_1A2C:
     lea       (_OBJSIZE,a1),a1                  | next enemy
@@ -3769,6 +3774,7 @@ garu_zakato_explode: | $2897
     bsr.w     init_garu_zakato_explosion
     moveq     #GARU_ZAKATO_SND,d0
     jsr       osd_sound_start
+    ** TBD possibly another sound here too!?!
     clr.b     (_TYPE,a5)
     clr.b     (_STATE,a5)
     bra       add_obj_handler

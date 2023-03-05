@@ -23,7 +23,7 @@
     OPT_REVEAL_SOL_TOWER=0
     OPT_REVEAL_BONUS_FLAG=0
     OPT_DISPLAY_AREA=1
-    OPT_SKIP_SPLASH=1
+    OPT_SKIP_SPLASH=0
     OPT_SKIP_ATTRACT=0
 
 ***
@@ -75,8 +75,10 @@
     .equ  BOMB_SND,               0x0c
     .equ  BONUS_FLAG_SND,         0x0d
     .equ  SOLVALOU_SND,           0x0e
-    ** unknown origin
+    * 60XX (noise chip?)
     .equ  COIN_SND,               0x10
+    .equ  GROUND_EXPLOSION_SND,   0x11
+    .equ  SOLVALOU_EXPLOSION_SND, 0x12
     
 ***
 *** global variables

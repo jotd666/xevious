@@ -39,6 +39,8 @@
     .global osd_read_start
     .global osd_sound_start
     .global osd_sound_stop
+    .global osd_sound_mute
+    .global osd_sound_unmute
     .global osd_read_high_scores
     .global osd_write_high_scores
     .global osd_debug_hook
@@ -1175,6 +1177,7 @@ osd_read_start:
 
 * d0 = sound ordinal
 osd_sound_start:
+    movem.l   d0/a0,-(a7)
     lea       snd_playing,a0
     cmp.b     #ORDINAL_1_SND,d0
     beq       9f
@@ -1187,7 +1190,8 @@ osd_sound_start:
     move.b    #1,(a0,d0.w)
 2:  add.w     #0x1f,d0                          | calc sound command
     move.b    d0,(REG_SOUND)
-9:  rts
+9:  movem.l   (a7)+,d0/a0
+    rts
 
 *
 * 00-02,0E (high score, solvalou) B loop
@@ -1195,7 +1199,6 @@ osd_sound_start:
     
 * d0 = sound ordinal
 osd_sound_stop:
-    lea       snd_playing,a0
     * ADPCMA_LOOP_STOP
     cmp.b     #BOMB_SND,d0
     bne       1f
@@ -1206,10 +1209,19 @@ osd_sound_stop:
     beq.b     2f
     cmp.b     #HIGH_SCORE_SND,d0
     bgt.b     9f
-2:  clr.b     (a0,d0.w)
+2:  movem.l   d0/a0,-(a7)
+    lea       snd_playing,a0
+    clr.b     (a0,d0.w)
     move.b    #0x1a,(REG_SOUND)
+    movem.l   (a7)+,d0/a0
 9:  rts
+
+osd_sound_mute:
+    rts
     
+osd_sound_unmute:
+    rts
+        
 ***
 *** high score format
 *** - high score table (a0) $50 bytes
