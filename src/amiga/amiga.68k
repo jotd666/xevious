@@ -126,13 +126,25 @@ mul\value\()_table:
 	move.b	d0,(offset,a1)
 	.endm
 
-.macro	NOT_AND_FG_BYTE	
-	move.b	(a0)+,d0
-	not.b	d0
-	and.b	(offset,a1),d0
+.macro	AND_FG_BYTE
+	move.b	(offset,a1),d0
+	and.b	(a0)+,d0
 	move.b	d0,(offset,a1)
 	.endm
 
+
+.macro   PREP_FG_MASK_LOOP
+	moveq	#2,d3
+	lea		(-8,a0),a0
+	lea		not_mask(pc),a2
+	move.l	(a0)+,d0
+	not.l	d0
+	move.l	d0,(a2)
+	move.l	(a0),d0
+	not.l	d0
+	move.l	d0,(4,a2)
+	.endm
+	
 .macro blitz
 	move.w	d0,-(a7)
 	clr.w	d0
@@ -180,6 +192,8 @@ out\@:
 		.global osd_sound_stop
 		.global osd_sound_loop
 		.global osd_sound_start
+		.global	osd_sound_mute
+		.global	osd_sound_unmute
 
 * debugging only
     .global osd_debug1
@@ -462,6 +476,15 @@ _vblank:
 	
     rte
 
+
+osd_sound_mute:
+	st.b	sound_muted
+	rts
+	
+osd_sound_unmute:
+	clr.b	sound_muted
+	rts
+	
 osd_sound_start:
 	movem.l	d0/a0/a6,-(a7)
 	lea		repeating_sounds(pc),a6
@@ -493,6 +516,8 @@ osd_sound_start:
 	.else
 	move.l	(a0,d0.w*4),a0
 	.endif	
+	move.l	a0,d0
+	beq.b	1f
 	jsr		_mt_loopfx
 	bra.b	1f
 0:
@@ -505,6 +530,8 @@ osd_sound_start:
 	* it would override the intro music
 	st.b	(SOLVALOU_SND*2+1,a6)
 2:
+	tst.b	sound_muted
+	bne.b	1f
 	lea		sound_table(pc),a0
 	.ifdef	NO68020
 	*add.w	d0,d0
@@ -513,6 +540,8 @@ osd_sound_start:
 	.else
 	move.l	(a0,d0.w*4),a0
 	.endif
+	move.l	a0,d0
+	beq.b	1f
 	lea		_custom,a6
 	jsr		_mt_playfx
 1:
@@ -551,6 +580,8 @@ osd_sound_stop:
 	movem.l	(a7)+,d0/a6
 	rts
 	
+sound_muted:
+	.word	0
 intro_music_counter:
 	.word	0
 	
@@ -575,6 +606,8 @@ repeating_sounds:
     .byte	0,0
     ** unknown origin
     .byte	0,0		| COIN_SND,               0x10
+    .byte	0,0		| GROUND_EXPLOSION_SND,               0x11
+    .byte	0,0		| SOLVALOU_EXPLOSION_SND,               0x12
 	
 osd_kick_wdog:
     rts
@@ -1175,13 +1208,18 @@ update_fg_tile:
 	.endr
 	* now remove all bits of the character on other planes
 	* to respect the original color
-	moveq	#2,d3
+	* we could have used pre-NOTed tables, but that's really
+	* not worth the trouble. A few cycles lost to prepare the
+	* mask prior to usage using 32 bit fetches and NOT should be
+	* fast enough, then reused in all 3 planes, that saves
+	* 24 NOT byte instructions
+	PREP_FG_MASK_LOOP
 10:
+	move.l	a2,a0	| reset mask pointer
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
-	lea		(-8,a0),a0
 	.set	offset,0
 	.rept		8
-	NOT_AND_FG_BYTE
+	AND_FG_BYTE
 	.set	offset,offset+NB_BYTES_PER_ROW
 	.endr
 	dbf		d3,10b
@@ -1196,13 +1234,13 @@ update_fg_tile:
 	.endr
 	* now remove all bits of the character on other planes
 	* to respect the original color
-	moveq	#2,d3
+	PREP_FG_MASK_LOOP
 20:
+	move.l	a2,a0
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
-	lea		(-8,a0),a0
 	.set	offset,NB_BYTES_PER_ROW*7
 	.rept		8
-	NOT_AND_FG_BYTE
+	AND_FG_BYTE
 	.set	offset,offset-NB_BYTES_PER_ROW
 	.endr
 	dbf		d3,20b
@@ -1233,7 +1271,9 @@ update_fg_tile:
 	.endr
 	rts
 
-	
+not_mask:
+	.long	0,0
+		
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
 	move.w	d6,scroll_offset
@@ -1287,7 +1327,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-	*.include	"ag_test_clip.68k"
+	.include	"ag_test_clip.68k"
 
 out:
 	rts
@@ -1318,7 +1358,7 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	**lea		ag_sprites(pc),a4
+	*lea		ag_sprites(pc),a4
 
 	move.l		previous_sprite_state_ptr(pc),a5
 	lea			is_hw_sprite_table,a6
@@ -1741,10 +1781,18 @@ draw_hw_sprite:
 	* Y in D3
 	* set a lifetime in sprite table
 	lea		real_sprite_display_table(pc),a4
+	
 	add.w	d0,a4
 	lea		(4,a4),a6	| start of sprite pointer & row backup zone (header: (4+16)*2)
 	*clr.l	(20,a6)		| remove second sprite pointer preventively
 	lea	(2,a3,d1.w),a0
+
+	* clear D4 & d0 MSW
+	* some offsets are above 0x7fff
+	swap	d4
+	clr		d4
+	swap	d4
+	
 5:
 	move.w	(a0)+,d6	| sprite number
 	bmi		21f			| end of sprite chain
@@ -1774,6 +1822,7 @@ draw_hw_sprite:
 	addq.w	#4,a1
 	dbf		d0,6b
 
+	moveq	#0,d0		| we need to clear MSB
 	* get sprite data
 	move.l	(a0)+,a1
 	* store it in sprite table structure
@@ -1787,24 +1836,27 @@ draw_hw_sprite:
 	beq.b	7f			| no need to save or restore: sprite has the same pos
 	* restore previous sprite bitmap line
 	lea	(4,a6),a2	| source
-	lsl.w	#4,d0
-	lea		(a1,d0.w),a5	| destination
+	lsl.l	#4,d0
+	lea		(a1,d0.l),a5	| destination
 	* copy 16 bytes back to restore sprite line
 	move.l	(a2)+,(a5)+
 	move.l	(a2)+,(a5)+
 	move.l	(a2)+,(a5)+
 	move.l	(a2),(a5)
-7:	
+7:
+	* store a1 in backup BEFORE adding offset to it
+	move.l	a1,(a6)
+
 	tst.w	d4
 	beq.b	8f
 	* must move sprite start & put position here
 	* first we back up sprite data
 	move.w	d4,(2,a4)  | store previous offset
-	lsl.w	#4,d4
+	lsl.l	#4,d4
 	lea	(4,a6),a5			| destination
 	* add offset to sprite pointer to start by that line
-	add.w	d4,a1
-	lsr.w	#4,d4	| restore d4 value for next loop
+	add.l	d4,a1
+	lsr.l	#4,d4	| restore d4 value for next loop
 	move.l	a1,a2	| source
 	* copy 16 bytes to sprite line backup space
 	* and zero that sprite line so 
@@ -1814,7 +1866,6 @@ draw_hw_sprite:
 	clr.l	(a2)+
 	.endr
 8:	
-	move.l	a1,(a6)
 
 	* compute control words
 	move.w	d5,d0
