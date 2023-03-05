@@ -1217,9 +1217,11 @@ osd_sound_stop:
 9:  rts
 
 osd_sound_mute:
+    move.b    #0x16,(REG_SOUND)
     rts
     
 osd_sound_unmute:
+    move.b    #0x17,(REG_SOUND)
     rts
         
 ***
