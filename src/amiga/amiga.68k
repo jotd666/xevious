@@ -1512,7 +1512,7 @@ osd_update_32_sprite_hw:
 	* now the value is negative Y, make it a positive offset
 	neg.w	d3
 	move.w	d3,d2
-	move.w	#16,d3		| and displays clipped at y = 0 TEMP 16!!!
+	clr.w	d3		| and displays clipped at y = 0
 49:
 	cmp.b	#AS_FIRST,d6
 	bne.b	50f
@@ -1903,8 +1903,7 @@ draw_hw_sprite:
 	* compute control words
 	move.w	d5,d0
 	move.w	d3,d1
-	* same position as bobs
-	sub.w	#16,d1
+	* same position as bobs: shift X by 8
 	sub.w	#8,d0
 	bsr		store_sprite_pos
 	move.w	d0,(8,a1)
@@ -2057,7 +2056,7 @@ HW_SpriteXTable:
 HW_SpriteYTable_\height:
   .set	reptn,0
   .rept 288
-	.set	ys,reptn+0x2c
+	.set	ys,reptn+0x1c
 	.set	ye,ys+\height
     .byte  ys&255, 0, ye&255, ((ys>>6)&4)+((ye>>7)&2)
 	.set	reptn,reptn+1

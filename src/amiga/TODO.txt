@@ -6,6 +6,8 @@
 
 * can be worked on my own:
 
+- display sprite at y=0 doesn't work, only works with y>=16: store_sprite_pos
+  certainly receives trash when y=0, because it should work (0x2C => 0x1C in table does the job)
 - when Andrej provides the music, up sampling rate to 22 or 28k
 - andor appearing sprite clipping is trashing the sprite, backup not working
 - andor center tile is still a bob (is that a problem?)
@@ -20,7 +22,6 @@
   (when in "game" mode not "menu"/"title" mode)
 - glitter sprite is flashing. revert to BOB (WinUAE only issue)
 - sprites for big mothership: test including sprite clipping
-- display sprite at y=0 doesn't work, only works with y>=16: check EAB post
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
 - check if tiles missing (wrongly??) in level 1 too!!
