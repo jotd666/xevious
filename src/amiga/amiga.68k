@@ -521,7 +521,7 @@ osd_sound_start:
 	jsr		_mt_loopfx
 	bra.b	1f
 0:
-	cmp.w	#ORDINAL_1_SND,d0
+	cmp.w	#MAIN_THEME_SND,d0
 	bne.b	2f
 	* special case: we have to lock solvalou
 	* looped music until this one has ended
@@ -1201,10 +1201,22 @@ update_fg_tile:
 	* to refresh the back buffer, not the one being shown
 	btst	#7,d4
 	bne	2f
+	* try to super-optimize it because it costs cycles
+	* here by pre-fetching the source in 32 bits, and shifting
+	* we can even use or.b dreg,memory which is not possible
+	* with or.b (areg)+,memory
+	
 	.set	offset,0
-	.rept		8
-	OR_FG_BYTE
-	.set	offset,offset+NB_BYTES_PER_ROW
+	.rept		2
+	move.l	(a0)+,d1
+	or.b	d1,(3*NB_BYTES_PER_ROW+offset,a1)
+	lsr.w	#8,d1
+	or.b	d1,(2*NB_BYTES_PER_ROW+offset,a1)
+	swap	d1
+	or.b	d1,(NB_BYTES_PER_ROW+offset,a1)
+	lsr.w	#8,d1
+	or.b	d1,(offset,a1)
+	.set	offset,offset+4*NB_BYTES_PER_ROW
 	.endr
 	* now remove all bits of the character on other planes
 	* to respect the original color
@@ -1226,11 +1238,19 @@ update_fg_tile:
 	
 	rts
 2:
-	* or, flipped tile
-	.set	offset,NB_BYTES_PER_ROW*7
-	.rept		8
-	OR_FG_BYTE
-	.set	offset,offset-NB_BYTES_PER_ROW
+	* or, flipped tile: note this seems never reached
+	* fg tiles don't seem to need flipping
+	.set	offset,NB_BYTES_PER_ROW*4
+	.rept		2
+	move.l	(a0)+,d1
+	or.b	d1,(offset,a1)
+	lsr.w	#8,d1
+	or.b	d1,(1*NB_BYTES_PER_ROW+offset,a1)
+	swap	d1
+	or.b	d1,(2*NB_BYTES_PER_ROW+offset,a1)
+	lsr.w	#8,d1
+	or.b	d1,(3*NB_BYTES_PER_ROW+offset,a1)
+	.set	offset,offset-4*NB_BYTES_PER_ROW
 	.endr
 	* now remove all bits of the character on other planes
 	* to respect the original color
@@ -1327,7 +1347,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-	.include	"ag_test_clip.68k"
+	*.include	"ag_test_clip.68k"
 
 out:
 	rts

@@ -23,7 +23,7 @@ lq_sample_rate = 8000
 loop_channel = 0
 
 sound_dict = {
-"ORDINAL_1_SND"          :{"index":0x01,"channel":loop_channel,"sample_rate":lq_sample_rate},
+"MAIN_THEME_SND"          :{"index":0x01,"channel":loop_channel,"sample_rate":lq_sample_rate},
 "HIGHEST_SCORE_SND"      :{"index":0x02,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
 "HIGH_SCORE_SND"         :{"index":0x03,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
 "EXTRA_SOLVALOU_SND"     :{"index":0x04,"channel":3,"sample_rate":hq_sample_rate},

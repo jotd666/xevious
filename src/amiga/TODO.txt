@@ -22,13 +22,15 @@
   (when in "game" mode not "menu"/"title" mode)
 - glitter sprite is flashing. revert to BOB (WinUAE only issue)
 - sprites for big mothership: test including sprite clipping
-- display sprite at y=0 doesn't work, only works with y>=16
+- display sprite at y=0 doesn't work, only works with y>=16: check EAB post
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
 - check if tiles missing (wrongly??) in level 1 too!!
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
 - dip switches screen
 - level 14: tile layout looks wrong (bird drawing)
+
+-> can be fixed with big erase blit at copper interrupt start
 - during the demo, insert a coin, double buffering ghost images remain
   workaround: always clear drawing screen when switching tile palettes
   (going from game to intro)
