@@ -41,7 +41,7 @@ BG_SCREEN_SIZE =  BG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 FG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*(NB_LINES+16)
 FG_SCREEN_SIZE =  FG_SCREEN_PLANE_SIZE*NB_PLAYFIELD_PLANES
 
-NB_SPRITES_TO_UPDATE = 64
+NB_SPRITES_TO_UPDATE = 32
 NB_SPRITES_TOTAL = 64
 REMAINING_SPRITE_STRUCT_BITS = 6
 
@@ -450,14 +450,16 @@ _vblank:
 12:
 	st.b	no_gfx_update
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
+	* no screen switch to skip if no double buffering,
+	* hence that branch is only required if double buffering
 	bra.b	21f
 	.endif
 2:
 	* has to be copper
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 	bsr		switch_screen_buffers
-	.endif
 21:	
+	.endif
 	jsr		xevious_im1_irq
 	
     move.w  vbl_counter(pc),d0
@@ -1385,8 +1387,11 @@ osd_update_32_sprite_hw:
 	
 	* first restore all background tiles behind the previous
 	* positions of the previously active objects
+	* only if D0=0 (ground objects pass)
+	tst.w	d7
+	bne.w	12f
 	movem.l	d2-d5/a0-a2/a5,-(a7)
-	move.w	#NB_SPRITES_TO_UPDATE-1,d4
+	move.w	#NB_SPRITES_TOTAL-1,d4
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
 	beq.w	11f
@@ -1445,12 +1450,16 @@ osd_update_32_sprite_hw:
 	lea		(SPRITE_MEM_SIZE,a5),a5
 	dbf		d4,2b
 	movem.l	(a7)+,d2-d5/a0-a2/a5
-
+12:
 	* then update the active sprites
 	lea		sprite_picbase,a3
 	move.l	a4,-(a7)
 	move.w	#NB_SPRITES_TO_UPDATE-1,d4
-	| sprite loop
+	tst		d7
+	beq.b	4f
+	* second half
+	lea		(SPRITE_MEM_SIZE*NB_SPRITES_TO_UPDATE,a4),a4
+	* sprite loop
 4:
 	cmp.b	#STATE_INACTIVE,(a4)
 	beq		2f
@@ -1561,13 +1570,13 @@ osd_update_32_sprite_hw:
 		
 	* then back up current object state (X,Y,STATE) for next update
 	move.l	(a7)+,a4
-	move.w	#NB_SPRITES_TOTAL/2-1,d0	| 32*SPRITE_MEM_SIZE bytes
+	move.w	#NB_SPRITES_TO_UPDATE-1,d0	| 32*SPRITE_MEM_SIZE bytes
 	* d7 is 0 or 32
 	tst.w	d7
 	beq.b	3f
 	* second half of sprite data (*8 bytes, /2)
-	lea		((NB_SPRITES_TOTAL*SPRITE_MEM_SIZE)/2,a4),a4
-	lea		((NB_SPRITES_TOTAL*SPRITE_MEM_SIZE)/2,a5),a5
+	lea		(NB_SPRITES_TO_UPDATE*SPRITE_MEM_SIZE,a4),a4
+	lea		(NB_SPRITES_TO_UPDATE*SPRITE_MEM_SIZE,a5),a5
 3:
 	* copy one sprite backup structure (multiple of 4 bytes) 32 times
 	.rept	2   | 8/4 change if SPRITE_MEM_SIZE changes!!

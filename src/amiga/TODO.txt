@@ -14,7 +14,7 @@
 - sprite lifetime system is not working for clipped y sprites as zeroing
   the base address X/Y isn't effective if sprite is being clipped: should
   reset the sprite pointer too
-- real machine: retry without loadview (no whdload) (currently lockup)
+- real machine: retry without loadview (no whdload) (currently lockup) => still lockup on real machine
 - real machine: flickering re-test with big number of enemies
 - real machine: fg tile refresh on "XEVIOUS" title slows down a lot
   maybe create a big BOB and blit it instead, skip that fg
@@ -30,13 +30,16 @@
 - dip switches screen
 - level 14: tile layout looks wrong (bird drawing)
 
--> can be fixed with big erase blit at copper interrupt start
+- optim: erase width & offset instead of 18 height
+- main theme lock music counter: rather use a vbl counter because frameskip
+  can vary
+
 - during the demo, insert a coin, double buffering ghost images remain
   workaround: always clear drawing screen when switching tile palettes
   (going from game to intro)
 - sheonite sprites too fast, seem to fail the sprite erase phase
-  workaround (maybe): if sheonite on screen, clear all screen (no biggie
-  because nothing else is displayed on screen)
+  or maybe because too close to the right of the screen?
+
 
 further optims:
 
