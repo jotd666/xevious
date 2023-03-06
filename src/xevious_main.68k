@@ -52,8 +52,7 @@ xevious_reset: | $0000
     bra       start
 
 exit_caller: | $001D
-    lea       (4,a7),a7
-    
+    addq.l    #4,a7    
 null_fn: | $001f
     rts
 
@@ -264,7 +263,7 @@ main_loop: | $0447
     movem.l   d7/a6,-(a7)
     jsr       (a0)                              | call function
     movem.l   (a7)+,d7/a6
-    lea       (4,a6),a6                         | next table entry
+    addq.l    #4,a6                             | next table entry
     dbf       d7,main_loop
 
     move.w    #0x8000,d0                        | black
@@ -423,7 +422,7 @@ coined_up:
     move.w    #64-1,d7                          | 64 bytes to copy
 3:  move.b    (a0)+,(a1)+                       | init P2 settings
     dbf       d7,3b
-    moveq     #ORDINAL_1_SND,d0
+    moveq     #MAIN_THEME_SND,d0
     jsr       osd_sound_start
 
 main_gameplay_loop: | $0593
@@ -450,7 +449,7 @@ main_gameplay_loop: | $0593
     lea       main_fn_1__handle_solvalou,a0
     move.l    a0,(main_fn_tbl_RAM+4*1)          | reset entry point
     clr.b     (scroll_disabled)
-    moveq     #ORDINAL_1_SND,d0
+    moveq     #MAIN_THEME_SND,d0
     jsr       osd_sound_start
     move.b    #0xa0,(countdown_timer_1)
     bsr       display_player_start_msgs
@@ -559,14 +558,14 @@ zero_obj_state_tbl: | $06F0
     lea       obj_tbl,a5
     moveq     #32-1,d7                          | 32 objects
 1:  clr.w     (_STATE,a5)                       | state,bank
-    lea       (32,a5),a5                        | next object
+    lea       (_OBJSIZE,a5),a5                  | next object
     dbf       d7,1b
     lea       obj_tbl+_OBJSIZE*0x3A,a5          | flying enemies
     *** There was a BUG in the original
     *** which cleared 6 bytes, rather than 6 objects (12 bytes)
     moveq     #6-1,d7
 2:  clr.w     (_STATE,a5)                       | state,bank
-    lea       (32,a5),a5                        | next object
+    lea       (_OBJSIZE,a5),a5                  | next object
     dbf       d7,2b
     rts
     
@@ -1479,14 +1478,14 @@ compare_high_score_entry: | $115B
     cmp.b     (a0),d1                           | MSB score higher?
     bcs.b     score_lower_than_entry            | no, go
     bne.b     move_high_score_entry_down        | higher, go
-    lea       (1,a0),a0                         
-    lea       (1,a1),a1                         
+    addq.l    #1,a0                         
+    addq.l    #1,a1                         
     move.b    (a1),d1                           
     cmp.b     (a0),d1                           | next byte score higher?
     bcs.b     score_lower_than_entry            | no, go
     bne.b     move_high_score_entry_down        | higher, go
-    lea       (1,a0),a0                         
-    lea       (1,a1),a1                         
+    addq.l    #1,a0                         
+    addq.l    #1,a1                         
     move.b    (a1),d1                           
     cmp.b     (a0),d1                           | LSB score higher?
     bcs.b     score_lower_than_entry            | no, go
@@ -2034,11 +2033,14 @@ check_bullets_and_flying: | $1655
     moveq     #16-1,d7                          | 16 bacura
 check_bacura: | $1665
     bsr.b     check_bacura_hit_solvalou
-    bcs.b     9f
+    bcs.b     8f
     lea       (_OBJSIZE,a1),a1                  | next object
     addq.l    #2,a3                             | next sprite coords
     dbf       d7,check_bacura
 9:  rts
+
+main_debug1:
+8:  rts
 
 check_bullet_or_flying_hit_solvalou: | $1670
     cmp.b     #2,(_STATE,a1)                    | active?
@@ -2159,7 +2161,7 @@ main_fn_30__handle_shooting: | $1727
     movem.l   d7/a3/a4/a6,-(a7)
     jsr       (a0)                              | call handler
     movem.l   (a7)+,d7/a3/a4/a6
-    lea       (4,a6),a6                         | next table entry
+    addq.l    #4,a6                             | next table entry
     lea       (_OBJSIZE,a5),a5                  | next object
     addq.l    #2,a3                             | next sprite shadow entry
     dbf       d7,3b                             | loop thru all bullets
@@ -3092,7 +3094,7 @@ is_close_to_solvalou_Y: | $20CB
     rts
 
 loc_20E2: | $20E2
-    lea       (4,a7),a7                         | bypass caller
+    addq.l    #4,a7                             | bypass caller
     bra       flying_enemy_hit
             
 * Torkan (Scout Ship/Beetle) - 50 pts   
@@ -3337,7 +3339,7 @@ jara_check_proximity: | $238C
     rts
     
 jara_hit: | $23A3
-    lea       (4,a7),a7                         | bypass caller
+    addq.l    #4,a7                             | bypass caller
     bra       flying_enemy_hit
     
 * Kapi (Rhombus) 300 pts
@@ -4277,14 +4279,14 @@ check_grobda_hit: | $2E45
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq.b     1f                                | yes, go
     rts
-1:  lea       (4,a7),a7                         | return up call stack
+1:  addq.l    #4,a7                             | return up call stack
     bra       handle_bomb_explosion
 
 check_grobda_hit_and_remove: | $2E55
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq.b     1f                                | yes, go
     rts
-1:  lea       (4,a7),a7                         | return up call stack
+1:  addq.l    #4,a7                             | return up call stack
     bra       explode_and_remove_object
 
 animate_grobda_forwards: | $2E65
@@ -4521,7 +4523,7 @@ main_fn_2__handle_objects: | $3000
     jsr       (a0)                              | call handler fn
     movem.l   (a7)+,d7/a5-a6
     lea       (_OBJSIZE,a5),a5                  | next object
-    lea       (4,a6),a6                         | next object fn
+    addq.l    #4,a6                             | next object fn
     dbf       d7,5b
     
     lea       (_OBJSIZE*7,a5),a5                | skip solvalou, shots
@@ -4532,7 +4534,7 @@ main_fn_2__handle_objects: | $3000
     jsr       (a0)                              | call handler fn
     movem.l   (a7)+,d7/a5-a6
     lea       (_OBJSIZE,a5),a5                  | next object
-    lea       (4,a6),a6                         | next object fn
+    addq.l    #4,a6                             | next object fn
     dbf       d7,6b
     
     move.l    (a7)+,a6                          | restore main jump table address

@@ -498,6 +498,8 @@ platform_init:
     moveq     #0x20-1,d7
 8:  clr.b     (a0)+
     dbf       d7,8b
+    clr.w     (main_theme_cnt)
+    clr.w     (andor_genesis_cnt)
     
 * CD hardware only
 .ifdef __cd__
@@ -817,7 +819,6 @@ row_scroll:
     bra       9f
 
 arbitrary_scroll:
-osd_debug1:    
     move.w    d6,(bg_scroll_x_r)
     * deactivate all active sprites
     lea       SCB3+BGSS,a1
@@ -1175,53 +1176,83 @@ osd_read_start:
     or.b      d6,d0                             | bit0=P1, bit1=P2
 9:  rts
 
+.equ  ADPCM_MUTE,           0x16
+.equ  ADPCM_SET_MAX_VOL,    0x17
+.equ  ADPCM_STOP,           0x18
+.equ  ADPCMA_LOOP_STOP,     0x19
+.equ  ADPCMB_LOOP_STOP,     0x1a
+
+* all sonds are ADPCM-A for CD support
+* MAIN_THEME, HIGHEST_SCORE, HIGH_SCORE and ANDOR_GENESIS BG channel
+* - MAIN_THEME uses a timer (clocked by SOLVALOU_SND)
+*   - all other sounds muted while MAIN_THEME plays
+* - HIGHEST_SCORE & HIGH_SCORE should just play until stop
+* - ANDOR_GENESIS needs to pre-empt SOLVALOU_SND
+
 * d0 = sound ordinal
 osd_sound_start:
     movem.l   d0/a0,-(a7)
     lea       snd_playing,a0
-    cmp.b     #ORDINAL_1_SND,d0
-    beq       9f
-    cmp.b     #SOLVALOU_SND,d0
-    beq.b     1f
-    cmp.b     #HIGH_SCORE_SND,d0
-    bgt.b     2f
-1:  tst.b     (a0,d0.w)                         | already playing?
+    tst.b     (MAIN_THEME_SND,a0)               | main theme playing?
+    beq       0f                                | no, continue
+    * solvalou sound used for a timer for main theme
+    cmp.b     #SOLVALOU_SND,d0                  | solvalou sound?
+    bne.b     9f                                | no, exit
+    subq.w    #1,(main_theme_cnt)               | dec theme counter
+    bne.b     9f                                | exit if not done
+    clr.b     (MAIN_THEME_SND,a0)               | flag not playing
+    bra.b     snd_flag_and_play                 | start solvalou sound
+    * main theme not playing
+0:  tst.b     (ANDOR_GENESIS_SND,a0)            | andor genesis playing?
+    beq       1f                                | no, continue
+    * solvolou sound userfor a timer for andor genesis
+    cmp.b     #SOLVALOU_SND,d0                  | solvalou sound?
+    bne.b     3f                                | no, handle other sounds
+    subq.w    #1,(andor_genesis_cnt)            | dec andor genesis counter
+    bne.b     9f                                | exit if ont done
+    clr.b     (ANDOR_GENESIS_SND,a0)            | flag not playing
+    bra.b     snd_flag_and_play                 | start solvalou sound
+    * andor genesis not playing either
+1:  cmp.b     #MAIN_THEME_SND,d0                | MAIN_THEME?
+    bne       2f                                | no, skip
+    move.w    #380,(main_theme_cnt)             | init countdown timer
+    bra.b     snd_flag_and_play                 | start playing
+2:  cmp.b     #HIGH_SCORE_SND,d0                | HIGHEST/HIGH_SCORE?
+    ble.b     snd_check_playing                 | yes, go
+3:  cmp.b     #ANDOR_GENESIS_SND,d0             | ANDOR_GENESIS?
+    bne.b     4f                                | no, skip
+    move.w    #4,(andor_genesis_cnt)            | init countdown timer
+    bra.b     snd_check_playing                 | yes, go
+4:  cmp.b     #SOLVALOU_SND,d0
+    bne.b     snd_flag_and_play                 | no, go
+snd_check_playing:  
+    tst.b     (a0,d0.w)                         | already playing?
     bne.b     9f                                | yes, exit
-    move.b    #1,(a0,d0.w)
-2:  add.w     #0x1f,d0                          | calc sound command
+snd_flag_and_play:
+    move.b    #1,(a0,d0.w)                      | flag playing
+    add.w     #0x1f,d0                          | calc sound command
     move.b    d0,(REG_SOUND)
 9:  movem.l   (a7)+,d0/a0
     rts
 
-*
-* 00-02,0E (high score, solvalou) B loop
-*
-    
 * d0 = sound ordinal
 osd_sound_stop:
     * ADPCMA_LOOP_STOP
     cmp.b     #BOMB_SND,d0
-    bne       1f
-    move.b    #0x19,(REG_SOUND)
-    rts
-    * ADPCMB_LOOP_STOP
-1:  cmp.b     #SOLVALOU_SND,d0
-    beq.b     2f
-    cmp.b     #HIGH_SCORE_SND,d0
-    bgt.b     9f
+    beq.b     9f                                | ignore for BOMB
 2:  movem.l   d0/a0,-(a7)
     lea       snd_playing,a0
     clr.b     (a0,d0.w)
-    move.b    #0x1a,(REG_SOUND)
+    move.b    #ADPCMA_LOOP_STOP,(REG_SOUND)
     movem.l   (a7)+,d0/a0
 9:  rts
 
 osd_sound_mute:
-    move.b    #0x16,(REG_SOUND)
+    move.b    #ADPCM_MUTE,(REG_SOUND)
     rts
     
 osd_sound_unmute:
-    move.b    #0x17,(REG_SOUND)
+    move.b    #ADPCM_SET_MAX_VOL,(REG_SOUND)
     rts
         
 ***
@@ -1383,6 +1414,8 @@ p1_input_r:                   ds.b    1
 p2_input_r:                   ds.b    1
 
 snd_playing:                  ds.b    0x20
+main_theme_cnt:               ds.w    1
+andor_genesis_cnt:            ds.w    1
 
     .align 4
 memcard_buf:
