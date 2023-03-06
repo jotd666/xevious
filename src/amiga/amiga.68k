@@ -1,7 +1,8 @@
 *
 *	Amiga-specific portions of Xevious
 *
-
+* (c) JOTD 2023
+*
 
 .include "../src/xevious.inc"
 .include "custom.i"
@@ -21,8 +22,12 @@ OPT_ENABLE_DOUBLE_BUFFERING = 1
 * empiric values of number of 16x16 bob objects
 * currently displayed. Allows to adapt framerate
 * and avoid flicker/slowdowns
-MEDIUM_SPRITES_THRESHOLD = 12
-HIGH_SPRITES_THRESHOLD = 24
+* 12 & 24 seem to work ok on A1200 68060/50
+*MEDIUM_SPRITES_THRESHOLD = 12
+*HIGH_SPRITES_THRESHOLD = 24
+
+MEDIUM_SPRITES_THRESHOLD = 16
+HIGH_SPRITES_THRESHOLD = 32
 
 _custom = 0xDFF000
 
@@ -282,12 +287,8 @@ _user:
     bne.b   .standard
     move.l a0,_resload
     *move.b  d1,_keyexit
-    *move.l  a0,a2
-    *lea	_tags(pc),a0
-    *jsr	resload_Control(a2)
-    *bsr load_highscores
-    bra.b   .startup
-	nop
+
+    bra.b   .no_forbid
 .standard:
     * open dos library, graphics library
     move.l  0x4.W,a6
@@ -302,10 +303,8 @@ _user:
     move.l	d0,a6
 	sub.l	a1,a1
 	jsr	_LVOLoadView(a6)
-	*jsr	_LVOWaitTOF(a6)
-	*jsr	_LVOWaitTOF(a6)
-	*move.l  0x4.W,a6
-    *bsr load_highscores
+	jsr	_LVOWaitTOF(a6)
+	jsr	_LVOWaitTOF(a6)
 
     * check if "floppy" file is here
     
@@ -322,14 +321,8 @@ _user:
     move.l  #100,d1
     jsr     _LVODelay(a6)
 .no_floppy:
-	* stop cdtv device if found, avoids that cd device
-	* sends spurious interrupts
-    *move.l  #CMD_STOP,d0
-    *bsr send_cdtv_command
+
 .startup:
-    lea  _custom,a5
-    *move.b  #0,controller_joypad_1
-    
 
 * no multitask
     tst.l   _resload
@@ -1328,15 +1321,26 @@ osd_update_sprite_shadow:
 	move.b	(_ATTR,a5),(a4)+
 	move.b	(_CODE,a5),(a4)+
 	move.b	(_COLOUR,a5),(a4)+
-	move.w	(_X,a5),d1
-	lsr.w	#6,d1
-	move.b	d1,(a2)+	| d1: X[8:1]
-	add.w	d1,d1		| shift back
-	move.w	d1,(a4)+
 	move.w	(_Y,a5),d2
 	lsr.w	#5,d2		| d2: Y[7:0]
-	move.b	d2,(a2)+
-	* mirror
+    *** THIS IS MANDATORY IN EVERY PORT
+	* (copied from neogeo code, not sure of how or why it works)
+    move.b    #0xef,d3                          | arcade adjustment
+    sub.b     d2,d3                             | arcade adjustment
+    move.b    d3,(a2)+                          | store Y[7:0] for hit-box calcs
+    *** END OF MANDATORY
+
+	move.w	(_X,a5),d1
+	lsr.w	#5,d1
+    move.w    d1,d3
+    *** THIS IS MANDATORY IN EVERY PORT
+    addq.b    #8,d3    
+    lsr.w     #1,d3
+    move.b    d3,(a2)+                          | store X[8:1] for hit-box calcs
+    *** END OF MANDATORY
+	move.w	d1,(a4)+
+
+	* mirror prior to store Y for amiga display
 	neg.w	d2
 	add.w	#32*8,d2
 	move.w	d2,(a4)+
@@ -2054,7 +2058,7 @@ HW_SpriteYTable_\height:
   .set	reptn,0
   .rept 288
 	.set	ys,reptn+0x2c
-	.set	ye,ys+\height       | size = 16
+	.set	ye,ys+\height
     .byte  ys&255, 0, ye&255, ((ys>>6)&4)+((ye>>7)&2)
 	.set	reptn,reptn+1
   .endr

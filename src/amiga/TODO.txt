@@ -1,7 +1,5 @@
 * to see with Mark:
 
-- sprite shadow management: complete?
-  probably not for double width/height objects, bug with bacura collision
 - find a way to make up for those shaking ground enemies
 - optimize main/sub code more
 - level 14: black balls start with 4 toroids!!
@@ -14,9 +12,9 @@
 - sprite lifetime system is not working for clipped y sprites as zeroing
   the base address X/Y isn't effective if sprite is being clipped: should
   reset the sprite pointer too
-- real machine: retry without loadview (no whdload) (currently lockup) => still lockup on real machine
-- real machine: flickering re-test with big number of enemies
-- real machine: fg tile refresh on "XEVIOUS" title slows down a lot
+- real machine: currently lockup at start without whdload => still lockup on real machine, try from fastmem
+- real machine: test with more fps / enemies
+- real machine: fg tile refresh on "XEVIOUS" title slows down a lot: re-test
   maybe create a big BOB and blit it instead, skip that fg
   tile write completely since nothing else is ever written there
   (when in "game" mode not "menu"/"title" mode)
@@ -29,11 +27,8 @@
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
 - dip switches screen
 - level 14: tile layout looks wrong (bird drawing)
-
+- solvalou sprite flickering on emulator. Check real hardware: check if lifetime is broken when not hit
 - optim: erase width & offset instead of 18 height
-- main theme lock music counter: rather use a vbl counter because frameskip
-  can vary
-
 - during the demo, insert a coin, double buffering ghost images remain
   workaround: always clear drawing screen when switching tile palettes
   (going from game to intro)
@@ -43,6 +38,8 @@
 
 further optims:
 
+- main theme lock music counter: rather use a vbl counter because frameskip
+  can vary
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
