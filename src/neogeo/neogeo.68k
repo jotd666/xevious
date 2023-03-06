@@ -498,6 +498,7 @@ platform_init:
     moveq     #0x20-1,d7
 8:  clr.b     (a0)+
     dbf       d7,8b
+    clr.w     (main_theme_cnt)
     
 * CD hardware only
 .ifdef __cd__
@@ -817,7 +818,6 @@ row_scroll:
     bra       9f
 
 arbitrary_scroll:
-osd_debug1:    
     move.w    d6,(bg_scroll_x_r)
     * deactivate all active sprites
     lea       SCB3+BGSS,a1
@@ -1179,16 +1179,26 @@ osd_read_start:
 osd_sound_start:
     movem.l   d0/a0,-(a7)
     lea       snd_playing,a0
-    cmp.b     #ORDINAL_1_SND,d0
-    beq       9f
-    cmp.b     #SOLVALOU_SND,d0
-    beq.b     1f
-    cmp.b     #HIGH_SCORE_SND,d0
-    bgt.b     2f
-1:  tst.b     (a0,d0.w)                         | already playing?
+    cmp.b     #MAIN_THEME_SND,d0
+    bne       1f
+    tst.b     (a0,d0.w)                         | already playing?
+    bne.b     9f                                | yes, go
+    move.w    #380,(main_theme_cnt)
+    bra.b     8f                                | start playing
+1:  cmp.b     #SOLVALOU_SND,d0
+    bne.b     2f
+    tst.w     (main_theme_cnt)                  | main theme playing?
+    beq       3f                                | no, continue
+    subq.w    #1,(main_theme_cnt)               | dec theme counter
+    bne.b     9f                                | exit if not done
+    clr.b     (MAIN_THEME_SND,a0)               | flag not playing
+    bra.b     9f
+2:  cmp.b     #HIGH_SCORE_SND,d0
+    bgt.b     8f
+3:  tst.b     (a0,d0.w)                         | already playing?
     bne.b     9f                                | yes, exit
-    move.b    #1,(a0,d0.w)
-2:  add.w     #0x1f,d0                          | calc sound command
+8:  move.b    #1,(a0,d0.w)
+    add.w     #0x1f,d0                          | calc sound command
     move.b    d0,(REG_SOUND)
 9:  movem.l   (a7)+,d0/a0
     rts
@@ -1383,6 +1393,7 @@ p1_input_r:                   ds.b    1
 p2_input_r:                   ds.b    1
 
 snd_playing:                  ds.b    0x20
+main_theme_cnt:               ds.w    1
 
     .align 4
 memcard_buf:

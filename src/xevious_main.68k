@@ -423,7 +423,7 @@ coined_up:
     move.w    #64-1,d7                          | 64 bytes to copy
 3:  move.b    (a0)+,(a1)+                       | init P2 settings
     dbf       d7,3b
-    moveq     #ORDINAL_1_SND,d0
+    moveq     #MAIN_THEME_SND,d0
     jsr       osd_sound_start
 
 main_gameplay_loop: | $0593
@@ -450,7 +450,7 @@ main_gameplay_loop: | $0593
     lea       main_fn_1__handle_solvalou,a0
     move.l    a0,(main_fn_tbl_RAM+4*1)          | reset entry point
     clr.b     (scroll_disabled)
-    moveq     #ORDINAL_1_SND,d0
+    moveq     #MAIN_THEME_SND,d0
     jsr       osd_sound_start
     move.b    #0xa0,(countdown_timer_1)
     bsr       display_player_start_msgs

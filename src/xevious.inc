@@ -22,7 +22,7 @@
     OPT_TCDEV_EASTER_EGG=1
     OPT_REVEAL_SOL_TOWER=0
     OPT_REVEAL_BONUS_FLAG=0
-    OPT_DISPLAY_AREA=1
+    OPT_DISPLAY_AREA=0
     OPT_SKIP_SPLASH=0
     OPT_SKIP_ATTRACT=0
 
@@ -61,7 +61,7 @@
 
 * sound ordinals
 
-    .equ  ORDINAL_1_SND,          0x01
+    .equ  MAIN_THEME_SND,         0x01
     .equ  HIGHEST_SCORE_SND,      0x02
     .equ  HIGH_SCORE_SND,         0x03
     .equ  EXTRA_SOLVALOU_SND,     0x04
