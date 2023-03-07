@@ -638,6 +638,7 @@ _mt_end:
 	move.w	#0xc000,INTENA(a6)
 	rts
 
+	.global	_mt_start
 _mt_start:
 	.ifndef	SDATA
 	move.l	a4,-(sp)

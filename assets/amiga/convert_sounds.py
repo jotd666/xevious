@@ -17,15 +17,13 @@ src_dir = os.path.join(this_dir,"../../src/amiga")
 outfile = os.path.join(src_dir,"sounds.68k")
 sndfile = os.path.join(src_dir,"sound_entries.68k")
 
-hq_sample_rate = 16000
-lq_sample_rate = 8000
+hq_sample_rate = 22050
 
-loop_channel = 0
 
 sound_dict = {
-"MAIN_THEME_SND"          :{"index":0x01,"channel":loop_channel,"sample_rate":lq_sample_rate},
-"HIGHEST_SCORE_SND"      :{"index":0x02,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
-"HIGH_SCORE_SND"         :{"index":0x03,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
+"MAIN_THEME_SND"          :{"index":0x01,"pattern":0,"ticks":324,"loops":False},
+"HIGHEST_SCORE_SND"      :{"index":0x02,"pattern":3,"ticks":316,"loops":True},
+"HIGH_SCORE_SND"         :{"index":0x03,"pattern":2,"ticks":316,"loops":True},
 "EXTRA_SOLVALOU_SND"     :{"index":0x04,"channel":3,"sample_rate":hq_sample_rate},
 "FLYING_ENEMY_HIT_SND"   :{"index":0x05,"channel":2,"sample_rate":hq_sample_rate},
 "GARU_ZAKATO_SND"        :{"index":0x06,"channel":3,"sample_rate":hq_sample_rate},
@@ -36,19 +34,27 @@ sound_dict = {
 "SHOT_SND"               :{"index":0x0b,"channel":1,"sample_rate":hq_sample_rate},
 "BOMB_SND"               :{"index":0x0c,"channel":1,"sample_rate":hq_sample_rate},
 "BONUS_FLAG_SND"         :{"index":0x0d,"channel":3,"sample_rate":hq_sample_rate},
-"SOLVALOU_SND"           :{"index":0x0e,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
-"COIN_SND":{"index":0x10,"channel":1,"sample_rate":hq_sample_rate},
+"SOLVALOU_SND"           :{"index":0x0e,"pattern":1,"ticks":160,"loops":True},
+"COIN_SND"               :{"index":0x10,"channel":1,"sample_rate":hq_sample_rate},
 "GROUND_EXPLOSION_SND"   :{"index":0x11,"channel":3,"sample_rate":hq_sample_rate},
 "SOLVALOU_EXPLOSION_SND"   :{"index":0x12,"channel":3,"sample_rate":hq_sample_rate},
 }
 
 max_sound = max(x["index"] for x in sound_dict.values())+1
 sound_table = [""]*max_sound
-sound_table_simple = ["\t.long\t0\n"]*max_sound
+sound_table_simple = ["\t.long\t0,0\n"]*max_sound
 
 
 
 snd_header = rf"""
+# sound tables
+#
+# the "sound_table" table has 8 bytes per entry
+# first word: 0: no entry, 1: sample, 2: pattern from music module
+# second word: 0 except for music module: pattern number
+# longword: sample data pointer if sample, 0 if no entry and
+# 2 words: 0/1 noloop/loop followed by duration in ticks
+#
 FXFREQBASE = 3579564
 
     .macro    SOUND_ENTRY    sound_name,size,channel,soundfreq,volume
@@ -62,17 +68,37 @@ FXFREQBASE = 3579564
 
 """
 
+def write_asm(contents,fw):
+    n=0
+    for c in contents:
+        if n%16 == 0:
+            fw.write("\n\t.byte\t0x{:x}".format(c))
+        else:
+            fw.write(",0x{:x}".format(c))
+        n += 1
+    fw.write("\n")
+
+music_module_label = "xevious_tunes"
+
 raw_file = os.path.join(tempfile.gettempdir(),"out.raw")
 with open(sndfile,"w") as fst,open(outfile,"w") as fw:
     fst.write(snd_header)
 
     fw.write("\t.datachip\n")
-    for wav_file in sound_dict:
+    fw.write("\t.global\t{}\n".format(music_module_label))
+
+    for wav_file,details in sound_dict.items():
         wav_name = os.path.basename(wav_file).lower()[:-4]
-        fw.write("\t.global\t{}_raw\n".format(wav_name))
+        if details.get("channel") is not None:
+            fw.write("\t.global\t{}_raw\n".format(wav_name))
 
 
     for wav_entry,details in sound_dict.items():
+        sound_index = details["index"]
+        channel = details.get("channel")
+        if channel is None:
+            sound_table_simple[sound_index] = "\t.word\t{},{},{},{}\n".format(2,details["pattern"],details["ticks"],int(details["loops"]))
+            continue
         wav_name = os.path.basename(wav_entry).lower()[:-4]
         wav_file = os.path.join(sound_dir,wav_name+".wav")
 
@@ -97,10 +123,8 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
         amp_ratio = max(maxsigned,abs(minsigned))/128
 
         wav = os.path.splitext(wav_name)[0]
-        channel = details["channel"]
-        sound_index = details["index"]
         sound_table[sound_index] = "    SOUND_ENTRY {},{},{},{},{}\n".format(wav,len(signed_data)//2,channel,used_sampling_rate,int(64*amp_ratio))
-        sound_table_simple[sound_index] = f"\t.long\t{wav}_sound\n"
+        sound_table_simple[sound_index] = f"\t.long\t0x00010000,{wav}_sound\n"
 
         maxed_contents = [int(x/amp_ratio) for x in signed_data]
 
@@ -117,17 +141,15 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
             contents = b'\x00\x00' + contents
 
         fw.write("{}_raw:   | {} bytes".format(wav,len(contents)))
-        n = 0
+
         if len(contents)>65530:
             raise Exception(f"Sound {wav_entry} is too long")
-        for c in contents:
-            if n%16 == 0:
-                fw.write("\n\t.byte\t0x{:x}".format(c))
-            else:
-                fw.write(",0x{:x}".format(c))
-            n += 1
-        fw.write("\n")
+        write_asm(contents,fw)
     # make sure next section will be aligned
+    with open(os.path.join(sound_dir,"xevious_conv.mod"),"rb") as f:
+        contents = f.read()
+    fw.write("{}:".format(music_module_label))
+    write_asm(contents,fw)
     fw.write("\t.align\t8\n")
     fst.writelines(sound_table)
     fst.write("\n\t.global\t{0}\n\n{0}:\n".format("sound_table"))

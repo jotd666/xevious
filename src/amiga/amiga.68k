@@ -14,6 +14,8 @@ STATE_ACTIVE = 2
 STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
 	
+SPRITE_LIFETIME = 4
+
 OPT_ENABLE_LOGGING = 1
 * double-buffering is really needed here, else blits fail
 * to race the beam and flicker is very frequent
@@ -195,7 +197,6 @@ out\@:
 		.global osd_read_coin
 		.global osd_read_start
 		.global osd_sound_stop
-		.global osd_sound_loop
 		.global osd_sound_start
 		.global	osd_sound_mute
 		.global	osd_sound_unmute
@@ -401,7 +402,7 @@ _vblank:
     movem.l d0-d7/a0-a6,-(a7)
 	move.w	_custom+intreqr,d0
 	btst	#5,d0
-	beq.b	1f
+	beq		1f
 
 	move.l	_joypad_state(pc),d1
 	moveq	#1,d0
@@ -413,8 +414,25 @@ _vblank:
 	bne.b	0f
 	bsr		toggle_pause
 0:
+	move.w	music_tick(pc),d1
+	beq.b	13f
+	subq.w	#1,d1
+	bne.b	12f
+	tst.w	music_loops
+	beq.b	14f
+	* tick ended: reload & play
+	move.w	music_duration,d1
+	move.w	music_pattern(pc),d0
+	bsr		play_music
+12:
+	move.w	d1,music_tick
+13:
 	move.w	#0x20,_custom+intreq	
 	bra.b	3f
+14:
+	* only music that doesn't loop: intro
+	clr.b	sound_lock
+	bra.b	12b
 1:
  	clr.b	no_gfx_update
     move.w  vbl_counter(pc),d0
@@ -482,127 +500,76 @@ osd_sound_unmute:
 	
 osd_sound_start:
 	movem.l	d0/a0/a6,-(a7)
-	lea		repeating_sounds(pc),a6
-
-	.ifdef	NO68020
-	add.w	d0,d0
-	tst.b	(a6,d0.w)
-	.else
-	tst.b	(a6,d0.w*2)
-	.endif
-	beq.b	0f		| not looped play no matter what
-	.ifdef	NO68020
-	tst.b	(1,a6,d0.w)
-	.else
-	tst.b	(1,a6,d0.w*2)
-	.endif
-	bne.b	intro_already_playing		| already playing
-	.ifdef	NO68020
-	st.b	(1,a6,d0.w)
-	.else
-	st.b	(1,a6,d0.w*2)
-	.endif
-	lea		_custom,a6
-	lea		sound_table(pc),a0
-	.ifdef	NO68020
-	*add.w	d0,d0
-	add.w	d0,d0
-	move.l	(a0,d0.w),a0
-	.else
-	move.l	(a0,d0.w*4),a0
-	.endif	
-	move.l	a0,d0
-	beq.b	1f
-	jsr		_mt_loopfx
-	bra.b	1f
-0:
-	cmp.w	#MAIN_THEME_SND,d0
-	bne.b	2f
-	* special case: we have to lock solvalou
-	* looped music until this one has ended
-	clr.w	intro_music_counter
-	* prevent solvalou loop from playing right now
-	* it would override the intro music
-	st.b	(SOLVALOU_SND*2+1,a6)
-2:
 	tst.b	sound_muted
 	bne.b	1f
+	tst.b	sound_lock
+	bne.b	1f
+	
+	lea		_custom,a6
+	lsl.w	#3,d0
 	lea		sound_table(pc),a0
-	.ifdef	NO68020
-	*add.w	d0,d0
-	add.w	d0,d0
-	move.l	(a0,d0.w),a0
-	.else
-	move.l	(a0,d0.w*4),a0
-	.endif
-	move.l	a0,d0
-	beq.b	1f
+	move.w	(a0,d0.w),d1	| sound type
+	beq.b	1f		| no sound
+
+	cmp.w	#MAIN_THEME_SND*8,d0
+	bne.b	2f
+	* special case: we have to lock solvalou
+	* looped music (and all other sounds!!)
+	* until this one has ended
+	st.b	sound_lock
+2:
+	cmp.w	#1,d1
+	bne.b	3f		| music module
+	move.l	(4,a0,d0.w),a0
 	lea		_custom,a6
 	jsr		_mt_playfx
 1:
 	movem.l	(a7)+,d0/a0/a6
 	rts
-
-intro_already_playing:
-	addq.w	#1,intro_music_counter
-	cmp.w	#0x163,intro_music_counter
-	bne.b	1b
-	clr.b	(SOLVALOU_SND*2+1,a6)
+3:
+	tst.w	music_tick
+	bne.b	4f		| don't play if already playing
+	* play the proper module pattern
+	* load up the countdown if loop
+	move.w	(2,a0,d0.w),d1	| pattern number in .mod file
+	move.w	(4,a0,d0.w),d2
+	move.w	(6,a0,d0.w),music_loops
+	move.w	d1,music_pattern
+	move.w	d2,music_duration
+	* since it's not zero, next vbl tick will play the music
+	move.w	d2,music_tick
+	move.w	d1,d0
+	bsr		play_music
+4:
 	bra.b	1b
-	
-osd_sound_loop:
-	rts
-	
+
+* sound stop is only called on sounds that are
+* actually tunes. It's also called on bomb but we'll ignore
+* that since it's useless
 osd_sound_stop:
 	movem.l	d0/a6,-(a7)
-	lea		repeating_sounds(pc),a6
-	.ifdef	NO68020
-	add.w	d0,d0
-	tst.b	(1,a6,d0.w)
-	.else
-	tst.b	(1,a6,d0.w*2)
-	.endif
-	beq.b	0f		| not playing
-	.ifdef	NO68020
-	clr.b	(1,a6,d0.w)
-	.else
-	clr.b	(1,a6,d0.w*2)
-	.endif
-	moveq	#0,d0
+	cmp.w	#12,d0
+	beq.b	0f		| stop bomb makes no sense and stops the music!!
 	lea		_custom,a6
-	jsr	_mt_stopfx
+    clr.w   music_tick
+    jsr		_mt_end
 0:
 	movem.l	(a7)+,d0/a6
 	rts
 	
-sound_muted:
-	.word	0
-intro_music_counter:
-	.word	0
-	
-	* 2 bytes. If first one is 1, then sound must be stopped
-	* else it cannot be played again. It also loops
-repeating_sounds:
-	.byte	0,0
-    .byte	0,0		| ORDINAL_1_SND,          0x01
-    .byte	1,0		| HIGHEST_SCORE_SND,      0x02
-    .byte	1,0		| HIGH_SCORE_SND,         0x03
-    .byte	0,0		| EXTRA_SOLVALOU_SND,     0x04
-    .byte	0,0		| FLYING_ENEMY_HIT_SND,   0x05
-    .byte	0,0		| GARU_ZAKATO_SND,        0x06
-    .byte	0,0		| ANDOR_GENESIS_SND,      0x07
-    .byte	0,0		| SHEONITE_SND,           0x08
-    .byte	0,0		| TELEPORT_SND,           0x09
-    .byte	0,0		| BACURA_HIT_SND,         0x0a
-    .byte	0,0		| SHOT_SND,               0x0b
-    .byte	0,0		| BOMB_SND,               0x0c
-    .byte	0,0		| BONUS_FLAG_SND,         0x0d
-    .byte	1,0		| SOLVALOU_SND,           0x0e
-    .byte	0,0
-    ** unknown origin
-    .byte	0,0		| COIN_SND,               0x10
-    .byte	0,0		| GROUND_EXPLOSION_SND,               0x11
-    .byte	0,0		| SOLVALOU_EXPLOSION_SND,               0x12
+* < D0: track start number
+play_music:
+    movem.l d0-a6,-(a7)
+    lea _custom,a6
+    lea	xevious_tunes,a0
+    sub.l   a1,a1		| samples are in the module
+    jsr _mt_init
+    * set master volume a little less loud
+    *move.w  #12,d0
+    *bsr _mt_mastervol
+    jsr _mt_start
+    movem.l (a7)+,d0-a6
+    rts
 	
 osd_kick_wdog:
     rts
@@ -1862,7 +1829,7 @@ draw_hw_sprite:
 	* A4 is a pointer on the sprite display table
 	* add a lifetime of 2 updates each time called, we'll
 	* update with the pointer on the sprite structure later
-	move.w	#2,(a4)
+	move.w	#SPRITE_LIFETIME,(a4)
 	move.w	(2,a4),d0	| previous y clipping offset
 	beq.b	7f			| no clipping to restore from previous
 	cmp.w	d4,d0
@@ -2649,6 +2616,21 @@ ingame_palette_loaded:
 	dc.b	0
 no_gfx_update:
 	dc.b	0
+	* sound variables
+sound_lock:
+	.word	0
+music_duration:
+	.word	0
+music_loops:
+	.word	0
+music_pattern:
+	.word	0
+music_tick:
+	.word	0
+sound_muted:
+	.word	0
+intro_music_counter:
+	.word	0
 nb_active_bobs:
 	.word	0
 scroll_offset:

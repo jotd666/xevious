@@ -6,12 +6,12 @@
 
 * can be worked on my own:
 
-- display sprite at y=0 doesn't work, only works with y>=16: store_sprite_pos
-  certainly receives trash when y=0, because it should work (0x2C => 0x1C in table does the job)
-- when Andrej provides the music, up sampling rate to 22 or 28k
+- add music independent volume
+- calibrate solvalou music loop
+- test highscores music loops
 - andor appearing sprite clipping is trashing the sprite, backup not working
 - andor center tile is still a bob (is that a problem?)
-- sprite lifetime system is not working for clipped y sprites as zeroing
+- sprite backup system is not working for clipped y sprites as zeroing
   the base address X/Y isn't effective if sprite is being clipped: should
   reset the sprite pointer too
 - real machine: currently lockup at start without whdload => still lockup on real machine, try from fastmem
@@ -28,7 +28,6 @@
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
 - dip switches screen
 - level 14: tile layout looks wrong (bird drawing)
-- solvalou sprite flickering on emulator. Check real hardware: check if lifetime is broken when not hit
 - optim: erase width & offset instead of 18 height
 - during the demo, insert a coin, double buffering ghost images remain
   workaround: always clear drawing screen when switching tile palettes
