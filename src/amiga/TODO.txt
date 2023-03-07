@@ -1,35 +1,46 @@
 * to see with Mark:
 
-- sprite shadow management: complete?
-  probably not for double width/height objects
 - find a way to make up for those shaking ground enemies
-- sound playing in attract mode
 - optimize main/sub code more
+- level 14: black balls start with 4 toroids!!
 
 * can be worked on my own:
 
-- real machine: retry without loadview (no whdload) (currently lockup)
-- real machine: flickering re-test with big number of enemies
-- real machine: fg tile refresh on "XEVIOUS" title slows down a lot
+- display sprite at y=0 doesn't work, only works with y>=16: store_sprite_pos
+  certainly receives trash when y=0, because it should work (0x2C => 0x1C in table does the job)
+- when Andrej provides the music, up sampling rate to 22 or 28k
+- andor appearing sprite clipping is trashing the sprite, backup not working
+- andor center tile is still a bob (is that a problem?)
+- sprite lifetime system is not working for clipped y sprites as zeroing
+  the base address X/Y isn't effective if sprite is being clipped: should
+  reset the sprite pointer too
+- real machine: currently lockup at start without whdload => still lockup on real machine, try from fastmem
+- real machine: test with more fps / enemies
+- real machine: fg tile refresh on "XEVIOUS" title slows down a lot: re-test
   maybe create a big BOB and blit it instead, skip that fg
-  tile write completely since nothing else is ever written there?
-- generate NOT tables for FG tiles to optimize tile refresh (won't be enough)
-- andor sprite remains on the bottom of the screen once destroyed: re-test
+  tile write completely since nothing else is ever written there
+  (when in "game" mode not "menu"/"title" mode)
 - glitter sprite is flashing. revert to BOB (WinUAE only issue)
 - sprites for big mothership: test including sprite clipping
-- display sprite at y=0 doesn't work, only works with y>=16
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
 - check if tiles missing (wrongly??) in level 1 too!!
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
 - dip switches screen
 - level 14: tile layout looks wrong (bird drawing)
+- solvalou sprite flickering on emulator. Check real hardware: check if lifetime is broken when not hit
+- optim: erase width & offset instead of 18 height
+- during the demo, insert a coin, double buffering ghost images remain
+  workaround: always clear drawing screen when switching tile palettes
+  (going from game to intro)
 - sheonite sprites too fast, seem to fail the sprite erase phase
-  workaround (maybe): if sheonite on screen, clear all screen (no biggie
-  because nothing else is displayed on screen)
+  or maybe because too close to the right of the screen?
+
 
 further optims:
 
+- main theme lock music counter: rather use a vbl counter because frameskip
+  can vary
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)

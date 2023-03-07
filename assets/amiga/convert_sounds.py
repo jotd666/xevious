@@ -17,13 +17,13 @@ src_dir = os.path.join(this_dir,"../../src/amiga")
 outfile = os.path.join(src_dir,"sounds.68k")
 sndfile = os.path.join(src_dir,"sound_entries.68k")
 
-hq_sample_rate = 22050
+hq_sample_rate = 16000
 lq_sample_rate = 8000
 
 loop_channel = 0
 
-sound_dict = {"CREDIT_SND":{"index":0x10,"channel":1,"sample_rate":hq_sample_rate},
-"ORDINAL_1_SND"          :{"index":0x01,"channel":loop_channel,"sample_rate":lq_sample_rate},
+sound_dict = {
+"MAIN_THEME_SND"          :{"index":0x01,"channel":loop_channel,"sample_rate":lq_sample_rate},
 "HIGHEST_SCORE_SND"      :{"index":0x02,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
 "HIGH_SCORE_SND"         :{"index":0x03,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
 "EXTRA_SOLVALOU_SND"     :{"index":0x04,"channel":3,"sample_rate":hq_sample_rate},
@@ -37,6 +37,9 @@ sound_dict = {"CREDIT_SND":{"index":0x10,"channel":1,"sample_rate":hq_sample_rat
 "BOMB_SND"               :{"index":0x0c,"channel":1,"sample_rate":hq_sample_rate},
 "BONUS_FLAG_SND"         :{"index":0x0d,"channel":3,"sample_rate":hq_sample_rate},
 "SOLVALOU_SND"           :{"index":0x0e,"channel":loop_channel,"sample_rate":lq_sample_rate,"loop":True},
+"COIN_SND":{"index":0x10,"channel":1,"sample_rate":hq_sample_rate},
+"GROUND_EXPLOSION_SND"   :{"index":0x11,"channel":3,"sample_rate":hq_sample_rate},
+"SOLVALOU_EXPLOSION_SND"   :{"index":0x12,"channel":3,"sample_rate":hq_sample_rate},
 }
 
 max_sound = max(x["index"] for x in sound_dict.values())+1
