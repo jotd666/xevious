@@ -2033,14 +2033,11 @@ check_bullets_and_flying: | $1655
     moveq     #16-1,d7                          | 16 bacura
 check_bacura: | $1665
     bsr.b     check_bacura_hit_solvalou
-    bcs.b     8f
+    bcs.b     9f
     lea       (_OBJSIZE,a1),a1                  | next object
     addq.l    #2,a3                             | next sprite coords
     dbf       d7,check_bacura
 9:  rts
-
-main_debug1:
-8:  rts
 
 check_bullet_or_flying_hit_solvalou: | $1670
     cmp.b     #2,(_STATE,a1)                    | active?
