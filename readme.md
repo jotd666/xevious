@@ -31,6 +31,7 @@ CREDITS:
 
 - Mark McDougall (aka tcdev): reverse-engineering, core and Neo Geo code and assets
 - Jean-Francois Fabre (aka jotd): Amiga code and assets
+- Andrzej Dobrowolski (aka no9): Amiga music
 - Namco: original game :)
 
 REBUILDING FROM SOURCES:
