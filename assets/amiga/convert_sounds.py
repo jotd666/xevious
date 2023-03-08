@@ -21,9 +21,9 @@ hq_sample_rate = 22050
 
 
 sound_dict = {
-"MAIN_THEME_SND"          :{"index":0x01,"pattern":0,"ticks":324,"loops":False},
-"HIGHEST_SCORE_SND"      :{"index":0x02,"pattern":3,"ticks":316,"loops":True},
-"HIGH_SCORE_SND"         :{"index":0x03,"pattern":2,"ticks":316,"loops":True},
+"MAIN_THEME_SND"          :{"index":0x01,"pattern":0,"ticks":324,"loops":False,"volume":32},
+"HIGHEST_SCORE_SND"      :{"index":0x02,"pattern":3,"ticks":316,"loops":True,"volume":32},
+"HIGH_SCORE_SND"         :{"index":0x03,"pattern":2,"ticks":316,"loops":True,"volume":32},
 "EXTRA_SOLVALOU_SND"     :{"index":0x04,"channel":3,"sample_rate":hq_sample_rate},
 "FLYING_ENEMY_HIT_SND"   :{"index":0x05,"channel":2,"sample_rate":hq_sample_rate},
 "GARU_ZAKATO_SND"        :{"index":0x06,"channel":3,"sample_rate":hq_sample_rate},
@@ -34,7 +34,7 @@ sound_dict = {
 "SHOT_SND"               :{"index":0x0b,"channel":1,"sample_rate":hq_sample_rate},
 "BOMB_SND"               :{"index":0x0c,"channel":1,"sample_rate":hq_sample_rate},
 "BONUS_FLAG_SND"         :{"index":0x0d,"channel":3,"sample_rate":hq_sample_rate},
-"SOLVALOU_SND"           :{"index":0x0e,"pattern":1,"ticks":160,"loops":True},
+"SOLVALOU_SND"           :{"index":0x0e,"pattern":1,"ticks":160,"loops":True,"volume":12},
 "COIN_SND"               :{"index":0x10,"channel":1,"sample_rate":hq_sample_rate},
 "GROUND_EXPLOSION_SND"   :{"index":0x11,"channel":3,"sample_rate":hq_sample_rate},
 "SOLVALOU_EXPLOSION_SND"   :{"index":0x12,"channel":3,"sample_rate":hq_sample_rate},
@@ -97,7 +97,7 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
         sound_index = details["index"]
         channel = details.get("channel")
         if channel is None:
-            sound_table_simple[sound_index] = "\t.word\t{},{},{},{}\n".format(2,details["pattern"],details["ticks"],int(details["loops"]))
+            sound_table_simple[sound_index] = "\t.word\t{},{},{}\n\t.byte\t{},{}\n".format(2,details["pattern"],details["ticks"],details["volume"],int(details["loops"]))
             continue
         wav_name = os.path.basename(wav_entry).lower()[:-4]
         wav_file = os.path.join(sound_dir,wav_name+".wav")

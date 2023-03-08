@@ -418,7 +418,7 @@ _vblank:
 	beq.b	13f
 	subq.w	#1,d1
 	bne.b	12f
-	tst.w	music_loops
+	tst.b	music_loops
 	beq.b	14f
 	* tick ended: reload & play
 	move.w	music_duration,d1
@@ -533,7 +533,8 @@ osd_sound_start:
 	* load up the countdown if loop
 	move.w	(2,a0,d0.w),d1	| pattern number in .mod file
 	move.w	(4,a0,d0.w),d2
-	move.w	(6,a0,d0.w),music_loops
+	move.b	(6,a0,d0.w),music_volume
+	move.b	(7,a0,d0.w),music_loops
 	move.w	d1,music_pattern
 	move.w	d2,music_duration
 	* since it's not zero, next vbl tick will play the music
@@ -564,9 +565,11 @@ play_music:
     lea	xevious_tunes,a0
     sub.l   a1,a1		| samples are in the module
     jsr _mt_init
-    * set master volume a little less loud
-    *move.w  #12,d0
-    *bsr _mt_mastervol
+    * set master volume a little less loud if needed
+    moveq	#0,d0
+	move.b	music_volume(pc),d0
+    jsr	_mt_mastervol
+0:
     jsr _mt_start
     movem.l (a7)+,d0-a6
     rts
@@ -2622,7 +2625,9 @@ sound_lock:
 music_duration:
 	.word	0
 music_loops:
-	.word	0
+	.byte	0
+music_volume:
+	.byte	0
 music_pattern:
 	.word	0
 music_tick:
