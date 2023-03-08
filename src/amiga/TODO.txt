@@ -6,7 +6,6 @@
 
 * can be worked on my own:
 
-- add music independent volume
 - calibrate solvalou music loop
 - test highscores music loops
 - andor appearing sprite clipping is trashing the sprite, backup not working
@@ -20,7 +19,6 @@
   maybe create a big BOB and blit it instead, skip that fg
   tile write completely since nothing else is ever written there
   (when in "game" mode not "menu"/"title" mode)
-- glitter sprite is flashing. revert to BOB (WinUAE only issue)
 - sprites for big mothership: test including sprite clipping
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
@@ -38,8 +36,6 @@
 
 further optims:
 
-- main theme lock music counter: rather use a vbl counter because frameskip
-  can vary
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)

@@ -1064,7 +1064,8 @@ FG_TILE_CLEAR = 3
 
 * d0: offset
 * d1: tile code
-* d2: attribute
+* d2: attribute (note: vertical flip attribute isn't
+*     used, only for cocktail mode, so not tested here)
 * d3: draw mode (see FG_TILE_DRAW... above)
 * most other registers are killed
 
@@ -1143,29 +1144,20 @@ update_fg_tile:
 	.endif
 	
 	* draw
-	btst	#7,d4
-	bne	2f
 	.set	offset,0
 	.rept		8
 	SET_FG_BYTE
 	.set	offset,offset+NB_BYTES_PER_ROW
 	.endr
-	rts
-2:
-	.set	offset,NB_BYTES_PER_ROW*7
-	.rept		8
-	SET_FG_BYTE
-	.set	offset,offset-NB_BYTES_PER_ROW
-	.endr
 3:
 	rts
+
 5:
 	cmp.w	#FG_TILE_CLEAR,d3
 	beq	6f
 	* or it. This is the "tile refresh" mode. We just need
 	* to refresh the back buffer, not the one being shown
-	btst	#7,d4
-	bne	2f
+
 	* try to super-optimize it because it costs cycles
 	* here by pre-fetching the source in 32 bits, and shifting
 	* we can even use or.b dreg,memory which is not possible
@@ -1202,35 +1194,7 @@ update_fg_tile:
 	dbf		d3,10b
 	
 	rts
-2:
-	* or, flipped tile: note this seems never reached
-	* fg tiles don't seem to need flipping
-	.set	offset,NB_BYTES_PER_ROW*4
-	.rept		2
-	move.l	(a0)+,d1
-	or.b	d1,(offset,a1)
-	lsr.w	#8,d1
-	or.b	d1,(1*NB_BYTES_PER_ROW+offset,a1)
-	swap	d1
-	or.b	d1,(2*NB_BYTES_PER_ROW+offset,a1)
-	lsr.w	#8,d1
-	or.b	d1,(3*NB_BYTES_PER_ROW+offset,a1)
-	.set	offset,offset-4*NB_BYTES_PER_ROW
-	.endr
-	* now remove all bits of the character on other planes
-	* to respect the original color
-	PREP_FG_MASK_LOOP
-20:
-	move.l	a2,a0
-	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
-	.set	offset,NB_BYTES_PER_ROW*7
-	.rept		8
-	AND_FG_BYTE
-	.set	offset,offset-NB_BYTES_PER_ROW
-	.endr
-	dbf		d3,20b
-3:
-	rts
+
 6:
 	* clear
 	* because systematic tile refresh is optimized
