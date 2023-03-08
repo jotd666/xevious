@@ -144,6 +144,8 @@
 .equ BIOS_STATCHANGE,     0x10FDAD    | previous joystick 1/2 start/select
 .equ BIOS_USER_REQUEST,   0x10FDAE
 .equ BIOS_USER_MODE,      0x10FDAF
+.equ BIOS_CREDIT_DEC1,    0x10FDB0
+.equ BIOS_CREDIT_DEC2,    0x10FDB1
 .equ BIOS_START_FLAG,     0x10FDB4
 .equ BIOS_MESS_POINT,     0x10FDBE
 .equ BIOS_MESS_BUSY,      0x10FDC2

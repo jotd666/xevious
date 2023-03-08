@@ -143,6 +143,8 @@ sub_fn_4__handle_credits_and_start: | $0227
     jsr       osd_read_coin
     beq.b       1f
     * add a credit
+    cmp.b     #0x99,(num_credits)               | max credits?
+    beq.b     1f                                | yes, exit
     moveq     #1,d0
     move.b    (num_credits),d1
     abcd      d0,d1

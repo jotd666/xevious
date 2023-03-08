@@ -1138,34 +1138,42 @@ osd_read_p2_inputs:
     bra       osd_read_p1_inputs
     rts
 
+* coin in d0 and set Z flag on exit too
 osd_read_coin:
     tst.b     (BIOS_MVS_FLAG)
     beq       home_use
 *   The NEO GEO BIOS handles credits and coins for you
-*   so we always use 1C1C here and let DK handle the
+*   so we always use 1C1C here and let Xevious handle the
 *   actual credits itself
-    lea       0x10fdb0.l,a0
-    move.w    #0x0100,(a0)
+    * check KW dips first
+    moveq     #0,d0                             | default no coin
+    *btst.b    #6,(REG_DIPSW)                    | freeplay (active low)?
+    *bne.b     0f                                | no, go
+    * how do we handle freeplay setting?
+    *bra       9f
+0:  lea       BIOS_CREDIT_DEC1.l,a0
+    move.l    a0,-(a7)
+    move.w    #0x0100,(a0)                      | PLAYER1 1C1C
     jsr       BIOSF_CREDIT_CHECK
-    lea       0x10fdb0.l,a0
-    move.w    (a0),d0
-    cmpi.w    #0x0100,d0
-    beq       1f
-    moveq     #0,d0
+    move.l    (a7)+,a0
+    move.w    (a0),d1                           | read result
+    cmpi.w    #0x0100,d1                        | enough credits?
+    beq.b     1f                                | yes, skip
     bra       9f
-1:  jsr       BIOSF_CREDIT_DOWN
+1:  jsr       BIOSF_CREDIT_DOWN                 | deduct credit
     bra       coin_inserted
 home_use:   
     * fix me
     move.b    (BIOS_STATCHANGE),d6
     btst.b    #1,d6                             | <SELECT> changed?
-    beq       9f                                | no, skip
-    move.b    BIOS_STATCURNT,d0                 | read start buttons
-    btst.b    #1,d0                             | <SELECT> pressed?
-    beq       9f
+    beq.b     9f                                | no, skip
+    move.b    BIOS_STATCURNT,d1                 | read start buttons
+    btst.b    #1,d1                             | <SELECT> pressed?
+    beq.b     9f
 coin_inserted:    
     moveq     #1,d0
-9:  rts
+9:  tst.b     d0
+    rts
     
 osd_read_start:
     move.b    BIOS_STATCURNT,d0                 | bit0=P1, bit2=P2
