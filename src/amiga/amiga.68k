@@ -54,6 +54,10 @@ REMAINING_SPRITE_STRUCT_BITS = 6
 
 BLANK_FG_TILE_ID = 0x24
 
+* sprite lifetime/backup structure
+
+*slb_FUCK
+
 	bra	_user
 
 | write current PC value to some address
@@ -1278,6 +1282,7 @@ osd_update_sprite_shadow:
 	neg.w	d2
 	add.w	#32*8,d2
 	move.w	d2,(a4)+
+	addq.w	#4,a4		| skip 4 last bytes of the structure
 2:	
 	lea		(_OBJSIZE,a5),a5
 	dbf				d7,1b
@@ -1348,10 +1353,24 @@ osd_update_32_sprite_hw:
 3:
 	
 	move.l		fg_drawed_screen_ptr(pc),a1
-    move.w  #18,d3	| height
 	move.w	#4,d2	| width
 	* depending on double height/width properties, double amounts
 	move.b	(1,a5),d0	| attributes
+	* it's better to optimize erase height
+	* but doing that when d1 = 0 causes issues so skip
+	* the height change in that case (and also if double width
+	* and height)
+	*
+	* the erase optimization is already very efficient with
+	* solvalou and enemy bullets which have a small height
+	*
+	tst.w	d1
+	beq.b	30f
+	and.b	#3,d0
+	beq.b	310f
+30:
+    move.w  #18,d3	| max height
+	
 	btst	#0,d0		| double width (height on rotated display)
 	beq.b	31f
 	add.w	#16,d3
@@ -1359,6 +1378,15 @@ osd_update_32_sprite_hw:
 	btst	#1,d0		| double height (width on rotated display)
 	beq.b	32f
 	add.w	#2,d2
+	bra.b	32f
+	* simple width & height
+	* we optimize height & y-start
+310:
+	* add Y-offset (possibly 0, but > 0 for shots & small object)
+	add.w	(8,a5),d1
+	* set exact height (may be smaller than 16)
+	move.w	(10,a5),d3
+	addq.w	#2,d3
 32:
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
@@ -1517,7 +1545,7 @@ osd_update_32_sprite_hw:
 	lea		(NB_SPRITES_TO_UPDATE*SPRITE_MEM_SIZE,a5),a5
 3:
 	* copy one sprite backup structure (multiple of 4 bytes) 32 times
-	.rept	2   | 8/4 change if SPRITE_MEM_SIZE changes!!
+	.rept	3   | 12/4 change if SPRITE_MEM_SIZE changes!!
 	move.l	(a4)+,(a5)+
 	.endr
 	dbf		d0,3b
@@ -1619,7 +1647,7 @@ sprite_draw_jump_table:
 * < D3: Y
 * < D5: X
 * < A3: bitplane pointer list
-
+* < A4: sprite structure (to update height & y-offset)
 * trashed registers: A0
 sprite_draw_double_width:
 	bsr		draw_sprite_part
@@ -1658,6 +1686,7 @@ sprite_draw_double_height:
 * < D3: Y
 * < D5: X
 * < A3: graphical object structure (bobs or sprites)
+* < A4: sprite structure (to update height & y-offset)
 
 * trashed registers: A0
 
@@ -1712,8 +1741,13 @@ draw_sprite_part:
 	subq.w	#8,d0		| sprite X offset
 	move.w	d3,d1		| restore y
 	* bob: get params
-	add.w	(a0)+,d1	| y offset
+	move.w	(a0)+,d4	| y offset
 	move.w	(a0)+,d3	| height
+	* update sprite structure (to optimize single width/height
+	* sprite erases)
+	move.w	d4,(8,a4)
+	move.w	d3,(10,a4)
+	add.w	d4,d1		| apply Y offset
 	* attributes remain in d2
 	bsr	blit_16x_bob
 2:
@@ -2563,7 +2597,7 @@ wait_blit:
 	MUL_TABLE	NB_BYTES_PER_ROW,512
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512
 
-SPRITE_MEM_SIZE = 8
+SPRITE_MEM_SIZE = 12
 current_sprite_state:
 	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 previous_sprite_state_ptr:

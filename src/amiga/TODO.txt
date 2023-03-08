@@ -26,7 +26,6 @@
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
 - dip switches screen
 - level 14: tile layout looks wrong (bird drawing)
-- optim: erase width & offset instead of 18 height
 - during the demo, insert a coin, double buffering ghost images remain
   workaround: always clear drawing screen when switching tile palettes
   (going from game to intro)
