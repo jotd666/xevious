@@ -563,7 +563,7 @@ platform_init:
 splash:
     *         "  [--------------------------]  "
     .ascii    "                                "
-    .ascii    "            XEVIOUS     Beta1   "
+    .ascii    "            XEVIOUS     Beta2   "
     .ascii    "                                "
     .ascii    "            NGH 420             "
     .ascii    "                                "
@@ -604,7 +604,7 @@ splash:
     .align 2
 
 splash_attr:
-    .word     0x0000, 0x0000, 0x0000, 0x0000
+    .word     0x2000, 0x2000, 0x2000, 0x0000
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
     .word     0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000, 0x1000
