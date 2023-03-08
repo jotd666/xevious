@@ -24,12 +24,12 @@ OPT_ENABLE_DOUBLE_BUFFERING = 1
 * empiric values of number of 16x16 bob objects
 * currently displayed. Allows to adapt framerate
 * and avoid flicker/slowdowns
-* 12 & 24 seem to work ok on A1200 68060/50
-*MEDIUM_SPRITES_THRESHOLD = 12
-*HIGH_SPRITES_THRESHOLD = 24
+* >= 64 is useless as 64 sprites are updated per frame
+*MEDIUM_SPRITES_THRESHOLD = 24
+*HIGH_SPRITES_THRESHOLD = 48
 
-MEDIUM_SPRITES_THRESHOLD = 16
-HIGH_SPRITES_THRESHOLD = 32
+MEDIUM_SPRITES_THRESHOLD = 36
+HIGH_SPRITES_THRESHOLD = 50
 
 _custom = 0xDFF000
 
@@ -418,25 +418,23 @@ _vblank:
 	bne.b	0f
 	bsr		toggle_pause
 0:
+	* if music loops, no need to play it again and again
+	* ticks aren't important either
+	tst.b	music_loops
+	bne.b	13f
+	* here music doesn't loop. We have to stop it when it ends
 	move.w	music_tick(pc),d1
 	beq.b	13f
 	subq.w	#1,d1
-	bne.b	12f
-	tst.b	music_loops
-	beq.b	14f
-	* tick ended: reload & play
-	move.w	music_duration,d1
-	move.w	music_pattern(pc),d0
-	bsr		play_music
-12:
 	move.w	d1,music_tick
+	bne.b	13f
+	* only music that doesn't loop: intro music
+	* now it's over so let other tunes play
+	clr.b	sound_lock
 13:
 	move.w	#0x20,_custom+intreq	
 	bra.b	3f
-14:
-	* only music that doesn't loop: intro
-	clr.b	sound_lock
-	bra.b	12b
+
 1:
  	clr.b	no_gfx_update
     move.w  vbl_counter(pc),d0
@@ -531,8 +529,11 @@ osd_sound_start:
 	movem.l	(a7)+,d0/a0/a6
 	rts
 3:
+	* don't play if already playing
+	* (music_tick value is not important for looped tunes
+	* as long as it's not zero)
 	tst.w	music_tick
-	bne.b	4f		| don't play if already playing
+	bne.b	4f
 	* play the proper module pattern
 	* load up the countdown if loop
 	move.w	(2,a0,d0.w),d1	| pattern number in .mod file
@@ -549,14 +550,14 @@ osd_sound_start:
 	bra.b	1b
 
 * sound stop is only called on sounds that are
-* actually tunes. It's also called on bomb but we'll ignore
-* that since it's useless
+* actually tunes. It's also called on bomb but we'll skip it
+* that since it's harmful to music replay
 osd_sound_stop:
 	movem.l	d0/a6,-(a7)
 	cmp.w	#12,d0
-	beq.b	0f		| stop bomb makes no sense and stops the music!!
+	beq.b	0f		| stop bomb sound makes no sense and stops the music!!
 	lea		_custom,a6
-    clr.w   music_tick
+    clr.w   music_tick   | not playing anymore
     jsr		_mt_end
 0:
 	movem.l	(a7)+,d0/a6
@@ -1318,8 +1319,11 @@ AS_SECOND = 16
 osd_update_32_sprite_hw:
 	tst.b	no_gfx_update
 	bne.b	out
-	clr.w	nb_active_bobs
 	move.w	d0,d7
+	bne.b	0f
+	* reset number of active bobs only at first call
+	clr.w	nb_active_bobs
+
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
@@ -1701,7 +1705,7 @@ draw_sprite_part:
 	* (there are 2 versions of the sprite normal,mirror for each
 	* color configuration)
 	add.w	d1,d1
-	* d1 times 128*2 (<<8) is the row start pointer
+	* d0 times 128*2 (<<8) is the row start pointer
 	lsl.l	#8,d0
 
 	lea		_sprite_tile,a0

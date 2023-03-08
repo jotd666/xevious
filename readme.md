@@ -6,7 +6,7 @@ The original GAME and SUB CPU ROMs were disassembled and reverse-engineered. The
 
 The original target is the Neo Geo (AES/MVS/CD). It runs in 'tate' mode.
 
-Subsequent targets include the Amiga (requirements TBD).
+Subsequent targets include the AGA Amiga.
 
 In theory the core can be ported easily to any 68K target that can support the resolution, number of sprites (performance) and palette.
 
