@@ -215,6 +215,7 @@ out\@:
     .global _end_of_ng_code
     .global _end_of_ng_data
     
+	
 	.include	"ReadJoypad.i"
 	.include	"whdload_funcs.i"
 		.text
@@ -1075,9 +1076,9 @@ FG_TILE_CLEAR = 3
 * most other registers are killed
 
 update_fg_tile:
-	lea		_fg_tile,a0
 	and.w	#0xFF,d1
-	
+	move.w	d1,d6		| save tile ID unchanged
+	lea		_fg_tile,a0
 	cmp.w	#BLANK_FG_TILE_ID,d1
 	bne.b		0f
 	move.w	#FG_TILE_CLEAR,d3
@@ -1124,7 +1125,23 @@ update_fg_tile:
 	move.l	(a1,d1.w*4),a1	
 	.endif
 	move.w	d2,(a1)			| color palette index
+
+	* now we don't want to display the XEVIOUS attract mode
+	* tiles as it has to be redrawn all the time tile by
+	* tile using CPU and it's super-slow and flickers
+	* filter out most of those tiles
+	cmp.b	#215,d6
+	bne.b	11f
+	* a tile from the title. Just present once
+	* hack: blit the whole title when encountered
+	bra	blit_xevious_title
 	
+11:
+	cmp.b	#138,d6
+	bcs.b	0f
+	cmp.b	#219,d6
+	bcc.b	0f
+	rts
 0:
 	cmp.w	#FG_TILE_DRAW_COLOR,d3
 	bne.b	4f
@@ -1610,6 +1627,7 @@ osd_update_32_sprite_hw:
 	clr.w	(8,a2)	
 	bra.b	10b
 20:
+
 	.endif  | OPT_DISABLE_SPRITES
 	*clr.w	_custom+color
 	
@@ -2448,6 +2466,41 @@ blit_16x_bob:
 2:
 	movem.l	(a7)+,d2-d6/a0-a5
 	rts
+
+* what: blits XEVIOUS attract mode title
+blit_xevious_title:
+    movem.l d0-d7/a1-a5,-(a7)
+    lea _custom,A5
+	move.w	#52,d0
+	move.w	#128-48,d1
+	
+	move.w	#48,d4
+	moveq	#-1,d3		|masking of first/last word    
+    move.w  #176/8+2,d2
+	move.l	fg_drawed_screen_ptr(pc),a2
+	move.l	a2,a1
+	lea		xevious_title,a0
+	move.l	a0,a3		| mask is the same
+    bsr blit_plane_any_internal_cookie_cut
+	
+	* A1 points directly to destination, reuse it
+	* and set X and Y to zero (no offset computation)
+	* to remove 1 bits under the title
+	moveq	#2,d7
+0:
+	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
+	move.l	a1,a2
+	moveq	#0,d0
+	moveq	#0,d1
+	move.w	#48,d4
+	moveq	#-1,d3		|	masking of first/last word    
+    move.w  #176/8+2,d2
+	lea		xevious_title,a3
+    bsr blit_plane_any_internal_cookie_cut_blank_source
+	dbf		d7,0b
+	
+    movem.l (a7)+,d0-d7/a1-a5
+	rts
 	
 * what: blits 16x16 data on one plane, cookie cut
 * args:
@@ -2519,6 +2572,102 @@ blit_plane_any_internal_cookie_cut:
     swap    d1
     clr.w   d1
     swap    d1
+    beq   2f    | optim
+	.ifdef	NO68020
+	add.w	d1,d1
+    move.w  (a4,d1.w),d1	| y times 40
+	.else
+    move.w  (a4,d1.w*2),d1	| y times 40
+	.endif
+	add.w	d1,a2			| Y plane position for background
+2:
+    move.l  #0x0fca0000,d5    | B+C-A->D cookie cut   
+
+    move    d0,d6
+    beq   4f
+    asr.w   #3,d0
+	bclr	#0,d0
+    and.w   #0xF,d6
+	beq	3f
+
+    lsl.l   #8,d6
+    lsl.l   #4,d6
+    or.w    d6,d5            | add shift to mask (bplcon1)
+    swap    d6
+    clr.w   d6
+    or.l    d6,d5            | add shift
+3:   
+    move.w  d0,d6
+    add.w   d0,d1
+    
+4:
+    * make offset even. Blitter will ignore odd address
+    * but a 68000 CPU doesn't and since we RETURN A1...
+    bclr    #0,d1
+    add.l   d1,a1       | plane position (long: allow unsigned D1)
+
+    add.w   d6,a2       | X offset for background
+
+	move.w	#NB_BYTES_PER_ROW,d0
+	tst.w	d4
+	bpl.b	5f
+	neg.w	d0
+	neg.w	d4    | make d4 positive again
+5:
+
+    sub.w   d2,d0       | blit width
+    lsl.w   #6,d4
+    lsr.w   #1,d2
+    add.w   d2,d4       | blit height
+
+    * always the same settings (ATM)
+
+    * now just wait for blitter ready to write all registers
+	bsr	wait_blit
+    
+    * blitter registers set
+
+    move.l  d3,bltafwm(a5)
+	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
+	clr.w bltbmod(a5)		|A modulo=bytes to skip between lines
+	move.l d5,bltcon0(a5)	| sets con0 and con1
+
+    move.w  d0,bltcmod(a5)	|C modulo
+    move.w  d0,bltdmod(a5)	|D modulo
+							
+	move.l a3,bltapt(a5)	|source graphic top left corner (mask)
+	move.l a0,bltbpt(a5)	|source graphic top left corner
+	move.l a2,bltcpt(a5)	|pristine background top (bottom) left corner
+	move.l a1,bltdpt(a5)	|destination top (bottom) left corner
+	move.w  d4,bltsize(a5)	|rectangle size, starts blit
+    
+    movem.l (a7)+,d0-d6/a2/a4
+    rts
+
+* < A5: custom
+* < D0.W,D1.W: x,y
+* < A1: destination
+* < A2: background to mix with cookie cut
+* < A3: source mask for cookie cut
+* < D2: width in bytes (inc. 2 extra for shifting)
+* < D3: blit mask
+* < D4: height. If negative, source is copied with negative modulo (flip)*       
+* blit mask set
+* returns: start of destination in A1 (computed from old A1+X,Y)
+* trashes: a1
+
+blit_plane_any_internal_cookie_cut_blank_source:
+    movem.l d0-d6/a2/a4,-(a7)
+    * pre-compute the maximum of shit here
+    lea		mulNB_BYTES_PER_ROW_table,a4
+	tst.w	d4
+	bpl.b	1f
+	sub.w	d4,d1	| pre-add height to d1
+	subq.w	#1,d1	| minus one
+1:	
+    swap    d1
+    clr.w   d1
+    swap    d1
     beq   .d1_zero    | optim
 	.ifdef	NO68020
 	add.w	d1,d1
@@ -2528,7 +2677,7 @@ blit_plane_any_internal_cookie_cut:
 	.endif
 	add.w	d1,a2			| Y plane position for background
 .d1_zero:
-    move.l  #0x0fca0000,d5    | B+C-A->D cookie cut   
+    move.l  #0x0bca0000,d5    | C-A->D cookie cut   
 
     move    d0,d6
     beq   .d0_zero
@@ -2579,11 +2728,11 @@ blit_plane_any_internal_cookie_cut:
 	clr.w bltbmod(a5)		|A modulo=bytes to skip between lines
 	move.l d5,bltcon0(a5)	| sets con0 and con1
 
-    move.w  d0,bltcmod(a5)	|C modulo
+ 	move.w  #0,bltbdat(a5)	|B word is zero
+	move.w  d0,bltcmod(a5)	|C modulo
     move.w  d0,bltdmod(a5)	|D modulo
 							
 	move.l a3,bltapt(a5)	|source graphic top left corner (mask)
-	move.l a0,bltbpt(a5)	|source graphic top left corner
 	move.l a2,bltcpt(a5)	|pristine background top (bottom) left corner
 	move.l a1,bltdpt(a5)	|destination top (bottom) left corner
 	move.w  d4,bltsize(a5)	|rectangle size, starts blit

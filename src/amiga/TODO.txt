@@ -15,16 +15,13 @@
   reset the sprite pointer too
 - real machine: currently lockup at start without whdload => still lockup on real machine, try with color codes at start
   => set custom copperlist, change color at each step
-- real machine: test with more fps / enemies: seems to be ok except when title is displayed
-- real machine: fg tile refresh on "XEVIOUS" title slows down a lot: re-test
-  maybe create a big BOB and blit it instead, skip that fg
-  tile write completely since nothing else is ever written there
-  (when in "game" mode not "menu"/"title" mode)
+- real machine: test with more fps / enemies
+- blitted attract mode title: problems with masking on some bitplanes...
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
 - level 14: tile layout looks wrong (bird drawing)
-- sheonite sprites too fast, seem to fail the sprite erase
+- sheonite sprites too fast, seem to fail the sprite erase: log shenonite display & erase coords (code 48-57)
 - implement dip switches screen ??
 
 

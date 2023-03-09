@@ -19,7 +19,7 @@ WHDASM = vasmm68k_mot -DDATETIME -I$(HDBASE)/amiga39_JFF_OS/include -I$(WHDBASE)
 
 
 # leave MAIN_OBJ first
-OBJS = $(MAIN_OBJ) sprite_specific.o sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
+OBJS = $(MAIN_OBJ) sprite_specific.o title.o sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
 all: $(AMIGASRC)/graphics.68k $(AMIGASRC)/sounds.68k $(MAIN) $(WHDLOADER) $(WHDLOADER_CHIP)
 
 clean:
@@ -52,6 +52,8 @@ ReadJoyPad.o: $(AMIGASRC)/ReadJoyPad.68k amiga/ReadJoyPad.i
 	$(ASM) -I$(AMIGASRC) $(AMIGASRC)/ReadJoyPad.68k -o ReadJoyPad.o
 graphics.o: $(AMIGASRC)/graphics.68k xevious.inc
 	$(ASM) $(AMIGASRC)/graphics.68k -o graphics.o
+title.o: $(AMIGASRC)/title.68k
+	$(ASM) $(AMIGASRC)/title.68k -o title.o
 
 $(WHDLOADER) : $(SOURCE)
 	wdate.py> datetime
