@@ -40,7 +40,7 @@ endif
 
 OBJDIR = obj\$(OUTPUT)
 BINDIR = bin\$(OUTPUT)
-ASSETDIR = assets\$(OUTPUT)
+ASSETDIR = assets\$(PLATFORM)\$(OUTPUT)
 ISODIR = iso
 
 ##############################
