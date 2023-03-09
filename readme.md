@@ -14,7 +14,7 @@ PROGRESS:
 
 The core transcode is 100% complete. One "last" gameplay bug to be confirmed.
 
-The Neo Geo target is playable with sound on an emulator and also on real hardware (tested on an AES with NeoSD cartridge and NGCD).
+The Neo Geo target is playable with sound on an emulator and also on real hardware (tested on an AES with NeoSD cartridge and NGCD). Beta1 has been released (https://tcdev.itch.io/xevious).
 
 The Amiga target is playable.
 
