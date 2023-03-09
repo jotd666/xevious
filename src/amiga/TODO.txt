@@ -6,6 +6,7 @@
 
 * can be worked on my own:
 
+- andor genesis sound replays 
 - still missing sprites at area 14? (blue flashes)
 - crash in draw_sprite_part (area 14): log parameters? (maybe because of bad andor clipping too)
 - andor appearing sprite clipping is trashing the sprite, backup not working
@@ -16,7 +17,6 @@
 - real machine: currently lockup at start without whdload => still lockup on real machine, try with color codes at start
   => set custom copperlist, change color at each step
 - real machine: test with more fps / enemies
-- blitted attract mode title: problems with masking on some bitplanes...
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
