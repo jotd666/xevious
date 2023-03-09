@@ -3,7 +3,6 @@
 PLATFORM = neogeo
 #PLATFORM = amiga
 TARGET = xevious
-FQTN = $(TARGET).bin
 NGH = 0x0420
 
 #######################################
@@ -29,7 +28,6 @@ RM = rm
 INCLUDES = -I src -I src/$(PLATFORM)/include -I src/$(PLATFORM) -I src/$(PLATFORM)/include/$(OUTPUT)
 INCDIR = $(BASEDIR)/m68k/include
 LIBDIR = $(BASEDIR)/m68k/lib
-OBJDIR = obj
 
 ###################################
 # Output: {cart, cd} *lower case* #
@@ -40,6 +38,11 @@ ifeq ($(OUTPUT),)
 	OUTPUT = cart
 endif
 
+OBJDIR = obj\$(OUTPUT)
+BINDIR = bin\$(OUTPUT)
+ASSETDIR = assets\$(OUTPUT)
+ISODIR = iso
+
 ##############################
 # Object Files and Libraries #
 ##############################
@@ -48,6 +51,8 @@ OBJS = 	$(OBJDIR)/$(PLATFORM).o \
 				$(OBJDIR)/xevious_main.o \
 				$(OBJDIR)/xevious_sub.o \
 				$(OBJDIR)/map_rom.o
+
+BIN = $(BINDIR)\$(TARGET).bin
 								
 #LIBS = -linput -lprocess -lmath -lvideo -lc -lgcc
 
@@ -65,64 +70,82 @@ DEBUG = -g
 
 GUID = 202
 ifeq ($(OUTPUT),cart)
-  DRIVER = puzzledp
+  ISO = 
   P_SIZE = 1024
-	PRG = $(GUID)-p1.p1
-	SPRITES = $(GUID)-c?.*
-	OUTDIR = roms/$(DRIVER)
+	P1 = $(BINDIR)\$(TARGET).p1
+	C1 = $(BINDIR)\$(TARGET).c1
+	C2 = $(BINDIR)\$(TARGET).c2
+	FIX = $(ASSETDIR)\$(TARGET).s1
+	M1 = $(ASSETDIR)\$(TARGET).m1
+	V1 = $(ASSETDIR)\$(TARGET).v1
+	SPRITES = $(C1) $(C2)
+  ASSETS = $(M1) $(V1)
+	OUTPUT_INSTALL = install_cart
+	MAMEROMDIR = roms\neogeo\xevious
 endif
+
 ifeq ($(OUTPUT),cd)
-  DRIVER = joyjoy
-	PRG = PB_PROG.PRG
-	SPRITES = *.SPR
-	OUTDIR = cds/$(DRIVER)
+  ISO = $(ISODIR)\$(TARGET).iso
+	PRG = $(BINDIR)\$(TARGET).PRG
+	SPRITES = $(ASSETDIR)\$(TARGET).SPR
+	FIX = $(ASSETDIR)\$(TARGET).FIX
+	Z80 = $(ASSETDIR)\$(TARGET).Z80
+	PCM = $(ASSETDIR)\$(TARGET).PCM
+	ASSETS = $(Z80) $(PCM)
+	OUTPUT_INSTALL = install_cd
+	MAMEROMDIR = roms\neocdz
 endif
 
 ##############
 # Make rules #
 ##############
 
-.PHONY : directories
-
-all : directories $(PRG) $(FQTN)
 .PHONY : all
+.PHONY : directories
+.PHONY : install
 
-directories : $(OBJDIR) $(OUTDIR)
+all : directories $(ISO) $(P1) $(PRG) $(SPRITES)
 
+directories : $(OBJDIR) $(BINDIR) $(ISODIR)\contents
+	
 $(OBJDIR) :
 	$(MD) $(OBJDIR)
 
-$(OUTDIR) :
-	$(MD) $(OUTDIR)
+$(BINDIR) :
+	$(MD) $(BINDIR)
 
-ifeq ($(OUTPUT),cart)
+$(ISODIR)\contents :
+	$(MD) $(ISODIR)\contents
 
-$(PRG): $(FQTN) $(GUID)-c1.c1 $(GUID)-c2.c2 
+### CART
+
+$(P1) : $(BIN)
 	$(OBJC) --gap-fill=0x00 --pad-to=0x20000 -R .data -O binary $< $@
 	@romwak /f $@ >nul:
 	@romwak /p $@ $@ $(P_SIZE) 255 >nul:
-	@copy $@ roms\$(DRIVER)
 
-%.s1 : %.bin
-	@copy $< roms\$(DRIVER)\$@
-
-%.c1 %.c2 %.c3 %.c4 %.c5 %.c6 : %.bin
+$(C1) : $(ASSETDIR)/$(TARGET)-c1.bin
 	@romwak /p $< $@ 1024 255 > nul:
-	@copy $@ roms\$(DRIVER)
+	
+$(C2) : $(ASSETDIR)/$(TARGET)-c2.bin
+	@romwak /p $< $@ 1024 255 > nul:
 
-else
+### CD
 
-$(PRG): $(FQTN) PB_CHR.SPR
+$(ISO) : $(PRG) $(SPRITES)
+	@copy $(ASSETDIR)\*.* $(ISODIR)\contents
+	@copy $(PRG) $(ISODIR)\contents
+	$(RM) -f $(ISO)
+	mkisofs -iso-level 1 -o $(ISO) -pad -N -V "$(TARGET)" $(ISODIR)\contents
+
+#chdman createcd -f -i cds\$(TARGET).iso -o "roms/neocd/$(DRIVER)/puzzled (1994)(snk)(jp-us)[joy joy kid].chd"
+  
+$(PRG): $(BIN)
 	$(OBJC) -O binary $< $@
-	@copy $@ cds\$(DRIVER)
-	@copy PB_CHR.SPR cds\$(DRIVER)
-	$(RM) -f cds\$(TARGET).iso
-	mkisofs -iso-level 1 -o cds\$(TARGET).iso -pad -N -V "$(TARGET)" cds\$(DRIVER)
-	chdman createcd -f -i cds\$(TARGET).iso -o "roms/neocd/$(DRIVER)/puzzled (1994)(snk)(jp-us)[joy joy kid].chd"
 
-endif
+### CART & CD
 
-$(FQTN) : $(OBJS) src/$(PLATFORM)/neo$(OUTPUT).x makefile
+$(BIN) : $(OBJS) src/$(PLATFORM)/neo$(OUTPUT).x makefile
 	$(LD) -L$(LIBDIR) $(CCFLAGS) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
 
 $(OBJDIR)/%.o : src/$(PLATFORM)/%.68k makefile
@@ -131,11 +154,29 @@ $(OBJDIR)/%.o : src/$(PLATFORM)/%.68k makefile
 $(OBJDIR)/%.o : src/%.68k src/xevious.inc makefile
 	$(AS) -a=$*.lst $(ASFLAGS) $< -o $@
 
+### CLEAN AND INSTALL
+
 clean:
-	$(RM) -f $(OBJDIR)/*.*
-	$(RM) -f $(FQTN)
-	$(RM) -f $(PRG)
-	$(RM) -f $(GUID)-c?.c?
-	$(RM) -f $(OUTDIR)/$(PRG)
-	$(RM) -f $(OUTDIR)/$(SPRITES)
+	$(RM) -Rf obj
+	$(RM) -Rf bin
+	$(RM) -Rf iso
 	
+clean_install: clean $(INSTALL_OUTPUT)	
+	$(RM) -f $(MAMEROMDIR)\*.p1
+	$(RM) -f $(MAMEROMDIR)\*.s1
+	$(RM) -f $(MAMEROMDIR)\*.c?
+	$(RM) -f $(MAMEROMDIR)\*.m1
+	$(RM) -f $(MAMEROMDIR)\*.v1
+
+install_cart:
+	@copy $(P1) $(MAMEROMDIR)
+	@copy $(FIX) $(MAMEROMDIR)
+	@copy $(C1) $(MAMEROMDIR)
+	@copy $(C2) $(MAMEROMDIR)
+	@copy $(M1) $(MAMEROMDIR)
+	@copy $(V1) $(MAMEROMDIR)
+  
+install_cd:
+	@copy $(ISO) $(MAMEROMDIR)
+  
+install: all $(OUTPUT_INSTALL)
