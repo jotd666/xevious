@@ -43,15 +43,13 @@ Prerequesites:
 - Windows
 - NeoDev kit (Fabrice Martinez, Jeff Kurtz, et al)  
   https://wiki.neogeodev.org/index.php?title=Development_tools
-- puzzledp ROM files
 
 Build process:
 
 - install NeoDev and set path accordingly
 - clone repository
-- unzip original puzzledp roms in 'roms/puzzledp' subdirectory
 - set PLATFORM=neogeo in makefile
-- make
+- make OUTPUT={cart|cd}
 
 AMIGA:
 
