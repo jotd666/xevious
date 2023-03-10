@@ -48,9 +48,20 @@ Build process:
 
 - install NeoDev and set path accordingly
 - clone repository
-- make -f makefile.ng PLATFORM=neogeo OUTPUT={cart|cd}
-- (TBD)
+- make -f makefile.ng OUTPUT={cart|cd}
+  - (OUTPUT defaults to cart)
+  
+Install process (MAME):
 
+- make -f makefile.ng OUTPUT={cart|cd} MAMEDIR={mamedir} install
+  - (mamedir defaults to '.')
+- paste xevious.xml into MAME's hash/neogeo.xml file
+
+To run in MAME:
+
+cart - 'mame neogeo xevious'
+  cd - 'mame neocdz -cdrom roms/neocdz/xevious.iso'
+  
 AMIGA:
 
 Prerequesites:

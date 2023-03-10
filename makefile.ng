@@ -4,6 +4,7 @@ PLATFORM = neogeo
 #PLATFORM = amiga
 TARGET = xevious
 NGH = 0x0420
+MAMEDIR = .
 
 #######################################
 # Base dir of your m68k gcc toolchain #
@@ -79,7 +80,7 @@ ifeq ($(OUTPUT),cart)
 	V1 = $(ASSETDIR)\$(TARGET).v1
 	SPRITES = $(C1) $(C2)
 	OUTPUT_INSTALL = install_cart
-	MAMEROMDIR = roms\neogeo\xevious
+	MAMEROMDIR = $(MAMEDIR)\roms\neogeo\xevious
 endif
 
 ifeq ($(OUTPUT),cd)
@@ -90,7 +91,7 @@ ifeq ($(OUTPUT),cd)
 	Z80 = $(ASSETDIR)\$(TARGET).Z80
 	PCM = $(ASSETDIR)\$(TARGET).PCM
 	OUTPUT_INSTALL = install_cd
-	MAMEROMDIR = roms\neocdz
+	MAMEROMDIR = $(MAMEDIR)\roms\neocdz
 endif
 
 ##############
