@@ -48,8 +48,8 @@ Build process:
 
 - install NeoDev and set path accordingly
 - clone repository
-- set PLATFORM=neogeo in makefile
-- make OUTPUT={cart|cd}
+- make -f makefile.ng PLATFORM=neogeo OUTPUT={cart|cd}
+- (TBD)
 
 AMIGA:
 
