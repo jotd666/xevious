@@ -59,8 +59,8 @@ Install process (MAME):
 
 To run in MAME:
 
-cart = 'mame neogeo xevious'
-  cd = 'mame neocdz -cdrom roms/neocdz/xevious.iso'
+- cart : 'mame neogeo xevious'
+- cd : 'mame neocdz -cdrom roms/neocdz/xevious.iso'
   
 AMIGA:
 
