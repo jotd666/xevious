@@ -53,16 +53,15 @@ NB_SPRITES_TOTAL = 64
 
 BLANK_FG_TILE_ID = 0x24
 
-* sprite lifetime/backup structure
+* sprite backup structure
 * total struct size = 32*2, one or two sprites
-slb_lifetime = 0
-slb_y_clipping = 2
-slb_orig_ptr = 4
-slb_copperlist_ptr = 8    | points on first SPRPTL instruction: so +2.W, +6.W are half pointers
-slb_saved_line = 12       | ends at 12+16 = 28
-slb_second_sprite = 32   | second sprite, slb_lifetime... etc... everything repeated
+actsprite_y_clipping = 2
+actsprite_orig_ptr = 4
+actsprite_copperlist_ptr = 8    | points on first SPRPTL instruction: so +2.W, +6.W are half pointers
+actsprite_saved_line = 12       | ends at 12+16 = 28
+actsprite_second_sprite = 32   | second sprite... etc... everything repeated
 
-SPRITE_LIFETIME_STRUCT_BITS = 6    | 1<<6 = 64: can hold a slb struct
+ACTIVE_SPRITE_STRUCT_BITS = 6    | 1<<6 = 64: can hold a slb struct
 
 	bra	_user
 
@@ -1496,8 +1495,8 @@ osd_update_32_sprite_hw:
 	* left or right part
 	* D1 is the color code
 	
-	* for the sprite lifetime/backup table
-	lsl.w	#SPRITE_LIFETIME_STRUCT_BITS,d0
+	* for the sprite backup table
+	lsl.w	#ACTIVE_SPRITE_STRUCT_BITS,d0
 	move.w	(6,a4),d5	| prepare X
 	move.l	a3,-(a7)
 
@@ -1624,41 +1623,29 @@ osd_update_32_sprite_hw:
 	cmp.w	#FG_DIRTY_TILES_SIZE,d0
 	bne.b	4b
 	.endif
-	
 
 	* after displaying real hardware sprite, we scan the possible sprites
 	* and decrease the life counter.
 	* if the life counter is zero, clear the sprite positions
 	* this is required because we cannot rely on the previous state to know that
-	* a HW sprite isn't displayed anymore. It works in some cases, but in some other
-	* cases (ship explosion), the sprite slot in the structure is just reused with
-	* a different tile and it's going to flicker, so we can't use it.
-	* same goes for the title spark at startup
-	*
-	* this is bad design, but works in the limited cases we're using
-	* - andor genesis
-	* - main ship (solvalou)
-	* - bragza (not so well I think)
-	
-	lea		real_sprite_display_table(pc),a0
-	lea		real_sprite_tiles,a4
-	
-10:
-	move.w	(a4)+,d0
-	bmi.b	20f
-	lsl.w	#SPRITE_LIFETIME_STRUCT_BITS,d0	| times 64
-	lea		(a0,d0.w),a1
-	tst.w	(slb_lifetime,a1)
-	beq.b	10b		| not active
-	subq.w	#1,(slb_lifetime,a1)
-	bne.b	10b		| display it a little longer
+
+	lea		active_hw_sprite_lifetime(pc),a0
+	moveq	#7,d7
+6:
+	move.w	(a0),d0
+	beq.b	9f
+	subq	#1,d0
+	move.w	d0,(a0)
+	bne.b	9f
+	* sprite lifetime elapsed: hide it
+	move.l	(2,a0),a1	| sprite tile number
 	* end of life for that sprite
 	bsr		hide_sprite
-	* second sprite at same screen position (more colors)
-	lea		(slb_second_sprite,a1),a1
-	bsr		hide_sprite
-	bra.b	10b
-20:
+9:
+	lea		(8,a0),a0
+	dbf		d7,6b
+
+
 
 	.endif  | OPT_DISABLE_SPRITES
 	*clr.w	_custom+color
@@ -1675,23 +1662,28 @@ zzz:
 * < D1: Y
 * < D2: height
 * < D3: y offset
-* < D6: sprite number
+* < D6: amiga sprite number (0-7)
 
 show_sprite:
-	movem.l	d2-d6/a2-a5,-(a7)
+	movem.l	d2-d6/a0/a2-a5,-(a7)
 	* store it in sprite table structure
 	* A4 is a pointer on the sprite display table
 	* add a lifetime of 2 updates each time called, we'll
 	* update with the pointer on the sprite structure later
-	move.w	#SPRITE_LIFETIME,(slb_lifetime,a4)
+	
+	lea		active_hw_sprite_lifetime(pc),a0
+	lsl.w	#3,d6
+	add.w	d6,a0
+	move.w	#SPRITE_LIFETIME,(a0)+
+	move.l	A4,(a0)
+	
 	moveq	#0,d5
-	move.w	(slb_y_clipping,a4),d5	| previous y clipping offset
+	move.w	(actsprite_y_clipping,a4),d5	| previous y clipping offset
 	beq.b	7f			| no clipping to restore from previous
 	cmp.w	D3,d5
 	beq.b	7f			| no need to save or restore: sprite has the same pos
-
 	* restore previous sprite bitmap line
-	lea	(slb_saved_line,a4),a2	| source
+	lea	(actsprite_saved_line,a4),a2	| source
 	lsl.l	#4,d5
 	lea		(a1,d5.l),a5	| destination
 	* copy 16 bytes back to restore sprite line
@@ -1701,7 +1693,7 @@ show_sprite:
 	move.l	(a2),(a5)
 7:
 	* store a1 in backup BEFORE adding offset to it
-	move.l	a1,(slb_orig_ptr,a4)
+	move.l	a1,(actsprite_orig_ptr,a4)
 
 	tst.w	D3
 	beq.b	8f
@@ -1709,9 +1701,9 @@ show_sprite:
 
 	* must move sprite start & put position here
 	* first we back up sprite data
-	move.w	D3,(slb_y_clipping,a4)  | store previous offset
+	move.w	D3,(actsprite_y_clipping,a4)  | store previous offset
 	lsl.l	#4,D3
-	lea	(slb_saved_line,a4),a5			| destination
+	lea	(actsprite_saved_line,a4),a5			| destination
 	* add offset to sprite pointer to start by that line
 	add.l	D3,a1
 	lsr.l	#4,D3	| restore D3 value for next loop
@@ -1733,13 +1725,12 @@ show_sprite:
 	* put it in the proper sprite slot (d6: sprite number)
 	move.l	a1,d0
 	lea		sprites,a1
-	lsl.w	#3,d6	| times 8
-	add.w	d6,a1
-	move.l	a1,(slb_copperlist_ptr,a4)
+	lea		(a1,d6.w),a1	| times 8, but d6 is already *8 at this point
+	move.l	a1,(actsprite_copperlist_ptr,a4)
 	move.w	d0,(6,a1)
 	swap	d0
 	move.w	d0,(2,a1)
-	movem.l	(a7)+,d2-d6/a2-a5
+	movem.l	(a7)+,d2-d6/a0/a2-a5
 	
 	rts
 	
@@ -1749,29 +1740,29 @@ show_sprite:
 * (else it's pointing on the clipped sprite in the copperlist
 * and we are going to restore the sprite data at this line)
 *
-* < A1: sprite backup structure
+* < A1: sprite backup structure (if zero, skip)
 * destroyed registers: none
 
 hide_sprite:
 	movem.l	d0/a2-a3,-(a7)
-	move.l	(slb_orig_ptr,a1),a2
+	move.l	(actsprite_orig_ptr,a1),a2
 	move.l	a2,d0
 	beq.b	11f
-	move.l	(slb_copperlist_ptr,a1),a3
+	move.l	(actsprite_copperlist_ptr,a1),a3
 	move.w	d0,(6,a3)
 	swap	d0
 	move.w	d0,(2,a3)
 	* nullify pointer
-	clr.l	(slb_orig_ptr,a1)
+	clr.l	(actsprite_orig_ptr,a1)
 	* now set coords to zero
 	clr.w	(a2)
 	clr.w	(8,a2)
-	move.w	(slb_y_clipping,a1),d0
+	move.w	(actsprite_y_clipping,a1),d0
 	beq.b	11f		| no need to restore
 	* we need to restore backuped line
 	lsl.w	#4,d0	| times 16
 	add.w	d0,a2	| destination to be restored
-	lea		(slb_saved_line,a1),a3
+	lea		(actsprite_saved_line,a1),a3
 	* restore sprite data
 	move.l	(a3)+,(a2)+
 	move.l	(a3)+,(a2)+
@@ -1939,7 +1930,7 @@ draw_sprite_part:
 	* (damn it's time that this project ends, the code is trickier
 	* and trickier!)
 	
-	lsr.l	#8-SPRITE_LIFETIME_STRUCT_BITS,d0
+	lsr.l	#8-ACTIVE_SPRITE_STRUCT_BITS,d0
 	move.w	#16,d2		| 16 height (standard 16x16)
 	move.w	d3,d4
 	moveq	#0,d3		| no clipping
@@ -1959,7 +1950,7 @@ draw_hw_sprite:
 	* X in D5
 	* Y in D4
 	* set a lifetime in sprite table
-	lea		real_sprite_display_table(pc),a4
+	lea		active_hw_sprite_display_table(pc),a4
 	
 	add.w	d0,a4
 	lea	(2,a3,d1.w),a0
@@ -1980,7 +1971,7 @@ draw_hw_sprite:
 	lea	sprite_cols_32_63,a1
 
 	add.w	d1,a1
-	move.w	#3,d0	| 4 colors
+	moveq	#3,d0	| 4 colors
 6:
 	move.w	(a0)+,(2,a1)
 	addq.w	#4,a1
@@ -1988,13 +1979,13 @@ draw_hw_sprite:
 	* lower part of RGB palette
 	lea	sprite_cols_32_63_lower,a1
 	add.w	d1,a1
-	move.w	#3,d0	| 4 colors
+	moveq	#3,d0	| 4 colors
 6:
 	move.w	(a0)+,(2,a1)
 	addq.w	#4,a1
 	dbf		d0,6b
 
-	moveq	#0,d0		| we need to clear MSB
+	*moveq	#0,d0		| we need to clear MSB, already done above
 	* get sprite data
 	move.l	(a0)+,a1
 
@@ -2004,7 +1995,7 @@ draw_hw_sprite:
 	bsr		show_sprite
 
 	* next sprite for this image
-	lea		(slb_second_sprite,a4),a4
+	lea		(actsprite_second_sprite,a4),a4
 	bra	5b
 21:
 	movem.l	(a7)+,d6/a2/a4-a6
@@ -2916,20 +2907,29 @@ fg_displayed_screen_ptr:
 	.long	fg_screen_data_1
 	.endif
 
-* table accounting for sprites that the engine asked to display
-* 64 bytes per sprite is more than enough but makes access simple
-* by shifting
-* we need:
-* - 2 bytes for lifetime
-* - 2 bytes for y clipping offset
-* then 1 or 2 times:
-* - 4 bytes to save sprite pointer
-* - 16 bytes to save the line that sprite position bytes overwrites
-*   when clipping sprites y-wise
+* table accounting for amiga hardware sprites that the engine
+* asked to display. Holds y-offset (for andor) & line backup
+* (when y-offset is non-zero). Also holds pointers on sprite start
+* and also on part of the copperlist which displays the sprite
+* (so it can be reset when clipped sprite disappears)
+*
+* 64 bytes per sprite is enough to make access simple
+* by shifting by ACTIVE_SPRITE_STRUCT_BITS
+* each entry can hold up to 2 sprites (6-colored sprites)
+*
+* a lot of entries are unused, as only a few sprites are hardware ones
+* (andor, solvalo, title spark, and bragza)
 
-real_sprite_display_table:
-	ds.l	320*(1<<SPRITE_LIFETIME_STRUCT_BITS)
-	
+active_hw_sprite_display_table:
+	ds.l	320*(1<<ACTIVE_SPRITE_STRUCT_BITS)
+
+* simple structure 1 per hw sprite
+* word: life (0: not active)
+* long: sprite backup structure (needed to shut down the sprite)
+* word: pad
+
+active_hw_sprite_lifetime:
+	ds.l	16
 	
 	.include	"sound_entries.68k"
 	
