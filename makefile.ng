@@ -4,6 +4,7 @@ PLATFORM = neogeo
 #PLATFORM = amiga
 TARGET = xevious
 NGH = 0x0420
+MAMEDIR = .
 
 #######################################
 # Base dir of your m68k gcc toolchain #
@@ -68,20 +69,18 @@ ARFLAGS = cr
 
 DEBUG = -g
 
-GUID = 202
 ifeq ($(OUTPUT),cart)
   ISO = 
   P_SIZE = 1024
 	P1 = $(BINDIR)\$(TARGET).p1
 	C1 = $(BINDIR)\$(TARGET).c1
 	C2 = $(BINDIR)\$(TARGET).c2
-	FIX = $(ASSETDIR)\$(TARGET).s1
+	S1 = $(ASSETDIR)\$(TARGET).s1
 	M1 = $(ASSETDIR)\$(TARGET).m1
 	V1 = $(ASSETDIR)\$(TARGET).v1
 	SPRITES = $(C1) $(C2)
-  ASSETS = $(M1) $(V1)
 	OUTPUT_INSTALL = install_cart
-	MAMEROMDIR = roms\neogeo\xevious
+	MAMEROMDIR = $(MAMEDIR)\roms\neogeo\xevious
 endif
 
 ifeq ($(OUTPUT),cd)
@@ -91,9 +90,8 @@ ifeq ($(OUTPUT),cd)
 	FIX = $(ASSETDIR)\$(TARGET).FIX
 	Z80 = $(ASSETDIR)\$(TARGET).Z80
 	PCM = $(ASSETDIR)\$(TARGET).PCM
-	ASSETS = $(Z80) $(PCM)
 	OUTPUT_INSTALL = install_cd
-	MAMEROMDIR = roms\neocdz
+	MAMEROMDIR = $(MAMEDIR)\roms\neocdz
 endif
 
 ##############
@@ -145,13 +143,13 @@ $(PRG): $(BIN)
 
 ### CART & CD
 
-$(BIN) : $(OBJS) src/$(PLATFORM)/neo$(OUTPUT).x makefile
+$(BIN) : $(OBJS) src/$(PLATFORM)/neo$(OUTPUT).x makefile.ng
 	$(LD) -L$(LIBDIR) $(CCFLAGS) $(LDFLAGS) $(OBJS) $(LIBS) -o $@
 
-$(OBJDIR)/%.o : src/$(PLATFORM)/%.68k makefile
+$(OBJDIR)/%.o : src/$(PLATFORM)/%.68k src/xevious.inc makefile.ng
 	$(AS) -a=$*.lst $(ASFLAGS) $< -o $@
 
-$(OBJDIR)/%.o : src/%.68k src/xevious.inc makefile
+$(OBJDIR)/%.o : src/%.68k src/xevious.inc makefile.ng
 	$(AS) -a=$*.lst $(ASFLAGS) $< -o $@
 
 ### CLEAN AND INSTALL
@@ -167,16 +165,20 @@ clean_install: clean $(INSTALL_OUTPUT)
 	$(RM) -f $(MAMEROMDIR)\*.c?
 	$(RM) -f $(MAMEROMDIR)\*.m1
 	$(RM) -f $(MAMEROMDIR)\*.v1
+	$(RM) -f $(MAMEROMDIR)\*.iso
 
-install_cart:
+$(MAMEROMDIR) :
+	$(MD) $(MAMEROMDIR)
+	
+install_cart: $(MAMEROMDIR)
 	@copy $(P1) $(MAMEROMDIR)
-	@copy $(FIX) $(MAMEROMDIR)
+	@copy $(S1) $(MAMEROMDIR)
 	@copy $(C1) $(MAMEROMDIR)
 	@copy $(C2) $(MAMEROMDIR)
 	@copy $(M1) $(MAMEROMDIR)
 	@copy $(V1) $(MAMEROMDIR)
   
-install_cd:
+install_cd: $(MAMEROMDIR)
 	@copy $(ISO) $(MAMEROMDIR)
   
 install: all $(OUTPUT_INSTALL)
