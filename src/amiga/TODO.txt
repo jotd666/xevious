@@ -7,13 +7,9 @@
 
 * can be worked on my own:
 
-- adjust literal offsets in sprite backup routine as all fields
-  are now doubled
 - 4 red glowing hulls of andor genesis HW sprite should be overlayed with
-  BOBO (even if golden colors are blacked out) just to be
-  able to be shut down by bombs (core is already a BOB)
-- when a sprite is reused (ex: title spark) the lifetime of old sprites (now switched)
-  make current sprite flicker
+  BOBS (even if golden colors are blacked out) just to be
+  able to be shut down by bombs (core is already a BOB) => when sprite color doesn't exist, replace by transparent (andor genesis glowing parts)
 - andor genesis sound replays: should lock timer
 - still missing sprites at area 14? (blue flashes)
 - crash in draw_sprite_part (area 14): log parameters? (maybe because of bad andor clipping too)

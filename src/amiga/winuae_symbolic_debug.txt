@@ -1,0 +1,153 @@
+https://eab.abime.net/showthread.php?t=91321
+
+Very experimental debugger updates are now available for testing. (Features previously mentioned here: http://eab.abime.net/showthread.php?t=87499)
+
+https://download.abime.net/winuae/files/b/uaedbg.zip (Amiga-side loader)
+
+Updates:
+
+- "zero page" and non-existing address support.
+- amiga.lib LVO symbol support.
+- stack frame tracking.
+- stack frame tracking without debugmem debugging + supervisor stack frame tracking.
+- amiga.lib/*.fd parsing for symbols.
+- segtracker like functionality
+- lvo are resolved if scanned with TL. ("d exec/wait" disassembles exec.library Wait function)
+- break to debugger when any unexpected exception happens (tc_TrapCode)
+
+--
+
+New debugger feature: ability to load any Amiga executable to special debugger RAM:
+
+- Static location, custom loader: program is always loaded in same addresses.
+- Each hunk is separated with (later configurable) 32k space to detect possible out of bounds accesses.
+- Program's memory allocations are also allocated from debugger RAM, with mungwall-like out of bounds access detection.
+- Program's stack is also moved to debug RAM.
+- Out of bounds detection is real-time and byte-based, detects both reads and writes. Detects also reads from uninitialized memory (read before write).
+
+Note that stack does not have unitialized memory read detection because dos does not always write to all addresses in stack frames it allocates (for example when it creates dos packet structures) which causes too many false positives.
+
+If debug ram is not manually configured and uaedbg is run, 256M of memory is automatically allocated if $70000000 to $f0000000 has at least one free 256M block. It can be manually configured by adding following lines to config file:
+
+debugmem_start=<address>
+debugmem_size=<size in megabytes> Must be power of 2.
+
+Amiga-side debugger command (may become built-in later):
+
+uaedbg <program to debug> <program parameters>
+
+uaedbg loads the program, relocates it to debug memory region, moves stack to debug memory region, breaks to debugger with PC pointing to first instruction of program. Hooks also AllocMem() and FreeMem() and if current task is same as uaedbg task, memory allocation is done from debug ram. (This needs to handle programs that create new tasks, later..)
+
+If program includes symbols (HUNK_SYMBOL), they are also loaded and shown in disassembler when current address matches or instruction's effect address matches symbol's address.
+
+Segment 1: 000003e9 70008000-700122ef
+__stext:
+70008008 [000000] 23c8 7002 3cfc MOVE.L A0,$70023cfc [00000000] ___commandline
+7000800E [000006] 23c0 7002 3cf0 MOVE.L D0,$70023cf0 [00000000] ___commandlen
+
+If program includes GCC stab (-g) debugging information in HUNK_DEBUG, it is loaded and parsed, including source files. Disassembly will automatically list matched source files.
+
+70008172 [00016A] 48e7 3f3e MOVEM.L D2-D7/A2-A6,-(A7)
+70008176 [00016E] 2478 0004 MOVEA.L $0004 [08000810],A2
+
+240 SysBase = *((struct ExecBase **)4);
+241
+242 /* init globaldata */
+
+7000817A [000172] 2c4a MOVEA.L A2,A6
+
+243 g = AllocMem(sizeof(struct globaldata), MEMF_CLEAR);
+
+7000817C [000174] 203c 0000 09d0 MOVE.L #$000009d0,D0
+70008182 [00017A] 7201 MOVE.L #$01,D1
+70008184 [00017C] 4841 SWAP.W D1
+70008186 [00017E] 4eae ff3a JSR (A6, -$00c6) == $00f9f4ec
+
+Debugging information also contains variable type data, register and local stack parameter data but it is not yet parsed or used.
+
+Debugger also resolves final address when it notices JSR x(PC) + JMP <final address> instruction combination:
+
+70008252 [00024A] 4eba 05f4 JSR (PC,$05f4) == $70008848 == $70015718 _FixStartupPacket
+
+vs old non-resolved final address:
+
+70008252 [00024A] 4eba 05f4 JSR (PC,$05f4) == $70008848
+
+Chip RAM "zero page" (0 to $400) is now watched (like Enforcer). All writes break to debugger immediately, long read from 4 is allowed, if vbr is 0: long aligned exception vector reads are allowed. All other reads break immediately.
+
+Non-existing RAM/IO read or write also breaks to debugger immediately.
+
+LVO symbol support:
+
+if amiga.lib (from Amiga NDK) is in plugins/debugger, it is scanned for LVO symbols.
+if plugins/debugger/fd contains one or more *.fd files, they are parsed and added to LVO symbol list.
+
+When disassembling jsr -$xx(a6) instructions will include name of library and LVO if a6 and -$xx matches.
+
+LVOs are resolved like this (See also TL command):
+
+70008034 [00002C] 4eae feda JSR (A6, -$0126) == $080006ea exec/FindTask == $00f8272a
+
+If LVO jump table points to other known segment (not debugged program's segment), segment information is also shown.
+
+Stack frame tracking:
+
+Tracks debugged program JSR/BSR/RTS instructions.
+
+70008052 -> 700080a0 SP=7003c0f8 [000098] Segment 1: 000003e9 70008000-700122ef
+70008052 [00004A] 614c BSR.B #$4c == $700080a0
+70008054 [00004C] 2f39 7002 3d00 MOVE.L $70023d00 [00000000] ___env,-(A7) [700080b8]
+
+700080b6 -> 700121ac SP=7003c0f4 [00A1A4] Segment 1: 000003e9 70008000-700122ef ___initlibraries
+700080B6 [0000AE] 4e90 JSR (A0) ___initlibraries
+700080B8 [0000B0] b584 EOR.L D2,D4
+
+700121d6 -> 080005e8 SP=7003c09c
+700121D6 [00A1CE] 4eae fdd8 JSR (A6, -$0228) == $080005e8 exec/OpenLibrary == $00fbf246
+700121DA [00A1D2] 2680 MOVE.L D0,(A3) [00000000] _DOSBase
+
+00fbf24e -> 080182b8 SP=7003c078
+00FBF24E 4ead 0038 JSR (A5, $0038) == $080182b8
+00FBF252 2400 MOVE.L D0,D2
+
+PC before JSR/BSR, PC after JSR/BSR instruction, Stack pointer before JSR/BSR.
+Segment offset and segment details new PC points to debugged program.
+SR is also listed if supervisor mode stack frame.
+Disassembly of branch instruction + following instruction.
+
+Other new debugger features:
+
+- Early boot segtracker-like feature for loadable libraries and others, enable in misc panel.
+
+New debugger commands:
+
+- tr = break when PC points to any allocated debug memory
+- tl = break when PC matches next source line, step to next source line.
+- seg = list loaded program's segments.
+- segs = list all segtracker loaded segments.
+- u = inhibit current debugmem break to debugger method. (ua = inhibit all, uc = clear all)
+- TL = scan and match library bases (exec library, device and resource lists) with loaded amiga.lib/*.fd symbols. Automatically done when starting debug mem debugging session.
+- rs = show tracked stack frame.
+- rss = show tracked supervisor stack frame.
+- ts = break when tracked stack frame count decreases. (=tracked stack frame matched executed RTS)
+- tsp = break when tracked stack frame count decreases or increases. (RTS/BSR/JSR).
+- tse/tsd = enable/disable full stack frame tracking. Can be used when no debugmem debugging is active.
+
+ts/tsp stores current supervisor mode and only breaks to debugger if stack frame operation has same supervisor mode.
+
+All debugger commands that take address or register value also support symbol names. (for example "d __stext")
+"library/lvo" is also resolved if library was found when scanned with TL. (for example "d exec/wait" disassembles Wait())
+Notes:
+
+- Don't mention anything about GUI. Proper source level debugger may require it but I am not yet sure if it really can be done or is worth the trouble..
+- Console debugger must be in use. (If GUI mode: enter xx command to switch)
+- If executable has chip ram hunks, whole address space is made chip ram compatible and then hunk is loaded to debug ram.
+- Very unoptimal data structures, most also have static sizes. Odd errors and crashes can happen..
+- JIT must be off.
+- 32-bit addressing must be enabled.
+- KS 2.0+ only.
+
+TODO:
+
+- Does other popular compilers also generate useful HUNK_DEBUG data?
+- Suggestions needed! (But don't mention GUI!) 

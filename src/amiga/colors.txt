@@ -1,0 +1,41 @@
+
+The map uses (only) 24 colours. Of those, 5 are used in less than 1,000
+pixels (out of 2M). They're used for 'anti-aliasing' to soften the lines
+between landscape features, and could be replaced without affecting the
+aesthetics too much.
+
+And as I mentioned, the Namco Classics Vol 1 arcade PCB, a 68K-based
+board with the Yamaha YGV608 graphics chip, and which includes a
+faithful recreation of the original Xevious, uses a (further) reduced
+palette which is quite noticeable when run side-by-side with the
+original in MAME. We could probably even use the palette from that
+version and maybe get down to just 16 colours?!?
+
+Anyway, included here for future reference should we proceed with the
+Amiga...
+
+map_colour_00 (000,000,000) = 448
+map_colour_01 (098,098,098) = 5620
+map_colour_02 (174,174,174) = 8344
+map_colour_03 (031,112,255) = 283158
+map_colour_04 (081,067,255) = 1647
+map_colour_05 (210,210,210) = 11648
+map_colour_06 (067,143,031) = 792116
+map_colour_07 (067,098,000) = 35825
+map_colour_08 (157,157,067) = 284825
+map_colour_09 (098,045,031) = 21232
+map_colour_10 (081,081,031) = 908
+map_colour_11 (112,143,045) = 17272
+map_colour_12 (081,143,157) = 884
+map_colour_13 (031,031,000) = 11748
+map_colour_14 (031,067,000) = 140375
+map_colour_15 (031,098,000) = 3436
+map_colour_16 (045,112,014) = 275955
+map_colour_17 (081,157,210) = 364
+map_colour_18 (157,157,112) = 290
+map_colour_19 (174,143,067) = 146808
+map_colour_20 (143,098,031) = 5082
+map_colour_21 (112,098,000) = 1106
+map_colour_22 (112,112,112) = 46562
+map_colour_23 (045,112,188) = 1499
+n_map_colours_used = 24

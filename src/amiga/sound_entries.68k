@@ -1,0 +1,60 @@
+
+# sound tables
+#
+# the "sound_table" table has 8 bytes per entry
+# first word: 0: no entry, 1: sample, 2: pattern from music module
+# second word: 0 except for music module: pattern number
+# longword: sample data pointer if sample, 0 if no entry and
+# 2 words: 0/1 noloop/loop followed by duration in ticks
+#
+FXFREQBASE = 3579564
+
+    .macro    SOUND_ENTRY    sound_name,size,channel,soundfreq,volume
+\sound_name\()_sound:
+    .long    \sound_name\()_raw
+    .word   \size
+    .word   FXFREQBASE/\soundfreq,\volume
+    .byte    \channel
+    .byte    1
+    .endm
+
+    SOUND_ENTRY extra_solvalou,10328,3,22050,34
+    SOUND_ENTRY flying_enemy_hit,2257,2,22050,27
+    SOUND_ENTRY garu_zakato,4380,3,22050,16
+    SOUND_ENTRY andor_genesis,19559,3,22050,12
+    SOUND_ENTRY sheonite,13916,3,22050,13
+    SOUND_ENTRY teleport,1089,2,22050,9
+    SOUND_ENTRY bacura_hit,1760,1,22050,23
+    SOUND_ENTRY shot,724,1,22050,13
+    SOUND_ENTRY bomb,8199,1,22050,13
+    SOUND_ENTRY bonus_flag,6551,3,22050,11
+    SOUND_ENTRY coin,5908,1,22050,55
+    SOUND_ENTRY ground_explosion,10473,3,22050,15
+    SOUND_ENTRY solvalou_explosion,19880,3,22050,47
+
+	.global	sound_table
+
+sound_table:
+	.long	0,0
+	.word	2,0,324
+	.byte	32,0
+	.word	2,3,1
+	.byte	32,1
+	.word	2,2,1
+	.byte	32,1
+	.long	0x00010000,extra_solvalou_sound
+	.long	0x00010000,flying_enemy_hit_sound
+	.long	0x00010000,garu_zakato_sound
+	.long	0x00010000,andor_genesis_sound
+	.long	0x00010000,sheonite_sound
+	.long	0x00010000,teleport_sound
+	.long	0x00010000,bacura_hit_sound
+	.long	0x00010000,shot_sound
+	.long	0x00010000,bomb_sound
+	.long	0x00010000,bonus_flag_sound
+	.word	2,1,1
+	.byte	12,1
+	.long	0,0
+	.long	0x00010000,coin_sound
+	.long	0x00010000,ground_explosion_sound
+	.long	0x00010000,solvalou_explosion_sound

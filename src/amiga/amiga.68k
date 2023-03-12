@@ -1498,7 +1498,6 @@ osd_update_32_sprite_hw:
 	* for the sprite backup table
 	lsl.w	#ACTIVE_SPRITE_STRUCT_BITS,d0
 	move.w	(6,a4),d5	| prepare X
-	move.l	a3,-(a7)
 
 	moveq	#0,d2	| default: no y clipping offset
 	
@@ -1529,12 +1528,14 @@ osd_update_32_sprite_hw:
 	bne.b	50f
 	* first left part
 	* may be off screen (too high)
+	move.l	a3,-(a7)
 	lea		andor_genesis_left,a3
 	bsr		draw_andor_sprite
 	move.l	(a7)+,a3
 	bra.b	2f
 50:
 	* second right part
+	move.l	a3,-(a7)
 	lea		andor_genesis_right,a3
 	bsr		draw_andor_sprite
 	move.l	(a7)+,a3
