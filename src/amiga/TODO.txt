@@ -3,10 +3,18 @@
 - find a way to make up for those shaking ground enemies
 - optimize main/sub code more
 - level 14: black balls start with 4 toroids!!
+- random! as soon as bacuras appear, solvalou explodes even if no collision (area 3?)
 
 * can be worked on my own:
 
-- andor genesis sound replays 
+- adjust literal offsets in sprite backup routine as all fields
+  are now doubled
+- 4 red glowing hulls of andor genesis HW sprite should be overlayed with
+  BOBO (even if golden colors are blacked out) just to be
+  able to be shut down by bombs (core is already a BOB)
+- when a sprite is reused (ex: title spark) the lifetime of old sprites (now switched)
+  make current sprite flicker
+- andor genesis sound replays: should lock timer
 - still missing sprites at area 14? (blue flashes)
 - crash in draw_sprite_part (area 14): log parameters? (maybe because of bad andor clipping too)
 - andor appearing sprite clipping is trashing the sprite, backup not working
@@ -14,15 +22,15 @@
 - sprite backup system is not working for clipped y sprites as zeroing
   the base address X/Y isn't effective if sprite is being clipped: should
   reset the sprite pointer too
-- real machine: currently lockup at start without whdload => still lockup on real machine, try with color codes at start
-  => set custom copperlist, change color at each step
-- real machine: test with more fps / enemies
+- real machine: currently lockup at start without whdload => still lockup on real machine
+  add multiple blitz+delay after forbid?
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
 - level 14: tile layout looks wrong (bird drawing)
 - sheonite sprites too fast, seem to fail the sprite erase: log shenonite display & erase coords (code 48-57)
 - implement dip switches screen ??
+- optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 
 
 further optims:
@@ -30,7 +38,6 @@ further optims:
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
-- cookie cut with fixed 0 source if plane_pic_0 (saves bandwidth)
 - don't generate mirror X-sprites if log doesn't tell game is using it
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
