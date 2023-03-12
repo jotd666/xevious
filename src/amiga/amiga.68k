@@ -1357,7 +1357,7 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	*lea		ag_sprites(pc),a4
+	**lea		ag_sprites(pc),a4
 
 	move.l		previous_sprite_state_ptr(pc),a5
 	lea			is_hw_sprite_table,a6
@@ -1469,7 +1469,7 @@ osd_update_32_sprite_hw:
 	* at this point, Y can be negative, but
 	* we allow this as blitter routine is able
 	* to perform Y-clipping in that case
-	
+	moveq	#0,d3			| clear D3 MSB
 	move.w	d1,d3			| save y
 	clr.w	d0
 	move.b	(2,a4),d0	    | sprite code
@@ -1673,7 +1673,8 @@ zzz:
 * < A4: pointer on the sprite backup table
 * < D0: X
 * < D1: Y
-* < D4: y offset
+* < D2: height
+* < D3: y offset
 * < D6: sprite number
 
 show_sprite:
@@ -1686,7 +1687,7 @@ show_sprite:
 	moveq	#0,d5
 	move.w	(slb_y_clipping,a4),d5	| previous y clipping offset
 	beq.b	7f			| no clipping to restore from previous
-	cmp.w	d4,d5
+	cmp.w	D3,d5
 	beq.b	7f			| no need to save or restore: sprite has the same pos
 
 	* restore previous sprite bitmap line
@@ -1702,16 +1703,18 @@ show_sprite:
 	* store a1 in backup BEFORE adding offset to it
 	move.l	a1,(slb_orig_ptr,a4)
 
-	tst.w	d4
+	tst.w	D3
 	beq.b	8f
+	* clipping enabled
+
 	* must move sprite start & put position here
 	* first we back up sprite data
-	move.w	d4,(slb_y_clipping,a4)  | store previous offset
-	lsl.l	#4,d4
+	move.w	D3,(slb_y_clipping,a4)  | store previous offset
+	lsl.l	#4,D3
 	lea	(slb_saved_line,a4),a5			| destination
 	* add offset to sprite pointer to start by that line
-	add.l	d4,a1
-	lsr.l	#4,d4	| restore d4 value for next loop
+	add.l	D3,a1
+	lsr.l	#4,D3	| restore D3 value for next loop
 	move.l	a1,a2	| source
 	* copy 16 bytes to sprite line backup space
 	* and zero that sprite line so 
@@ -1778,14 +1781,18 @@ hide_sprite:
 	movem.l	(a7)+,d0/a2-a3
 	rts
 	
+* draw andor genesis sprite
+* the interface slightly sucks, but hey this is highly specific
+
 * < A3: sprite structure
-* < D0: sprite index times 32 (for lifetime table)
+* < D0: sprite index times 64 (for backup/clipping table)
 * < D1: color code
 * < D2: y offset for clipping (0 if no clipping)
 * < D3: Y
 * < D5: X
 draw_andor_sprite:
 	move.w	d4,-(a7)
+	move.w	d3,d4		| Y in D4
 	* before drawing sprite, adjust red color
 	lea	red_color_table,a0
 	* update red color MSB/LSB (third color)
@@ -1793,11 +1800,17 @@ draw_andor_sprite:
 	move.b	(a0)+,(8,a3)
 	move.b	(a0)+,(16,a3)
 	clr.w	d1			| fake color config 0 (we change it dynamically just above)
-	move.w	d2,d4	| y-clipping in D4
+	move.w	d2,d3	| y-clipping in D3
 	move.w	#96,d2	| same height for both parts
 	bsr	draw_hw_sprite
 	move.w	(a7)+,d4
 	rts
+
+	
+* < D3: Y-offset (for clipping in the top area)
+* < D4: Y
+* < D5: X
+* < A3: graphical object structure (sprites)
 	
 sprite_draw_jump_table:
 	dc.l	draw_sprite_part
@@ -1928,35 +1941,29 @@ draw_sprite_part:
 	
 	lsr.l	#8-SPRITE_LIFETIME_STRUCT_BITS,d0
 	move.w	#16,d2		| 16 height (standard 16x16)
-	moveq	#0,d4		| no clipping
+	move.w	d3,d4
+	moveq	#0,d3		| no clipping
 	bsr		draw_hw_sprite
 	bra.b	2b
 	
 * < D0: sprite index times 64 (for lifetime table)
 * < D1: color table index
 * < D2: sprite height
-* < D3: Y
-* < D4: Y-offset (for clipping in the top area)
+* < D3.L: Y-offset (for clipping in the top area)
+* < D4: Y
 * < D5: X
 * < A3: graphical object structure (sprites)
-
-
 
 draw_hw_sprite:
 	movem.l	d6/a2/a4-a6,-(a7)
 	* X in D5
-	* Y in D3
+	* Y in D4
 	* set a lifetime in sprite table
 	lea		real_sprite_display_table(pc),a4
 	
 	add.w	d0,a4
 	lea	(2,a3,d1.w),a0
 
-	* clear D4 & d0 MSW
-	* some offsets are above 0x7fff
-	swap	d4
-	clr		d4
-	swap	d4
 	
 5:
 	move.w	(a0)+,d6	| sprite number
@@ -1993,8 +2000,7 @@ draw_hw_sprite:
 
 	* restore coordinates (same for all sprites in that chain)
 	move.w	d5,d0
-	move.w	d3,d1
-	
+	move.w	d4,d1
 	bsr		show_sprite
 
 	* next sprite for this image
