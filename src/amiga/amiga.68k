@@ -14,7 +14,7 @@ STATE_ACTIVE = 2
 STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
 	
-SPRITE_LIFETIME = 4
+SPRITE_LIFETIME = 2
 
 OPT_ENABLE_LOGGING = 1
 * double-buffering is really needed here, else blits fail
@@ -161,7 +161,12 @@ mul\value\()_table:
 	move.l	d0,(4,a2)
 	.endm
 	
+* debug macro that colors the screen until LMB pressed
+* (if LMB is pressed when entering, macro waits for release)
 .macro blitz
+w\@:
+	btst	#6,0xbfe001
+	beq.b	w\@
 	move.w	d0,-(a7)
 	clr.w	d0
 loop\@:
@@ -623,7 +628,7 @@ platform_init:
 	move.w	#0x7FFF,dmacon(a5)
 	* restrict borders: we don't see bobs on the borders!
     move.w #0x1C99,diwstrt(a5)
-    move.w #0x3881,diwstop(a5)
+    move.w #0x3881-8,diwstop(a5)
     move.w #0x0038,ddfstrt(a5)
     move.w #0x00D0,ddfstop(a5)
     #move.w #0x0210,bplcon0(a5)  
@@ -875,7 +880,7 @@ update_bg_tile:
 	neg.w	d3
 	add.w	#32-3,d3	| mirror
 	bmi.b		0f
-	cmp.w	#29,d3
+	cmp.w	#28,d3
 	bcs.b	1f
 0:
 	rts
@@ -1089,12 +1094,14 @@ FG_TILE_CLEAR = 3
 
 update_fg_tile:
 	and.w	#0xFF,d1
-	move.w	d1,d6		| save tile ID unchanged
 	lea		_fg_tile,a0
 	cmp.w	#BLANK_FG_TILE_ID,d1
 	bne.b		0f
 	move.w	#FG_TILE_CLEAR,d3
+	move.w	d0,d1	
+	bra.b	2f
 0:
+	move.w	d1,d6		| save tile ID unchanged
 	lsl.w	#4,d1			| *16 (each tile+mirror tile has 8+8 bytes)
 	btst	#6,d2			| X-flip?
 	beq.b	1f
@@ -1102,12 +1109,15 @@ update_fg_tile:
 1:
 	add.w	d1,a0
 	move.w	d0,d1
+2:
 	and.w	#0x3F,d1		| row
 	subq.w	#4,d1
 	bmi.w	3f
 
 	cmp.w	#36,d1		| limit to 36th row, rest is not displayed
 	bcc.w	3f
+	cmp.w	#FG_TILE_CLEAR,d3
+	beq	4f
 	
 	move.w	d2,d4
 	* decode color
@@ -1169,7 +1179,7 @@ update_fg_tile:
 	move.l	fg_drawed_screen_ptr(pc),a1
 	lea		(a1,d0.w),a1
 	cmp.w	#FG_TILE_DRAW_FULL,d3
-	bne.w	5f
+	bne.w	5f   | tile clear
 
 	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
 	* like clear, draw in both planes
@@ -1463,6 +1473,10 @@ osd_update_32_sprite_hw:
 	cmp.b	#STATE_INACTIVE,(a4)
 	beq		2f
 41:
+	move.w	(6,a4),d5	| prepare X
+	cmp.w	#31*8,d5
+	bcc		2f			| too much on the right
+	
 	move.w	(4,a4),d1
 	sub.w	#4*8,d1		| apply Y offset
 	* at this point, Y can be negative, but
@@ -1497,7 +1511,6 @@ osd_update_32_sprite_hw:
 	
 	* for the sprite backup table
 	lsl.w	#ACTIVE_SPRITE_STRUCT_BITS,d0
-	move.w	(6,a4),d5	| prepare X
 
 	moveq	#0,d2	| default: no y clipping offset
 	
@@ -1598,8 +1611,12 @@ osd_update_32_sprite_hw:
 	move.l	(a4)+,(a5)+
 	.endr
 	dbf		d0,3b
+	tst.w	d7
+	bne.b	31f
+	rts
 	
-	* in the end, redraw all foreground tiles
+31:
+	* in the second pass, redraw all foreground tiles
 	* this is much faster and simpler than marking the
 	* "dirty" tiles, because if the tile is empty nothing
 	* is done anyway
@@ -1611,7 +1628,7 @@ osd_update_32_sprite_hw:
 	* wait blit to avoid surprises with unfinished blits
 	bsr		wait_blit
 4:
-	move.b	(a5,d0.w),d1	| fetch tile from character grid
+	move.b	(a5)+,d1	| fetch tile from character grid
 	cmp.b	#BLANK_FG_TILE_ID,d1
 	beq.b	5f				| no need to OR if blank tile
 	move.b	(a4,d0.w),d2	| fetch tile from color grid

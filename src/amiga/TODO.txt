@@ -7,19 +7,15 @@
 
 * can be worked on my own:
 
+- deleting sprites using CPU is maybe a bad idea
+- if game is running on chipmem, reduce the framerate
+- tile refresh is too power-hungry
+- andor sprite flickers when appearing: disable lifetime to check
 - 4 red glowing hulls of andor genesis HW sprite should be overlayed with
   BOBS (even if golden colors are blacked out) just to be
   able to be shut down by bombs (core is already a BOB) => when sprite color doesn't exist, replace by transparent (andor genesis glowing parts)
 - andor genesis sound replays: should lock timer
 - still missing sprites at area 14? (blue flashes)
-- crash in draw_sprite_part (area 14): log parameters? (maybe because of bad andor clipping too)
-- andor appearing sprite clipping is trashing the sprite, backup not working
-- andor center tile is still a bob (is that a problem?)
-- sprite backup system is not working for clipped y sprites as zeroing
-  the base address X/Y isn't effective if sprite is being clipped: should
-  reset the sprite pointer too
-- real machine: currently lockup at start without whdload => still lockup on real machine
-  add multiple blitz+delay after forbid?
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
@@ -27,7 +23,7 @@
 - sheonite sprites too fast, seem to fail the sprite erase: log shenonite display & erase coords (code 48-57)
 - implement dip switches screen ??
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
-
+- not booting from real machine on CF card without whdload
 
 further optims:
 
