@@ -1312,7 +1312,7 @@ osd_update_sprite_shadow:
 	lsr.w	#5,d1
     move.w    d1,d3
     *** THIS IS MANDATORY IN EVERY PORT
-    addq.b    #8,d3    
+    addq.w    #8,d3    
     lsr.w     #1,d3
     move.b    d3,(a2)+                          | store X[8:1] for hit-box calcs
     *** END OF MANDATORY
