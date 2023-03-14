@@ -1866,7 +1866,7 @@ sprite_draw_double_width:
 	bra		draw_sprite_part
 	
 sprite_draw_double_width_and_height:
-	and.w	#0xFC,d0	| mask 2 lower bits
+	and.w	#0x1FC,d0	| mask 2 lower bits
 	add.w	#16,d3
 	addq	#3,d0
 	bsr		draw_sprite_part
@@ -1903,7 +1903,11 @@ sprite_draw_double_height:
 draw_sprite_part:
 	movem.w	d0-d4,-(a7)
 
-	* d0 is the tile index, compute clut index in d1
+	* d0 is the tile index
+	* d0 times 128*2 (<<8) is the row start pointer
+	lsl.l	#8,d0
+	beq.b	2f			| code 0 is all transparent: nothing drawn
+	* compute clut index in d1
 	and.w	#0x7F,d1	| significant color bits
 	beq.b	2f			| CLUT 0 is all transparent: nothing drawn
 	
@@ -1911,8 +1915,6 @@ draw_sprite_part:
 	* (there are 2 versions of the sprite normal,mirror for each
 	* color configuration)
 	add.w	d1,d1
-	* d0 times 128*2 (<<8) is the row start pointer
-	lsl.l	#8,d0
 
 	lea		_sprite_tile,a0
 

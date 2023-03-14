@@ -2,24 +2,23 @@
 
 - find a way to make up for those shaking ground enemies
 - optimize main/sub code more
-- level 14: black balls start with 4 toroids!!
 
 * can be worked on my own:
 
 - hotkey (f1?) to toggle music
-- if game is running on chipmem, reduce the framerate
-- andor sprite flickers when appearing: disable lifetime to check
-- optimize bg tile draw even more
+- if game is running on chipmem, reduce the framerate??
+- andor sprite flickers when appearing
+- andor sprite trashed the second time it appears
+- andor sprite is shifted (bombing doesn't work unless y-shifted)
 - 4 red glowing hulls of andor genesis HW sprite should be overlayed with
   BOBS (even if golden colors are blacked out) just to be
   able to be shut down by bombs (core is already a BOB) => when sprite color doesn't exist, replace by transparent (andor genesis glowing parts)
 - andor genesis sound replays: should lock timer
-- still missing sprites at area 14? (blue flashes)
+- andor sprite doesn't disappear completely (only second part is hidden) on the bottom part
 - title tiles missing (level 14) title tiles also with brown color config???
   related to hole in map???
   probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
 - level 14: tile layout looks wrong (bird drawing)
-- sheonite sprites too fast, seem to fail the sprite erase: log shenonite display & erase coords (code 48-57)
 - implement dip switches screen ??
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 - not booting from real machine on CF card without whdload
