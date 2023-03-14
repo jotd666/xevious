@@ -3,14 +3,13 @@
 - find a way to make up for those shaking ground enemies
 - optimize main/sub code more
 - level 14: black balls start with 4 toroids!!
-- random! as soon as bacuras appear, solvalou explodes even if no collision (area 3?)
 
 * can be worked on my own:
 
-- deleting sprites using CPU is maybe a bad idea
+- hotkey (f1?) to toggle music
 - if game is running on chipmem, reduce the framerate
-- tile refresh is too power-hungry
 - andor sprite flickers when appearing: disable lifetime to check
+- optimize bg tile draw even more
 - 4 red glowing hulls of andor genesis HW sprite should be overlayed with
   BOBS (even if golden colors are blacked out) just to be
   able to be shut down by bombs (core is already a BOB) => when sprite color doesn't exist, replace by transparent (andor genesis glowing parts)

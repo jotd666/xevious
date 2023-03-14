@@ -424,7 +424,7 @@ _vblank:
     movem.l d0-d7/a0-a6,-(a7)
 	move.w	_custom+intreqr,d0
 	btst	#5,d0
-	beq		1f
+	beq.b		1f
 
 	move.l	_joypad_state(pc),d1
 	moveq	#1,d0
@@ -620,6 +620,7 @@ switch_screen_buffers:
 	move.l	a3,(a2)
 	move.l	a1,(a0)
 	move.l	a5,(a4)
+	LOGPC	150
 	bra		set_fg_bitplanes
 	.endif
 	
@@ -1616,22 +1617,35 @@ osd_update_32_sprite_hw:
 	lea		fg_colorram,a4
 	lea		fg_videoram,a5
 	moveq	#FG_TILE_DRAW_OR,d3
+	move.l	#0x24242424,d7
 	* wait blit to avoid surprises with unfinished blits
 	bsr		wait_blit
-	move.b	#BLANK_FG_TILE_ID,d7
+	* highly optimized tile refresh routine
+	* assuming that tiles are empty most of the time
 4:
-	cmp.b	(a5)+,d7	| fetch tile from character grid
-	beq.b	5f				| no need to OR if blank tile (which happens a lot)
-	move.b	(-1,a5),d1		| not blank (rare enough!): get the value
-	move.b	(a4,d0.w),d2	| fetch tile from color grid
-	* now update tile to redraw what sprites have destroyed
-	movem.l	d0/d3/a4-a5,-(a7)
-	bsr	update_fg_tile
-	movem.l	(a7)+,d0/d3/a4-a5
-5:
-	addq.w	#1,d0
+	cmp.l	(a5)+,d7	| fetch tile from character grid
+	bne.b	5f			| no need to OR if 4 blank tiles (which happens a lot)
+	addq.w	#4,d0
 	cmp.w	#FG_DIRTY_TILES_SIZE,d0
 	bne.b	4b
+	bra.b	51f
+5:
+	move.l	(-4,a5),d1
+	.rept	4
+	rol.l	#8,d1
+	cmp.b	d1,d7
+	beq.b	50f
+	* now update tile to redraw what sprites have destroyed
+	movem.l	d0-d1/d3/a4-a5,-(a7)
+	move.b	(a4,d0.w),d2	| fetch tile from color grid
+	bsr	update_fg_tile
+	movem.l	(a7)+,d0-d1/d3/a4-a5
+50:
+	addq.w	#1,d0
+	.endr
+	cmp.w	#FG_DIRTY_TILES_SIZE,d0
+	bne.b	4b
+51:
 	.endif
 
 	* after displaying real hardware sprite, we scan the possible sprites
@@ -3055,10 +3069,6 @@ debug_color:
 	dc.l	-2
 	
 copperlist:
-fg_bitplanes:
-	DECL_4_BITPLANES	4
-bg_bitplanes:
-	DECL_4_BITPLANES	0
 	* dynamic colors for sprites, 32-63
 	.word	bplcon3,BASE_BPLCON3_VALUE+(1<<13)
 sprite_cols_32_63:
@@ -3069,6 +3079,10 @@ sprite_cols_32_63_lower:
     * reset color 0 & bank 0 & upper nibble
 	.word	bplcon3,BASE_BPLCON3_VALUE
 	.word	color,0
+fg_bitplanes:
+	DECL_4_BITPLANES	4
+bg_bitplanes:
+	DECL_4_BITPLANES	0
 sprites:
     * #0
     .word    sprpt+0,0
