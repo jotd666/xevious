@@ -975,11 +975,20 @@ update_bg_tile:
 	tst.b	(a0)+
 	beq	6f
 	.set	offset,0
-	.rept	8
-	move.b	(a0)+,d0
+	.rept	2
+	move.l	(a0)+,d0
+	move.b	d0,(3*NB_BYTES_PER_ROW+offset,a1)
+	move.b	d0,(3*NB_BYTES_PER_ROW+offset,a2)
+	lsr.l	#8,d0
+	move.b	d0,(2*NB_BYTES_PER_ROW+offset,a1)
+	move.b	d0,(2*NB_BYTES_PER_ROW+offset,a2)
+	lsr.l	#8,d0
+	move.b	d0,(1*NB_BYTES_PER_ROW+offset,a1)
+	move.b	d0,(1*NB_BYTES_PER_ROW+offset,a2)
+	lsr.l	#8,d0
 	move.b	d0,(offset,a1)
 	move.b	d0,(offset,a2)
-	.set	offset,offset+NB_BYTES_PER_ROW
+	.set	offset,4*NB_BYTES_PER_ROW
 	.endr
 1:
     lea   (BG_SCREEN_PLANE_SIZE.W,a1),a1
@@ -994,12 +1003,21 @@ update_bg_tile:
 	tst.b	(a0)+
 	beq.b	6f
 
-	.set	offset,NB_BYTES_PER_ROW*7
-	.rept	8
-	move.b	(a0)+,d0
+	.set	offset,NB_BYTES_PER_ROW*4
+	.rept	2
+	move.l	(a0)+,d0
 	move.b	d0,(offset,a1)
 	move.b	d0,(offset,a2)
-	.set	offset,offset-NB_BYTES_PER_ROW
+	lsr.l	#8,d0
+	move.b	d0,(1*NB_BYTES_PER_ROW+offset,a1)
+	move.b	d0,(1*NB_BYTES_PER_ROW+offset,a2)
+	lsr.l	#8,d0
+	move.b	d0,(2*NB_BYTES_PER_ROW+offset,a1)
+	move.b	d0,(2*NB_BYTES_PER_ROW+offset,a2)
+	lsr.l	#8,d0
+	move.b	d0,(3*NB_BYTES_PER_ROW+offset,a1)
+	move.b	d0,(3*NB_BYTES_PER_ROW+offset,a2)
+	.set	offset,0
 	.endr
 1:
 	lea		(BG_SCREEN_PLANE_SIZE.W,a1),a1
