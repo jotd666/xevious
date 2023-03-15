@@ -47,7 +47,7 @@ for i in range(304,320):
 # table gathering ALL sprites, the ones handled by the engine, and
 # special ones (andor genesis)
 sprite_table = [AS_NONE]*320
-for start,stop in ((88,96),(128,159)):
+for start,stop in ((88,91),(128,159)):  # 92-96 are glowing hulls, we need to display them
     sprite_table[start:stop+1] = [AS_TILE]*(stop-start+1)
 for r in real_sprites:
     sprite_table[r] = AS_OTHER

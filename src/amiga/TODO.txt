@@ -5,14 +5,13 @@
 
 * can be worked on my own:
 
-- hotkey (f1?) to toggle music
+- bonus flag is mirrored!
+- hotkey (f1?) to toggle music: not working yet
 - if game is running on chipmem, reduce the framerate??
 - andor sprite flickers when appearing
 - andor sprite trashed the second time it appears
-- andor sprite is shifted (bombing doesn't work unless y-shifted)
-- 4 red glowing hulls of andor genesis HW sprite should be overlayed with
-  BOBS (even if golden colors are blacked out) just to be
-  able to be shut down by bombs (core is already a BOB) => when sprite color doesn't exist, replace by transparent (andor genesis glowing parts)
+- andor bombing doesn't work too well
+- sprite position not 100% accurate (see andor bobs & sprites)
 - andor genesis sound replays: should lock timer
 - andor sprite doesn't disappear completely (only second part is hidden) on the bottom part
 - title tiles missing (level 14) title tiles also with brown color config???

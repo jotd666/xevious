@@ -576,6 +576,7 @@ osd_sound_stop:
 	beq.b	0f		| stop bomb sound makes no sense and stops the music!!
 	lea		_custom,a6
     clr.w   music_tick   | not playing anymore
+	clr.b	music_playing
     jsr		_mt_end
 0:
 	movem.l	(a7)+,d0/a6
@@ -586,12 +587,14 @@ play_music:
     movem.l d0-a6,-(a7)
     lea _custom,a6
     lea	xevious_tunes,a0
+	move.w	d0,music_track_start_number
     sub.l   a1,a1		| samples are in the module
     jsr _mt_init
     * set master volume a little less loud if needed
     moveq	#0,d0
 	move.b	music_volume(pc),d0
     jsr	_mt_mastervol
+	st.b	music_playing
 0:
     jsr _mt_start
     movem.l (a7)+,d0-a6
@@ -2361,12 +2364,30 @@ level2_interrupt:
     seq (a0,d0.w)       | updates keyboard table
     bne.b   .no_playing     | we don't care about key release
     
-    cmp.b   #0x19,d0
+    cmp.b   #0x19,d0	| "P" key
     bne.b   .no_kb_pause
 
     bsr	toggle_pause
 .no_kb_pause:
-
+	cmp.b	#0x50,d0	| F1 key
+	bne.b	.no_playing
+	move.w	music_track_start_number(pc),d0
+	cmp.w	#1,d0
+	bne.b	.no_playing
+	movem.l	d1-a6,-(a7)
+	eor.b	#1,music_muted
+	bne.b	.do_mute
+	| unmute
+	bsr		play_music
+	bra.b	1f
+.do_mute:
+	tst.b	music_playing
+	beq.b	1f
+	lea		_custom,a6
+    clr.w   music_tick   | not playing anymore
+    jsr		_mt_end
+1:
+	movem.l	(a7)+,d1-a6
 .no_playing:
 
 
@@ -2915,6 +2936,12 @@ music_duration:
 music_loops:
 	.byte	0
 music_volume:
+	.byte	0
+music_track_start_number:
+	.word	0
+music_playing:
+	.byte	0
+music_muted:
 	.byte	0
 music_pattern:
 	.word	0

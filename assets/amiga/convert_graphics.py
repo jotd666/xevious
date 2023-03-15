@@ -191,7 +191,7 @@ def remap_colors(tile_clut,color_dict,mask = 0xFF):
     # remap colors can fail to fetch color because quantization only considered
     # used CLUTs, not ALL cluts, but we need to keep the indices of the global CLUT
 
-    return [[color_dict.get(tuple(x & mask for x in c),black) for c in clut] for clut in tile_clut]
+    return [[color_dict.get(tuple(x & mask for x in c),transparent_color) for c in clut] for clut in tile_clut]
 
 def get_reduced_palette(reduced_color_dict):
     # we don't care about the keys here
