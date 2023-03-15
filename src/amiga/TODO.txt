@@ -7,17 +7,15 @@
 
 - bonus flag is mirrored!
 - hotkey (f1?) to toggle music: not working yet
-- if game is running on chipmem, reduce the framerate??
+- big flickering if game is running on chipmem
+- still some flashing (missing sprites)
 - andor sprite flickers when appearing
 - andor sprite trashed the second time it appears
 - andor bombing doesn't work too well
-- sprite position not 100% accurate (see andor bobs & sprites)
 - andor genesis sound replays: should lock timer
 - andor sprite doesn't disappear completely (only second part is hidden) on the bottom part
-- title tiles missing (level 14) title tiles also with brown color config???
-  related to hole in map???
-  probably related to warning (improve the warning): 22:64: <PIL.Image.Image image mode=RGB size=8x8 at 0x187C30614F0>: (x=0,y=0) rounded color (81, 81, 81) (#515151) not found, orig color (81, 81, 81) (#515151), maybe try adjusting precision mask 0 close colors: []
-- level 14: tile layout looks wrong (bird drawing)
+- level 14: tile layout looks wrong (bird drawing): empty brown tiles are probably not drawn
+  retaining the old data from previous scrolled map
 - implement dip switches screen ??
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 - not booting from real machine on CF card without whdload

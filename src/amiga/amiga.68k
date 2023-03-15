@@ -827,11 +827,11 @@ osd_w_bg_videoram:
 	movem.l	d0-d5/a0-a2,-(a7)
 	lea		bg_videoram,a2
 	* dump both tables (color+char): S bg_data <address@0x110> $1000
-	move.l	a1,0x110		| temp
 	cmp.b	(a2,d0.w),d1
 	beq.b	0f				| already the proper value
 	move.b	d1,(a2,d0.w)	| update logical grid
 	lea		bg_colorram,a1
+	move.l	a1,0x110		| temp
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
 	bsr		update_bg_tile
 0:
@@ -1354,7 +1354,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-	*.include	"ag_test_clip.68k"
+	*.include	"ag_test.68k"
 
 out:
 	rts
@@ -1388,7 +1388,7 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	**lea		ag_sprites(pc),a4
+	*lea		ag_sprites(pc),a4
 
 	move.l		previous_sprite_state_ptr(pc),a5
 	lea			is_hw_sprite_table,a6
@@ -1762,7 +1762,7 @@ show_sprite:
 	.endr
 8:
 	* same position as bobs: shift X by 8
-	sub.w	#8,d0
+	subq.w	#8,d0
 	bsr		store_sprite_pos
 	move.w	d0,(8,a1)
 	swap	d0
@@ -1838,6 +1838,7 @@ draw_andor_sprite:
 	clr.w	d1			| fake color config 0 (we change it dynamically just above)
 	move.w	d2,d3	| y-clipping in D3
 	move.w	#96,d2	| same height for both parts
+	addq.w	#2,d5	| make up for shift (strange!!)
 	bsr	draw_hw_sprite
 	move.w	(a7)+,d4
 	rts

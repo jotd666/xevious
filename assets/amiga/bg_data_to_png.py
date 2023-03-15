@@ -17,8 +17,9 @@ block_dict = {}
 
 winuae_dir = r"C:\Users\Public\Documents\Amiga Files\WinUAE"
 
-dump_dir = "dumps/bg"
-
+dump_dir = "dumps/bg_tile/orig"
+if not os.path.isdir(dump_dir):
+    raise Exception("{} doesn't exist".format(dump_dir))
 def dump_png(bg_data):
     with open(bg_data,"rb") as f:
         color_data = f.read(0x800)
@@ -60,8 +61,9 @@ def dump_png(bg_data):
     outimg.save(os.path.join("dumps","{}.png".format(os.path.basename(bg_data))))
     return used_tiles
 
-ut = dump_png("bg_data_scroll")
+ut = dump_png("bg_tile_bug")
 
+ut = dump_png("bg_data_scroll")
 ut = dump_png("bg_data_title")
 print(ut)
 
