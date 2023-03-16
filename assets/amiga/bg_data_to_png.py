@@ -42,6 +42,8 @@ def dump_png(bg_data):
         clut_index |= ((idx & 0x3F)>>2)
         clut_index |= (idx&0x3) << 5
         used_tiles.add(tile_index)
+        # tile_index == 256 and clut_index==32: blank brown title
+
         img = "img_{:02d}_{}.png".format(tile_index,clut_index)
         img = os.path.join(dump_dir,img)
 

@@ -31,7 +31,7 @@ sprite_color_count = collections.Counter()
 sprite_color_usage = collections.defaultdict(set)
 
 title_tiles = {240, 241, 242, 243, 244, 245, 246, 247, 248,
-249, 256, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425,
+249, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425,
 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437,
 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449,
  450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461,
@@ -341,6 +341,8 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
     for tile_index,cluts in tile_clut_dict.items():
         # select the used tile
         pic = pics[tile_index]
+
+
         # select the proper row (for all tile color configurations - aka bitplane configurations)
         row = matrix[tile_index]
         # generate the proper palette
@@ -366,6 +368,7 @@ def populate_tile_matrix(matrix,side,pics,tile_clut_dict,is_sprite,image_names_d
 
                 except bitplanelib.BitplaneException as e:
                     print("{}:{}: {}".format(tile_index,clut_index,e))
+
 
 def write_tiles(t,matrix,f,is_sprite):
     # background tiles/sprites: this is trickier as we have to write a big 2D table tileindex + all possible 64 color configurations (a lot are null pointers)
@@ -676,6 +679,7 @@ if dump_graphics:
     # compute the RGB configuration used for each used tile. Generate a lookup table with
 
     used_bg_cluts = get_used_bg_cluts()
+
     #bg_used_colors = clut_dict_to_rgb(bg_tile_clut,used_bg_cluts)
     tilemap_quantized_rgb =  reduced_color_dict["map_tiles"]
 

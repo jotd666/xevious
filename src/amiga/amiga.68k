@@ -423,8 +423,6 @@ _demo_end:
 _vblank:
     movem.l d0-d7/a0-a6,-(a7)
 	move.w	_custom+intreqr,d0
-	btst	#5,d0
-	beq.b		1f
 
 	move.l	_joypad_state(pc),d1
 	moveq	#1,d0
@@ -450,10 +448,6 @@ _vblank:
 	* now it's over so let other tunes play
 	clr.b	sound_lock
 13:
-	move.w	#0x20,_custom+intreq	
-	bra.b	3f
-
-1:
  	clr.b	no_gfx_update
     move.w  vbl_counter(pc),d0
 	* skip it no matter what, it is going to be updated twice (60Hz emu)
@@ -503,7 +497,7 @@ _vblank:
 22:
     move.w  d0,vbl_counter
 23:
-	move.w	#0x10,_custom+intreq		
+	move.w	#0x20,_custom+intreq	
 3:
     movem.l (a7)+,d0-d7/a0-a6
 	
@@ -754,15 +748,15 @@ set_aga_color_registers:
 
 * 60Hz VBLANK interrupt (also keyboard)
 osd_enable_vblank_interrupt:
-	move.w	#0xC038,_custom+intena
+	move.w	#0xC028,_custom+intena
 	rts
 
 osd_ack_vblank_interrupt:
-	**move.w	#0x10,_custom+intreq
+	**move.w	#0x20,_custom+intreq
  	rts
 		
 osd_disable_vblank_interrupt:
-	move.w	#0x0010,_custom+intena
+	move.w	#0x0020,_custom+intena
 	rts
 		
 * d0=offset (preserved), d1=attribute (preserved)
@@ -925,6 +919,7 @@ update_bg_tile:
 	* bit 4 of the colour is derived from bit 7 of the videoram byte
 	bset	#4,d3	| add bit 4 if tile id & 0x80 != 0 (????)
 22:
+
 	* now d3 is the index, mul by 2 to get row pointer offset
 	add.w	d3,d3
 	* d1 times 256 (<<8) is the row start pointer
@@ -944,7 +939,6 @@ update_bg_tile:
 	tst.b	unknown_tile_found
 	bne.w	9f
 	st.b	unknown_tile_found
-	**blitz
 	bra.w	9f
 7:
 	move.w	(a0),a0
@@ -1629,6 +1623,22 @@ osd_update_32_sprite_hw:
 	rts
 	
 31:
+	lea		active_hw_sprite_lifetime(pc),a0
+	moveq	#7,d7
+6:
+	move.w	(a0),d0
+	beq.b	9f
+	subq	#1,d0
+	move.w	d0,(a0)
+	bne.b	9f
+	* sprite lifetime elapsed: hide it
+	move.l	(2,a0),a1	| sprite tile number
+	* end of life for that sprite
+	bsr		hide_sprite
+9:
+	addq.w	#8,a0
+	dbf		d7,6b
+
 	* in the second pass (D0=32), redraw all foreground tiles
 	* this is much faster and simpler than marking the
 	* "dirty" tiles, because if the tile is empty nothing
@@ -1674,21 +1684,6 @@ osd_update_32_sprite_hw:
 	* if the life counter is zero, clear the sprite positions
 	* this is required because we cannot rely on the previous state to know that
 
-	lea		active_hw_sprite_lifetime(pc),a0
-	moveq	#7,d7
-6:
-	move.w	(a0),d0
-	beq.b	9f
-	subq	#1,d0
-	move.w	d0,(a0)
-	bne.b	9f
-	* sprite lifetime elapsed: hide it
-	move.l	(2,a0),a1	| sprite tile number
-	* end of life for that sprite
-	bsr		hide_sprite
-9:
-	addq.w	#8,a0
-	dbf		d7,6b
 
 
 
@@ -3199,7 +3194,6 @@ color_row_30_plus:
 
 	dc.w	fgcol,(testcol & 0x0FFF)
  	dc.w	beampos+0x400,0xFFFE   | wait before interrupt, avoid losing last bobs lines
-    dc.w	 intreq,0x8010
 	*dc.w	color,(0xF0F)
 	*dc.w	fgcol,0xF00	| test
     dc.l    -2					

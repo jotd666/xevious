@@ -1,27 +1,26 @@
 * to see with Mark:
 
 - find a way to make up for those shaking ground enemies
-- optimize main/sub code more
 
 * can be worked on my own:
 
+- fg tile flickering!! probably not refreshed on both displayed/drawed planes
 - bonus flag is mirrored!
 - hotkey (f1?) to toggle music: not working yet
 - big flickering if game is running on chipmem
-- still some flashing (missing sprites)
+- still some flashing (missing sprites, level 14)
 - andor sprite flickers when appearing
 - andor sprite trashed the second time it appears
-- andor bombing doesn't work too well
+- andor bombing doesn't work too well: test on real machine
 - andor genesis sound replays: should lock timer
 - andor sprite doesn't disappear completely (only second part is hidden) on the bottom part
-- level 14: tile layout looks wrong (bird drawing): empty brown tiles are probably not drawn
-  retaining the old data from previous scrolled map
 - implement dip switches screen ??
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 - not booting from real machine on CF card without whdload
 
 further optims:
 
+- optimize main/sub code more
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
