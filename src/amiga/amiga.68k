@@ -496,8 +496,8 @@ _vblank:
     addq.w  #1,d0
     cmp.w   #5,d0
     bne.b   22f
-    * update a second time, simulate 60Hz
-    jsr	xevious_im1_irq
+    * update a second time, simulate 60Hz: doesn't work!
+    **jsr	xevious_im1_irq
     clr.w d0    
 22:
     move.w  d0,vbl_counter
@@ -1404,6 +1404,11 @@ osd_update_32_sprite_hw:
 	beq.w	11f
 	clr		d0
 	move.b	(2,a5),d0
+	tst.b		(1,a5)   | sprite attributes	
+	bpl.b	222f
+	* second bank
+	bset	#8,d0
+222:
 	tst.b	(a6,d0.w)
 	bne.w	11f		| real sprite: skip erase
 	* erase previous sprite position (but not if sprite type
@@ -1648,6 +1653,8 @@ osd_update_32_sprite_hw:
 	* this is much faster and simpler than marking the
 	* "dirty" tiles, because if the tile is empty nothing
 	* is done anyway
+	
+	
 	.ifeq	OPT_DISABLE_FG_LAYER
 	moveq	#0,d0
 	lea		fg_colorram,a4
