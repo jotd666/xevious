@@ -4,10 +4,10 @@
 
 * can be worked on my own:
 
+- big flickering if game is running on chipmem
 - fg tile flickering!! probably not refreshed on both displayed/drawed planes
 - bonus flag is mirrored!
 - hotkey (f1?) to toggle music: not working yet
-- big flickering if game is running on chipmem
 - still some flashing (missing sprites, level 14)
 - andor sprite flickers when appearing
 - andor sprite trashed the second time it appears
