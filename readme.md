@@ -80,7 +80,7 @@ Build process:
 When changing asset-related data (since dependencies aren't good):
 
 - To update the "graphics.68k" & "palette*.68k" files from "assets/amiga" subdir, 
-  just run the "convert_sprites.py" python script, 
+  just run the "convert_graphics.py" python script, 
 - To update sounds, use "convert_sounds.py"
   python script (audio) to create sound*.68k files.
 
