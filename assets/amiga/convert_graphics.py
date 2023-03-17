@@ -289,7 +289,7 @@ with open(os.path.join(this_dir,"xevious_gfx.c")) as f:
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
 
 
-sprite_names = load_names("sprite_names.json")
+sprite_names = load_names(os.path.join(this_dir,"sprite_names.json"))
 
 
 # convert palette indexes to actual colors
