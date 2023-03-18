@@ -532,10 +532,14 @@ sub_fn_2__handle_objects: | $068F
     lea       obj_fn_tbl,a1
     move.b    (-1,a1,d0.w),d0                   | table is -1 based, index=type
     lea       sub_fn_2_handler,a1
+	.ifdef	NO68020
     add.w     d0,d0
     add.w     d0,d0                             | offset in table
     movea.l   (a1,d0.w),a1                      | jump address
-    jsr       (a1)
+    jmp       (a1)
+	.else
+	jmp		([a1,d0.w*4])
+	.endif
 9:  rts
 
 * table of function handlers for each object type
@@ -627,10 +631,10 @@ sub_2_fn_6__set_bacura_inc_cnt: | $075D
     rts
     
 sub_fn_3__handle_next_area: | $078B
-    bsr       save_PC_to_fn_tbl_and_ret   
+    jbsr       save_PC_to_fn_tbl_and_ret   
     cmp.b     #0x0e,(scroll_cntr)               | MSB
     beq.b     9f                                | not ready to finish
-    bsr       save_PC_to_fn_tbl_and_ret   
+    jbsr       save_PC_to_fn_tbl_and_ret   
     cmp.b     #0x0e,(scroll_cntr)               | MSB
     bne.b     9f                                | not finished
     move.w    (area),d0
@@ -644,16 +648,20 @@ sub_fn_3__handle_next_area: | $078B
     lea       area_offset_in_map_tbl,a0
     move.b    (a0,d0.w),(area_offset_in_map)    | update offset
     lea       area_object_tbl_tbl,a0
+	.ifdef		NO68020
     add.w	    d0,d0                             | offset in table
     add.w	    d0,d0                             | offset in table
     move.l    (a0,d0.w),(area_obj_ptr)          | new area ptr
+	.else
+	move.l	(a0,d0.w*4),(area_obj_ptr)
+	.endif
     *** show area on screen for debugging
     .ifne OPT_DISPLAY_AREA
     move.w    #0x0123,d0                        | screen col,row
     move.w    (area),d1
     addq.w    #1,d1
     moveq     #BANK_FG_VIDEORAM,d2
-    bsr       display_char
+    jbsr       display_char
     .endif
     bra.b     sub_fn_3__handle_next_area
 9:  rts
@@ -689,7 +697,7 @@ display_1up_2up:
     move.w    #BANK_FG_VIDEORAM,d2
     moveq     #3-1,d7
 4:  move.b    (a0)+,d1
-    bsr       display_char
+    jbsr       display_char
     dbf       d7,4b
 9:  rts
 
