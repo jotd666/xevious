@@ -259,10 +259,13 @@ restart_main_loop: | $0437
     lea       main_fn_tbl_RAM,a6
     moveq     #32-1,d7                          | 32 functions
 main_loop: | $0447
-    move.l    (a6),a0                           | get jump address
+    move.l    (a6),d0
+	beq.b	1f
+	move.l	d0,a0                           | get jump address
     movem.l   d7/a6,-(a7)
     jsr       (a0)                              | call function
     movem.l   (a7)+,d7/a6
+1:
     addq.l    #4,a6                             | next table entry
     dbf       d7,main_loop
 
@@ -280,30 +283,30 @@ main_fn_tbl_ROM: | $045B
     .long     main_fn_3__init_bacura
     .long     main_fn_4__spawn_flying_enemies
     .long     main_fn_5__inc_num_bacura
-    .long     null_fn                           | protection
-    .long     null_fn                           | protection_check
-    .long     null_fn                           | check_fn_7_code
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
-    .long     null_fn
+    .long     0                           | protection
+    .long     0                           | protection_check
+    .long     0                           | check_fn_7_code
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
+    .long     0
     .long     main_fn_30__handle_shooting
     .long     main_fn_31__handle_bombing
 

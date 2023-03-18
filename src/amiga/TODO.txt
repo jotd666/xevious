@@ -1,11 +1,17 @@
 * to see with Mark:
 
 - find a way to make up for those shaking ground enemies
+- make game 20% faster (60Hz)
 
 * can be worked on my own:
 
 - big flickering if game is running on chipmem
-- fg tile flickering!! probably not refreshed on both displayed/drawed planes
+  * partially because of fg tile refresh which is very CPU intensive
+  -> in menu mode, no BOBs => no need to update fg tiles
+  -> in game mode, could write into a backbuffer (1 plane) and blit only 
+     parts like score, remaining ships and optionally start message/game over regions
+  * but even without it where there are more than 5 or 6 objects it flickers
+    (maybe double buffering issue)
 - bonus flag is mirrored!
 - hotkey (f1?) to toggle music: not working yet
 - still some flashing (missing sprites, level 14)

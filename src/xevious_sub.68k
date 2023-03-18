@@ -66,11 +66,16 @@ restart_main_fn_loop:
     lea       sub_fn_jump_tbl_RAM,a6            | 32 functions
     moveq     #32-1,d7
 main_fn_loop:   
-    move.l    (a6),a0                           | get jump address
+    move.l    (a6),d0                           | get jump address
+	beq.b	1f		| skip if 0
     movem.l   d7/a6,-(a7)
-    jsr       (a0)                              | call function
+    move.l	d0,a0
+    jsr       (a0)                          | call function
     movem.l   (a7)+,d7/a6
-    lea       (4,a6),a6                         | next table entry
+1:
+    | next table entry (we can't do move.l (a6)+,d0
+	| as code seems to rely on current a6 value)
+	addq.w	#4,a6
     dbf       d7,main_fn_loop
 
     move.w    #0x8000,d0                        | black
@@ -90,29 +95,29 @@ sub_fn_jump_tbl_ROM: | $01B6
     .long     sub_fn_4__handle_credits_and_start
     .long     sub_fn_5__handle_pulsing_colours
     .long     sub_fn_6__display_1UP_2UP
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
-    .long     null_fn                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
+    .long     0                           | not used
     .long     sub_fn_30__handle_scroll
     .long     sub_fn_31__update_sprite_shadow
         

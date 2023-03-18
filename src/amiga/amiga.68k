@@ -17,6 +17,8 @@ STATE_INACTIVE = 0
 SPRITE_LIFETIME = 2
 
 OPT_ENABLE_LOGGING = 1
+OPT_ENABLE_PROFILING = 1
+
 * double-buffering is really needed here, else blits fail
 * to race the beam and flicker is very frequent
 OPT_ENABLE_DOUBLE_BUFFERING = 1
@@ -73,7 +75,14 @@ ACTIVE_SPRITE_STRUCT_BITS = 6    | 1<<6 = 64: can hold a slb struct
       move.l    (a7)+,0x\address
 .endm
 
-	
+.macro	WAIT_BLIT
+	move.w	#0x8400,dmacon+_custom
+wait\@:
+	BTST	#6,dmaconr+_custom
+	BNE.S	wait\@
+	move.w	#0x0400,dmacon+_custom
+.endm
+
 .macro MUL_TABLE value,len
 mul\value\()_table:
 	.set    mulv,0
@@ -294,6 +303,12 @@ DUMMY:
 	    
 TRAP:
 	rte
+
+	.ifne	OPT_ENABLE_PROFILING
+	* init profiling if enabled
+	.include	"profiler.68k"
+	.endif
+
 	    
 _user:
     * if D0 contains "WHDL"
@@ -303,7 +318,7 @@ _user:
     bne.b   .standard
     move.l a0,_resload
     *move.b  d1,_keyexit
-
+	
     bra		.no_forbid
 .standard:
 	lea		_custom,a5
@@ -629,6 +644,13 @@ switch_screen_buffers:
 platform_init:
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
+	* set blitter parameters once and for all
+	.ifndef	VARIABLE_MASKS_AB_MODS
+    move.l  #-1,bltafwm(a5)
+	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
+	clr.w bltbmod(a5)		|B modulo=bytes to skip between lines
+	.endif
+	
 	* restrict borders: we don't see bobs on the borders!
     move.w #0x1C99,diwstrt(a5)
     move.w #0x3881-8,diwstop(a5)
@@ -677,6 +699,16 @@ platform_init:
 	move.l	(a7)+,0x68.W
 	pea		_vblank(pc)
 	move.l	(a7)+,0x6C.W
+
+	.ifne	OPT_ENABLE_PROFILING
+	* init profiling if enabled
+	lea		0x180000,a0
+	move.l	#0x20000,d0
+	lea		0x100,a1
+	bsr		init_fixed_address
+	bsr		install_profiler_vbl_hook
+	.endif
+
 	
     rts
 
@@ -757,11 +789,11 @@ osd_enable_vblank_interrupt:
 	rts
 
 osd_ack_vblank_interrupt:
-	**move.w	#0x10,_custom+intreq
+	move.w	#0x30,_custom+intreq
  	rts
 		
 osd_disable_vblank_interrupt:
-	move.w	#0x0010,_custom+intena
+	move.w	#0x0030,_custom+intena
 	rts
 		
 * d0=offset (preserved), d1=attribute (preserved)
@@ -896,10 +928,10 @@ update_bg_tile:
 2:
 	.ifne  OPT_ENABLE_LOGGING
 	move.l	a0,0x120
-	* log the tile, use start address in 0x100 then
+	* log the tile, use start address in 0x114 then
 	* S bg_tile_log <address> !64*!512
 	lea		bg_tile_log,a1
-	move.l	a1,0x100
+	move.l	a1,0x114
 	movem.l	d1/d2,-(a7)
 
 	lsl.w	#6,d1		| times 64, 128 cluts but depend on bit 4
@@ -973,6 +1005,7 @@ update_bg_tile:
 	* draw
 	btst	#6,d2    | Y-flip
 	bne	5f
+
 4:
 	tst.b	(a0)+
 	beq	6f
@@ -1398,7 +1431,7 @@ osd_update_32_sprite_hw:
 	tst.w	d7
 	bne.w	12f
 	movem.l	d2-d5/a0-a2/a5,-(a7)
-	move.w	#NB_SPRITES_TOTAL-1,d4
+	move.w	#NB_SPRITES_TOTAL-1,d3
 2:
 	cmp.b	#STATE_INACTIVE,(a5)
 	beq.w	11f
@@ -1437,11 +1470,11 @@ osd_update_32_sprite_hw:
 	and.b	#3,d0
 	beq.b	310f
 30:
-    move.w  #18,d3	| max height
+    move.w  #16,d4	| max height
 	
 	btst	#0,d0		| double width (height on rotated display)
 	beq.b	31f
-	add.w	#16,d3
+	add.w	#16,d4
 31:
 	btst	#1,d0		| double height (width on rotated display)
 	beq.b	32f
@@ -1453,28 +1486,26 @@ osd_update_32_sprite_hw:
 	* add Y-offset (possibly 0, but > 0 for shots & small object)
 	add.w	(8,a5),d1
 	* set exact height (may be smaller than 16)
-	move.w	(10,a5),d3
-	addq.w	#2,d3
+	move.w	(10,a5),d4
+	addq.w	#2,d4
 32:
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
 
-	movem.l	d3/a5,-(a7)
+	movem.l	d4/a5,-(a7)
     lea _custom,a5
 
 	move.l		fg_drawed_screen_ptr(pc),a1
 	.rept	4
 	movem.l	a1/d0-d4,-(a7)
-	move.w	d3,d4
-    moveq.l #-1,d3
     bsr clear_plane_any_blitter_internal
 	movem.l	(a7)+,a1/d0-d4
 	lea		(FG_SCREEN_PLANE_SIZE.W,a1),a1
 	.endr
-	movem.l	(a7)+,d3/a5
+	movem.l	(a7)+,d4/a5
 11:
 	lea		(SPRITE_MEM_SIZE.W,a5),a5
-	dbf		d4,2b
+	dbf		d3,2b
 	movem.l	(a7)+,d2-d5/a0-a2/a5
 12:
 	* then update the active sprites
@@ -1577,13 +1608,13 @@ osd_update_32_sprite_hw:
 	bgt.w	2f		| too low
 
 	.ifne  OPT_ENABLE_LOGGING
-	* log the sprite, use start address in 0x104 then
+	* log the sprite, use start address in 0x110 then
 	* S sprite_tile_log <address> !128*!320
 	* then run the "convert_graphics.py" script
 	* to discover the new sprite configurations
 	
 	lea		sprite_tile_log,a1
-	move.l	a1,0x104
+	move.l	a1,0x110
 	movem.l	d0-d2,-(a7)
 	lsl.w	#7,d0		| times 128
 	add.l	d0,a1
@@ -1624,9 +1655,11 @@ osd_update_32_sprite_hw:
 	lea		(NB_SPRITES_TO_UPDATE*SPRITE_MEM_SIZE.W,a5),a5
 3:
 	* copy one sprite backup structure (multiple of 4 bytes) 32 times
-	.rept	3   | 12/4 change if SPRITE_MEM_SIZE changes!!
-	move.l	(a4)+,(a5)+
-	.endr
+	** | 12/4 change if SPRITE_MEM_SIZE changes!!
+	movem.l	(a4)+,d1/d2/d3
+	movem.l	d1/d2/d3,(a5)
+	lea		(12,a5),a5
+
 	dbf		d0,3b
 	tst.w	d7
 	bne.b	31f
@@ -1662,7 +1695,7 @@ osd_update_32_sprite_hw:
 	moveq	#FG_TILE_DRAW_OR,d3
 	move.l	#0x24242424,d7
 	* wait blit to avoid surprises with unfinished blits
-	bsr		wait_blit
+	WAIT_BLIT
 	* highly optimized tile refresh routine
 	* assuming that tiles are empty most of the time
 4:
@@ -2495,10 +2528,13 @@ clear_plane_any_blitter_internal:
     add.w   d2,d4       | blit height
 
     * now just wait for blitter ready to write all registers
-	bsr	wait_blit
+	WAIT_BLIT
     
     * blitter registers set
+	.ifdef	VARIABLE_MASKS_AB_MODS
     move.l  d3,bltafwm(a5)
+	.endif
+	
 	move.l d5,bltcon0(a5)	
     move.w  d0,bltdmod(a5)	|D modulo
 	move.w  #-1,bltadat(a5)	|source graphic top left corner
@@ -2721,7 +2757,7 @@ blit_plane_cookie_cut_16x_flipped:
 * < A2: background to mix with cookie cut
 * < A3: source mask for cookie cut
 * < D2: width in bytes (inc. 2 extra for shifting)
-* < D3: blit mask
+* < D3: blit mask (not considered, optim, -1 all through the game)
 * < D4: height. If negative, source is copied with negative modulo (flip)*       
 * blit mask set
 * returns: start of destination in A1 (computed from old A1+X,Y)
@@ -2790,13 +2826,15 @@ blit_plane_any_internal_cookie_cut:
     * always the same settings (ATM)
 
     * now just wait for blitter ready to write all registers
-	bsr	wait_blit
+	WAIT_BLIT
     
     * blitter registers set
 
+	.ifdef	VARIABLE_MASKS_AB_MODS
     move.l  d3,bltafwm(a5)
 	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
 	clr.w bltbmod(a5)		|A modulo=bytes to skip between lines
+	.endif
 	move.l d5,bltcon0(a5)	| sets con0 and con1
 
     move.w  d0,bltcmod(a5)	|C modulo
@@ -2886,12 +2924,14 @@ blit_plane_any_internal_cookie_cut_blank_source:
     * always the same settings (ATM)
 
     * now just wait for blitter ready to write all registers
-	bsr	wait_blit
+	WAIT_BLIT
     
     * blitter registers set
 
+	.ifdef	VARIABLE_MASKS_AB_MODS
     move.l  d3,bltafwm(a5)
 	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
+	.endif
 	move.l d5,bltcon0(a5)	| sets con0 and con1
 
  	move.w  #0,bltbdat(a5)	|B word is zero
@@ -2906,12 +2946,7 @@ blit_plane_any_internal_cookie_cut_blank_source:
     movem.l (a7)+,d0-d6/a2/a4
     rts
 
-wait_blit:
-	TST.B	0xBFE001
-100:
-	BTST	#6,dmaconr+_custom
-	BNE.S	100b
-	rts
+
 	
 	MUL_TABLE	NB_BYTES_PER_ROW,512
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512
