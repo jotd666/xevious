@@ -78,7 +78,17 @@ start:
     IFD CHIP_ONLY
     lea  _expmem(pc),a0
     move.l  #CHIPMEMSIZE/2,(a0)
+	; full chipmem: enable cache for representativity
+	move.l	#WCPUF_Base_WT|WCPUF_Exp_CB|WCPUF_Slave_CB|WCPUF_IC|WCPUF_DC|WCPUF_BC|WCPUF_SS|WCPUF_SB,d0	
+	ELSE
+	move.l	#WCPUF_Base_NC|WCPUF_Exp_CB|WCPUF_Slave_CB|WCPUF_IC|WCPUF_DC|WCPUF_BC|WCPUF_SS|WCPUF_SB,d0	
     ENDC
+	
+	;enable cache
+	move.l	#WCPUF_All,d1
+	jsr	(resload_SetCPU,a2)
+
+
     lea progstart(pc),a0
     move.l  _expmem(pc),(a0)
 

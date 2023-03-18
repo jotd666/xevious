@@ -17,7 +17,7 @@ STATE_INACTIVE = 0
 SPRITE_LIFETIME = 2
 
 OPT_ENABLE_LOGGING = 1
-OPT_ENABLE_PROFILING = 1
+OPT_ENABLE_PROFILING = 0
 
 * double-buffering is really needed here, else blits fail
 * to race the beam and flicker is very frequent
@@ -377,6 +377,7 @@ _user:
 	*move.l	#-1,pr_WindowPtr(A0)	| no more system requesters (insert volume, write protected...)
 
 .no_forbid:
+	
 	* soundfx lib
 	lea		_custom,a6
 	sub.l	a0,a0	| assuming vbr=0
@@ -417,7 +418,7 @@ demo_game:
 		bne.b   .no_super
 		move.l	4,A6
 		jsr		_LVOSuperState(a6)
-.no_super:	
+.no_super:
 		move		#0x4000,_custom+intena						| disable interrupts
 		bsr			platform_init					| amiga-specific init
 		jmp			xevious_reset					| pass control to the xevious core
