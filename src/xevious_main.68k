@@ -190,6 +190,9 @@ xevious_im1_irq: | $0038
     move.w    #0x4F00,d0                        | red
     jsr       osd_debug_hook
     bsr       update_sprite_hw_and_other_things
+.ifne OPT_SUB_HAS_IRQ
+    bsr       xevious_sub_irq
+.endif    
     move.w    #0x8000,d0                        | black
     jsr       osd_debug_hook
     movem.l   (a7)+,d0-d7/a0-a6
@@ -250,9 +253,13 @@ start: | $012E
     jsr       osd_enable_vblank_interrupt
     
 restart_main_loop: | $0437
-    tst.b    (vb_semaphore_main)       | signalled?
-    beq.b      restart_main_loop                 | no, spin
-    clr.b     (vb_semaphore_main)               | reset
+    *move.b    (vb_semaphore_main),d0
+    *subq.b    #1,d0                             | signalled?
+    *bne.b     restart_main_loop                 | no, spin
+    *clr.b     (vb_semaphore_main)               | reset
+    tst.b     (vb_semaphore_main)
+    beq.b     restart_main_loop
+    subq.b    #1,(vb_semaphore_main)
     addq.b    #1,(countup_timer_1)
 
     ***

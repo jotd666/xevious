@@ -11,6 +11,9 @@
     OPT_DISABLE_SPRITES=0
     OPT_DISABLE_DISPLAY_MASKS=0
 
+    * optimisation options
+    OPT_SUB_HAS_IRQ=0
+    
     * game options    
     OPT_START_AREA=1
     OPT_LOOP_AREA=0
