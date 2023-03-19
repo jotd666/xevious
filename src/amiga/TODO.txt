@@ -1,6 +1,5 @@
 * to see with Mark:
 
-- find a way to make up for those shaking ground enemies
 - make game 20% faster (60Hz)
 
 * can be worked on my own:
@@ -10,9 +9,8 @@
 - still some flashing (missing sprites, level 14)
 - andor sprite flickers when appearing
 - andor sprite trashed the second time it appears
-- andor bombing doesn't work too well: test on real machine
+- andor bombing doesn't work too well: test on MAME
 - andor genesis sound replays: should lock timer
-- andor sprite doesn't disappear completely (only second part is hidden) on the bottom part
 - implement dip switches screen ??
 - not booting from real machine on CF card without whdload
 - change improve FG tile handling: 
@@ -22,7 +20,6 @@
 
 further optims:
 
-- optimize main/sub code more
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
@@ -30,5 +27,6 @@ further optims:
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
+- find a way to make up for those still slightly shaking ground enemies
   
   

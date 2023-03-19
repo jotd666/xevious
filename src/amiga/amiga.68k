@@ -2672,42 +2672,49 @@ TITLE_HEIGHT = 48
 TITLE_WIDTH = 176/8+2
 * what: blits XEVIOUS attract mode title
 blit_xevious_title:
-    movem.l d0-d7/a1-a5,-(a7)
-    lea _custom,A5
+    movem.l d0-d3/a1,-(a7)
 	move.w	#TITLE_X,d0
 	move.w	#TITLE_Y,d1
-	
-	move.w	#TITLE_HEIGHT,d4
-	moveq	#-1,d3		|masking of first/last word    
+	move.w	#TITLE_HEIGHT,d3
     move.w  #TITLE_WIDTH,d2
+	lea		xevious_title,a0
+	bsr.b	blit_fg_layer
+    movem.l (a7)+,d0-d3/a1
+	rts
+	
+* what: blits parts of fg layer attract mode title
+* A0: data
+* D0: start X
+* D1: start Y
+* D2: width in bytes
+* D3: height
+
+blit_fg_layer:
+    movem.l d0-d7/a1-a5,-(a7)
+    lea _custom,A5
+	move.w	d3,d4		| width
+	
 	move.l	fg_drawed_screen_ptr(pc),a2
 	move.l	a2,a1
-	lea		xevious_title,a0
 	move.l	a0,a3		| mask is the same
-	move.l	a1,-(a7)
+	movem.l	d0-d3/a1,-(a7)
     bsr blit_plane_any_internal_cookie_cut
-	move.l	(a7)+,a1
+	movem.l	(a7)+,d0-d3/a1
 	
-	* A1 points directly to destination, reuse it
-	* and set X and Y to zero (no offset computation)
-	* to remove 1 bits under the title
+	* remove 1 bits under the title
 	moveq	#2,d7
 0:
 	lea		(FG_SCREEN_PLANE_SIZE.W,a1),a1
 	move.l	a1,a2
-	move.w	#TITLE_X,d0
-	move.w	#TITLE_Y,d1
-	move.w	#TITLE_HEIGHT,d4
-	moveq	#-1,d3		|masking of first/last word    
-    move.w  #TITLE_WIDTH,d2
- 	move.l	a1,-(a7)
+ 	movem.l	d0-d3/a1,-(a7)
     bsr blit_plane_any_internal_cookie_cut_blank_source
-	move.l	(a7)+,a1
+	movem.l	(a7)+,d0-d3/a1
 	dbf		d7,0b
 	
     movem.l (a7)+,d0-d7/a1-a5
 	rts
-	
+
+
 * what: blits 16x16 data on one plane, cookie cut
 * args:
 * < A0: data (16x16)
@@ -3131,6 +3138,9 @@ fg_screen_data_1:
 	.align 0x8		| 8 else fmode first bits set (BPAGEM&BLP32) makes display wrong
 fg_screen_data_2:
 	ds.b	FG_SCREEN_SIZE
+	
+fg_tile_layer:
+	ds.b	FG_SCREEN_PLANE_SIZE
 	
 	* small margin (I suspect that gas is buggy with ds directive)
 	* plus fg plane shifting can write one byte too far
