@@ -19,13 +19,14 @@ NO68020 = 1
     .global null_fn
     .global display_char
     .global _end_of_xevious_main_rom
-    
+	
     * RAM
     .global fg_colorram
     .global bg_colorram
     .global fg_videoram
     .global bg_videoram
     .global num_credits
+    .global	vb_semaphore_main
     
 * debugging only
     .global main_loop

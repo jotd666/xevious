@@ -16,6 +16,8 @@ STATE_INACTIVE = 0
 	
 SPRITE_LIFETIME = 2
 
+NB_VISIBLE_ROWS = 36
+
 OPT_ENABLE_LOGGING = 1
 OPT_ENABLE_PROFILING = 0
 
@@ -98,12 +100,23 @@ mul\value\()_table:
 	
 	.endm
 	
-* < D0,D1 as X,Y
+* < D0 as native game offset
+* > D0,D1 as amiga X,Y
+.macro GET_XY_FROM_OFFSET
+	move.w	d0,d1
+	subq.w	#2,d1
+	and.w	#0x3F,d1	| Y is computed
+	lsr.w	#6,d0
+	neg.w	d0
+	add.w	#32,d0	| mirror: X is computed
+.endm
+
+* < D0,D1 as amiga X,Y
 * > D0 as plane offset
 * > D1 recieves original D1*240 (can be tested against the limit
 * for post-processing)
-.macro GET_XY_OFFSET
-	* multiply D1 by 240
+.macro	GET_PLANE_OFFSET_FROM_XY
+	* now multiply D1 by 240
 	lea		mulNB_BYTES_PER_ROW_table(pc),a1
 	.ifdef	NO68020
 	add.w	d1,d1
@@ -111,23 +124,13 @@ mul\value\()_table:
 	.else
 	move.w	(a1,d1.w*2),d1		| times 40
 	.endif
-	* masks MSW, not needed
-	*swap	d1
-	*clr		d1
-	*swap	d1
-	*swap	d0
-	*clr		d0
-	*swap	d0
-	
 	lsl.w	#3,d1		| times 8
-	lsr.w	#6,d0
-	neg.w	d0
-	add.w	#32,d0	| mirror
 	* add y offset to screen data	
 	add.w	d1,d0	
 	.endm
 .macro GET_XY_ADDRESS  base_address
-	GET_XY_OFFSET
+	GET_XY_FROM_OFFSET
+	GET_PLANE_OFFSET_FROM_XY	
 	* add x offset to screen data
 	lea		(\base_address,d0.w),a1
 .endm
@@ -136,25 +139,7 @@ mul\value\()_table:
 * the non shifted version is just so simple...
 * huge thanks to dual playfield and bplcon1 x-shift!
 .macro	SET_FG_BYTE
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	move.b	(a0)+,d0
-	move.b	d0,(offset,a2)
-	move.b	d0,(offset,a1)
-	.else
 	move.b	(a0)+,(offset,a1)
-	.endif
-	.endm
-
-.macro	OR_FG_BYTE
-	move.b	(offset,a1),d0
-	or.b	(a0)+,d0
-	move.b	d0,(offset,a1)
-	.endm
-
-.macro	AND_FG_BYTE
-	move.b	(offset,a1),d0
-	and.b	(a0)+,d0
-	move.b	d0,(offset,a1)
 	.endm
 
 
@@ -508,16 +493,19 @@ _vblank:
 	bsr		switch_screen_buffers
 21:	
 	.endif
-	jsr		xevious_im1_irq
 	
     move.w  vbl_counter(pc),d0
     addq.w  #1,d0
     cmp.w   #5,d0
     bne.b   22f
+	move.b	#2,vb_semaphore_main
     * update a second time, simulate 60Hz: doesn't work!
     **jsr	xevious_im1_irq
     clr.w d0    
 22:
+
+	jsr		xevious_im1_irq
+	
     move.w  d0,vbl_counter
 23:
 	move.w	#0x10,_custom+intreq		
@@ -989,9 +977,9 @@ update_bg_tile:
 	moveq	#NB_PLAYFIELD_PLANES-1,d3
 
 	;;and.w	#0x3F,d1		| row
-	cmp.w	#36,d1
+	cmp.w	#NB_VISIBLE_ROWS,d1
 	bcc.w	bg_no_mirror
-	* convert coords to address with proper shift vs foreground
+	* convert coords to address
 	GET_XY_ADDRESS		bg_screen_data-NB_BYTES_PER_ROW*4
 	* duplicate display (scrolling)
 	lea		(BG_SCREEN_PLANE_SIZE/2.W,a1),a2
@@ -1139,8 +1127,7 @@ bg_no_mirror:
 		
 FG_TILE_DRAW_COLOR = 0
 FG_TILE_DRAW_FULL = 1
-FG_TILE_DRAW_OR = 2
-FG_TILE_CLEAR = 3
+FG_TILE_CLEAR = 2
 
 * d0: offset
 * d1: tile code
@@ -1204,23 +1191,7 @@ update_fg_tile:
 	move.l	(a1,d1.w*4),a1	
 	.endif
 	move.w	d2,(a1)			| color palette index
-
-	* now we don't want to display the XEVIOUS attract mode
-	* tiles as it has to be redrawn all the time tile by
-	* tile using CPU and it's super-slow and flickers
-	* filter out most of those tiles
-	cmp.b	#215,d6
-	bne.b	11f
-	* a tile from the title. Just present once
-	* hack: blit the whole title when encountered
-	bra	blit_xevious_title
 	
-11:
-	cmp.b	#138,d6
-	bcs.b	0f
-	cmp.b	#219,d6
-	bcc.b	0f
-	rts
 0:
 	cmp.w	#FG_TILE_DRAW_COLOR,d3
 	bne.b	4f
@@ -1228,21 +1199,41 @@ update_fg_tile:
 	* (saves cycles)
 	rts
 4:
-	GET_XY_OFFSET
-	cmp.w	#(40*280),d1
-	bcs.b	1f
-	sub.w	#40*4,d0
-1:	
-	move.l	fg_drawed_screen_ptr(pc),a1
+	* convert D0 (native game offset, difficult to work with)
+	* into X,Y (native amiga)
+	GET_XY_FROM_OFFSET
+
+	* mark tile as modified in our amiga-friendly table (32x64,
+	* transposed compared to original table)
+	*
+	* code:
+	*
+	* 0: no need to draw anything
+	* 1: need to delete zone once
+	* 2: need to delete then update with bitmap data
+	lea		fg_refresh_tile_table(pc),a1
+	move.w	d1,d5
+	lsl.w	#5,d5	| Y times 32
+	add.w	d5,a1	| apply Y offset
+	moveq	#2,d4
+	cmp.w	#BLANK_FG_TILE_ID,d6
+	bne.b	41f
+	moveq	#1,d4
+41:
+	move.b	d4,(a1,d0.w)	| store at offset Y*32+X
+	
+	* we have amiga XY now get plane offset to change tile data
+	GET_PLANE_OFFSET_FROM_XY
+	
+**	cmp.w	#(40*280),d1
+**	bcs.b	1f
+**	sub.w	#40*4,d0
+**1:	
+	lea		fg_tile_layer,a1
 	lea		(a1,d0.w),a1
 	cmp.w	#FG_TILE_DRAW_FULL,d3
-	bne.w	5f   | tile clear
+	bne.b	5f   | tile clear
 
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	* like clear, draw in both planes
-	move.l	fg_displayed_screen_ptr(pc),a2
-	lea		(a2,d0.w),a2
-	.endif
 	
 	* draw
 	.set	offset,0
@@ -1254,68 +1245,11 @@ update_fg_tile:
 	rts
 
 5:
-	cmp.w	#FG_TILE_CLEAR,d3
-	beq	6f
-	* or it. This is the "tile refresh" mode. We just need
-	* to refresh the back buffer, not the one being shown
 
-	* try to super-optimize it because it costs cycles
-	* here by pre-fetching the source in 32 bits, and shifting
-	* we can even use or.b dreg,memory which is not possible
-	* with or.b (areg)+,memory
-	
-	.set	offset,0
-	.rept		2
-	move.l	(a0)+,d1
-	or.b	d1,(3*NB_BYTES_PER_ROW+offset,a1)
-	lsr.w	#8,d1
-	or.b	d1,(2*NB_BYTES_PER_ROW+offset,a1)
-	swap	d1
-	or.b	d1,(NB_BYTES_PER_ROW+offset,a1)
-	lsr.w	#8,d1
-	or.b	d1,(offset,a1)
-	.set	offset,offset+4*NB_BYTES_PER_ROW
-	.endr
-	* now remove all bits of the character on other planes
-	* to respect the original color
-	* we could have used pre-NOTed tables, but that's really
-	* not worth the trouble. A few cycles lost to prepare the
-	* mask prior to usage using 32 bit fetches and NOT should be
-	* fast enough, then reused in all 3 planes, that saves
-	* 24 NOT byte instructions
-	PREP_FG_MASK_LOOP
-10:
-	move.l	a2,a0	| reset mask pointer
-	lea		(FG_SCREEN_PLANE_SIZE.W,a1),a1
-	.set	offset,0
-	.rept		8
-	AND_FG_BYTE
-	.set	offset,offset+NB_BYTES_PER_ROW
-	.endr
-	dbf		d3,10b
-	
-	rts
-
-6:
 	* clear
-	* because systematic tile refresh is optimized
-	* clearing has to clear tiles immediately on BOTH
-	* buffers else the effect is weird
-	* (on INSERT COIN flashing message)
-	*
-	* this is the best compromise as tile clearing happens
-	* rarely compared to refreshes
-	*
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	move.l	fg_displayed_screen_ptr(pc),a2
-	lea		(a2,d0.w),a2
-	.endif
 
 	.set	offset,0
 	.rept		8
-	.ifne	OPT_ENABLE_DOUBLE_BUFFERING
-	clr.b	(offset,a2)
-	.endif
 	clr.b	(offset,a1)
 	.set	offset,offset+NB_BYTES_PER_ROW
 	.endr
@@ -1324,6 +1258,9 @@ update_fg_tile:
 not_mask:
 	.long	0,0
 		
+fg_refresh_tile_table:
+	ds.b	0x800
+	
 * d6 = bg_scroll_x_shadow
 osd_update_scroll_hw:
 	move.w	d6,scroll_offset
@@ -1685,48 +1622,58 @@ osd_update_32_sprite_hw:
 	addq.w	#8,a0
 	dbf		d7,6b
 
+	.ifdef	FUC
 	* in the second pass (D0=32), redraw all foreground tiles
-	* this is much faster and simpler than marking the
-	* "dirty" tiles, because if the tile is empty nothing
-	* is done anyway
-	
-	
-	.ifeq	OPT_DISABLE_FG_LAYER
+	* where row was marked as "to draw"
+	* TODO:::: clear first plane prior to draw sprites
+	lea		fg_refresh_tile_table(pc),a6
+	LOGPC	100
+	moveq	#0,d7	| row counter
+	moveq	#0,d6	| "in dirty block" flag
+	bra.b	11f
+	* 2 passes: first compute the first dirty tile
+10:
+	tst		d6
+	beq.b	11f
+	move.b	(a6,d7.w),d0
+	bne.b	19f		| still dirty
+	* this row is clean: compute refresh height
+	move.w	d7,d3
+	sub.w	d4,d3	| nb dirty rows
+	* D4: first dirty row
+	* D5: nb of dirty rows
+	clr	d6		| ack flag
+	* now refresh screen
+	lea		fg_tile_layer,a0
 	moveq	#0,d0
-	lea		fg_colorram,a4
-	lea		fg_videoram,a5
-	moveq	#FG_TILE_DRAW_OR,d3
-	move.l	#0x24242424,d7
-	* wait blit to avoid surprises with unfinished blits
-	WAIT_BLIT
-	* highly optimized tile refresh routine
-	* assuming that tiles are empty most of the time
-4:
-	cmp.l	(a5)+,d7	| fetch tile from character grid
-	bne.b	5f			| no need to OR if 4 blank tiles (which happens a lot)
-	addq.w	#4,d0
-	cmp.w	#FG_DIRTY_TILES_SIZE,d0
-	bne.b	4b
-	bra.b	51f
-5:
-	move.l	(-4,a5),d1
-	.rept	4
-	rol.l	#8,d1
-	cmp.b	d1,d7
-	beq.b	50f
-	* now update tile to redraw what sprites have destroyed
-	movem.l	d0-d1/d3/a4-a5,-(a7)
-	move.b	(a4,d0.w),d2	| fetch tile from color grid
-	bsr	update_fg_tile
-	movem.l	(a7)+,d0-d1/d3/a4-a5
-50:
-	addq.w	#1,d0
-	.endr
-	cmp.w	#FG_DIRTY_TILES_SIZE,d0
-	bne.b	4b
-51:
-	.endif
+	move.w	d4,d1
+	lsl.w	#3,d1	| times 8 (y)
+	lsl.w	#3,d3	| times 8 (height)
+	move.w	d1,d4
+	mulu	#NB_BYTES_PER_ROW,d4
+	add.w	d4,a0
+	move.w	#NB_BYTES_PER_ROW,d2
 
+	**jbsr	blit_fg_layer
+	bra.b	20f
+	* previous rows were clean: looking for a dirty row
+11:
+	move.b	(a6,d7.w),d0
+	beq.b	20f		| clean, next tile
+	* dirty row found (D7)
+	* mark start
+	move.w	d7,d4
+	* flag as "looking for clean tile"
+	st	d6
+19:
+	* tile has been accounted for: no more dirty
+	
+20:
+	addq.w	#1,d7
+	cmp.w	#NB_VISIBLE_ROWS+1,d7
+	bne.b	10b
+	.endif
+	
 	* after displaying real hardware sprite, we scan the possible sprites
 	* and decrease the life counter.
 	* if the life counter is zero, clear the sprite positions
@@ -1742,6 +1689,7 @@ osd_update_32_sprite_hw:
 zzz:
 			blitz
 			rts
+
 
 * show sprite, supports clipping (y offset)
 * < A1: sprite data
