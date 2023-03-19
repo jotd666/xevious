@@ -417,9 +417,11 @@ demo_game:
 		tst.l   _resload
 		bne.b   .no_super
 		move.l	4,A6
+		jsr		_LVODisable(a6)
 		jsr		_LVOSuperState(a6)
 .no_super:
 		move		#0x4000,_custom+intena						| disable interrupts
+		move		#0x7FFF,_custom+intreq						| ack all interrupts
 		bsr			platform_init					| amiga-specific init
 		jmp			xevious_reset					| pass control to the xevious core
 

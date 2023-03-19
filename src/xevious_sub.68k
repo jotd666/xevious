@@ -8,6 +8,7 @@
 
     .global _start_of_xevious_sub_rom
     .global xevious_sub_reset
+    .global xevious_sub_irq
     .global xevious_sub_cpu
     .global _end_of_xevious_sub_rom
 
@@ -29,6 +30,21 @@ _start_of_xevious_sub_rom:
 xevious_sub_reset: | $0000
     bra.b     sub_start
     
+.ifne OPT_SUB_HAS_IRQ
+xevious_sub_irq:
+    *** these are ordinarily called from the main SUB routine
+    *** because there is not interrupt context in SUB
+    *** - calls these from the MAIN IRQ instead
+    *** - try swapping the order to reduce 'shaking'
+    ***   of ground objects
+    ****bsr       sub_fn_0__update_32_sprite_hw
+    move.w    #32,d0                            | start at sprite 32
+    jsr       osd_update_32_sprite_hw
+    ***bsr       sub_fn_1__update_scroll_hw
+    move.w    (bg_scroll_x_shadow),d6
+    jsr       osd_update_scroll_hw
+    rts
+.endif
 * d0 holds col,row
 calc_colour_video_ram_offset: | $0038
     move.w    d0,d6
@@ -55,10 +71,15 @@ sub_start: | $0165
     
 xevious_sub_cpu: | $018A
 restart_main_fn_loop:
+.if 0
+    *** we realy don't need to check the semaphore
+    *** because we're being called directly from MAIN
     tst.b     (vb_semaphore_sub)
     beq.b     9f
-    clr.b     (vb_semaphore_sub)
+    *clr.b     (vb_semaphore_sub)
+    subq.b    #1,(vb_semaphore_sub)             | dec
     * don't support FREEZE
+.endif
     
     move.w    #0x100F,d0                        | blue
     jsr       osd_debug_hook
@@ -88,8 +109,13 @@ main_fn_loop:
 
     .align 4
 sub_fn_jump_tbl_ROM: | $01B6
+.ifne OPT_SUB_HAS_IRQ
+    .long     0                           | not used
+    .long     0                           | not used
+.else
     .long     sub_fn_0__update_32_sprite_hw
     .long     sub_fn_1__update_scroll_hw
+.endif
     .long     sub_fn_2__handle_objects
     .long     sub_fn_3__handle_next_area
     .long     sub_fn_4__handle_credits_and_start
@@ -125,7 +151,7 @@ sub_fn_0__update_32_sprite_hw: | $01F6
     * on the Neo Geo we have do disable VBLANK
     * and possibly on other platforms as well
     * the other options is to move this into VBLANK
-    * TBD...
+    * see OPT_SUB_HAS_IRQ
     jsr       osd_disable_vblank_interrupt
     move.w    #32,d0                            | start at sprite 32
     jsr       osd_update_32_sprite_hw
@@ -135,7 +161,7 @@ sub_fn_1__update_scroll_hw: | $0218
     * on the Neo Geo we have do disable VBLANK
     * and possibly on other platforms as well
     * the other options is to move this into VBLANK
-    * TBD...
+    * see OPT_SUB_HAS_IRQ
     jsr       osd_disable_vblank_interrupt
     move.w    (bg_scroll_x_shadow),d6
     jsr       osd_update_scroll_hw

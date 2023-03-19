@@ -15,6 +15,10 @@
 - andor sprite doesn't disappear completely (only second part is hidden) on the bottom part
 - implement dip switches screen ??
 - not booting from real machine on CF card without whdload
+- change improve FG tile handling: 
+  write into a backbuffer (1 plane) and blit only rows that were changed using a
+  "dirty" array
+- optimize BG draw more?
 
 further optims:
 
@@ -26,12 +30,5 @@ further optims:
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
-- big flickering if game is running on chipmem
-  * partially because of fg tile refresh which is very CPU intensive
-  -> in menu mode, no BOBs => no need to update fg tiles
-  -> in game mode, could write into a backbuffer (1 plane) and blit only 
-     parts like score, remaining ships and optionally start message/game over regions
-  * but even without it where there are more than 5 or 6 objects it flickers
-    (maybe double buffering issue)
   
   
