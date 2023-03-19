@@ -1,22 +1,21 @@
 * to see with Mark:
 
-- make game 20% faster (60Hz)
-
+- still some explosion "replica" on the top of screen, only happens
+  when shooting enemies
+  
 * can be worked on my own:
 
-- bonus flag is mirrored!
+- change improve FG tile handling: in progress, partially working
+- make game 20% faster (60Hz): done, must test
+- strange graphical corruption at some point in the level ????
+- bonus flag is mirrored! check flag code, activate cheat and break here
 - hotkey (f1?) to toggle music: not working yet
 - still some flashing (missing sprites, level 14)
-- andor sprite flickers when appearing
-- andor sprite trashed the second time it appears
+- andor sprite flickers when appearing: log andor Y values
+- andor sprite trashed when it appears
 - andor bombing doesn't work too well: test on MAME
-- andor genesis sound replays: should lock timer
 - implement dip switches screen ??
-- not booting from real machine on CF card without whdload
-- change improve FG tile handling: 
-  write into a backbuffer (1 plane) and blit only rows that were changed using a
-  "dirty" array
-- optimize BG draw more?
+- optimize BG draw more
 
 further optims:
 

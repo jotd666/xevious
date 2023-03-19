@@ -42,7 +42,7 @@ sound_dict = {
 
 max_sound = max(x["index"] for x in sound_dict.values())+1
 sound_table = [""]*max_sound
-sound_table_simple = ["\t.long\t0,0\n"]*max_sound
+sound_table_simple = ["\t.long\t0,0"]*max_sound
 
 
 
@@ -98,7 +98,7 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
         channel = details.get("channel")
         if channel is None:
             # if music loops, ticks are set to 1 so sound orders only can happen once (else music is started 50 times per second!!)
-            sound_table_simple[sound_index] = "\t.word\t{},{},{}\n\t.byte\t{},{}\n".format(2,details["pattern"],details.get("ticks",1),details["volume"],int(details["loops"]))
+            sound_table_simple[sound_index] = "\t.word\t{},{},{}\n\t.byte\t{},{}".format(2,details["pattern"],details.get("ticks",1),details["volume"],int(details["loops"]))
             continue
         wav_name = os.path.basename(wav_entry).lower()[:-4]
         wav_file = os.path.join(sound_dir,wav_name+".wav")
@@ -125,7 +125,7 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
 
         wav = os.path.splitext(wav_name)[0]
         sound_table[sound_index] = "    SOUND_ENTRY {},{},{},{},{}\n".format(wav,len(signed_data)//2,channel,used_sampling_rate,int(64*amp_ratio))
-        sound_table_simple[sound_index] = f"\t.long\t0x00010000,{wav}_sound\n"
+        sound_table_simple[sound_index] = f"\t.long\t0x00010000,{wav}_sound"
 
         maxed_contents = [int(x/amp_ratio) for x in signed_data]
 
@@ -136,6 +136,9 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
             signed_contents = struct.pack(">H",0) + signed_contents
         with open(raw_file,"rb") as f:
             contents = f.read().rstrip(b"\x00")
+        # align on 16-bit
+        if len(contents)%2:
+            contents += b'\x00'
         # pre-pad with 0W, used by ptplayer for idling
         if contents[0] != b'\x00' and contents[1] != b'\x00':
             # add zeroes
@@ -154,5 +157,8 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
     fw.write("\t.align\t8\n")
     fst.writelines(sound_table)
     fst.write("\n\t.global\t{0}\n\n{0}:\n".format("sound_table"))
-    fst.writelines(sound_table_simple)
+    for i,st in enumerate(sound_table_simple):
+        fst.write(st)
+        fst.write(" | {}\n".format(i))
+
 

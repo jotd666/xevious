@@ -156,13 +156,7 @@ mul\value\()_table:
 	.endm
 	
 * debug macro that colors the screen until LMB pressed
-* (if LMB is pressed when entering, macro waits for release)
-.macro blitz
-w\@:
-	btst	#6,0xbfe001
-	beq.b	w\@
-	move.w	d0,-(a7)
-	clr.w	d0
+.macro 	blitz_bypass
 loop\@:
 	move.w	#BASE_BPLCON3_VALUE,_custom+bplcon3	| really color 0
 	move.w	d0,_custom+color
@@ -173,6 +167,16 @@ loop\@:
 out\@:
 	move.w	(a7)+,d0
 	nop
+.endm
+
+* same thing but if LMB is pressed when entering, macro waits for release)
+.macro blitz
+w\@:
+	btst	#6,0xbfe001
+	beq.b	w\@
+	move.w	d0,-(a7)
+	clr.w	d0
+	blitz_bypass
 .endm
 
 * exports
@@ -404,6 +408,9 @@ demo_game:
 		move.l	4,A6
 		jsr		_LVODisable(a6)
 		jsr		_LVOSuperState(a6)
+		* force VBR to zero if not whdload
+		moveq	#0,d0
+		movec	d0,vbr
 .no_super:
 		move		#0x4000,_custom+intena						| disable interrupts
 		move		#0x7FFF,_custom+intreq						| ack all interrupts
@@ -536,6 +543,20 @@ osd_sound_start:
 	move.w	(a0,d0.w),d1	| sound type
 	beq.b	1f		| no sound
 
+	cmp.w	#ANDOR_GENESIS_SND*8,d0
+	bne.b	11f
+	* andor genesis is also special, we need to workaround
+	* the constant replay and let the replayer "loop"
+	move.w	andor_genesis_cnt(pc),d2
+	beq.b	12f
+	subq.w	#1,d2
+	move.w	d2,andor_genesis_cnt
+	bra.b	1f
+12:
+	* andor not playing: play (not perfect, but does the job)
+	move.w	#50,andor_genesis_cnt
+	bra.b	2f
+11:
 	cmp.w	#MAIN_THEME_SND*8,d0
 	bne.b	2f
 	* special case: we have to lock solvalou
@@ -572,12 +593,15 @@ osd_sound_start:
 4:
 	bra.b	1b
 
+andor_genesis_cnt:
+	.word	0
+	
 * sound stop is only called on sounds that are
 * actually tunes. It's also called on bomb but we'll skip it
 * that since it's harmful to music replay
 osd_sound_stop:
 	movem.l	d0/a6,-(a7)
-	cmp.w	#12,d0
+	cmp.w	#BOMB_SND,d0
 	beq.b	0f		| stop bomb sound makes no sense and stops the music!!
 	lea		_custom,a6
     clr.w   music_tick   | not playing anymore
@@ -628,7 +652,6 @@ switch_screen_buffers:
 	move.l	a3,(a2)
 	move.l	a1,(a0)
 	move.l	a5,(a4)
-	LOGPC	150
 	bra		set_fg_bitplanes
 	.endif
 	
@@ -1208,19 +1231,23 @@ update_fg_tile:
 	*
 	* code:
 	*
-	* 0: no need to draw anything
-	* 1: need to delete zone once
-	* 2: need to delete then update with bitmap data
+	* 0: no need to draw anything 
+	* > 0: need to delete zone a number of times 
+	*       (double buffering!, decreased by consumer of that table)
+	* 0xFF: need to delete then update with bitmap data
 	lea		fg_refresh_tile_table(pc),a1
-	move.w	d1,d5
-	lsl.w	#5,d5	| Y times 32
-	add.w	d5,a1	| apply Y offset
-	moveq	#2,d4
-	cmp.w	#BLANK_FG_TILE_ID,d6
+	* X/Y offsets
+	add.w	d0,a1
+	move.w	d1,d4
+	lsl.w	#5,d4
+	add.w	d4,a1
+	
+	st	d4
+	cmp.w	#FG_TILE_CLEAR,d3
 	bne.b	41f
-	moveq	#1,d4
+	moveq	#2,d4
 41:
-	move.b	d4,(a1,d0.w)	| store at offset Y*32+X
+	move.b	d4,(a1,d1.w)	| modify offset Y for the whole row
 	
 	* we have amiga XY now get plane offset to change tile data
 	GET_PLANE_OFFSET_FROM_XY
@@ -1258,6 +1285,8 @@ update_fg_tile:
 not_mask:
 	.long	0,0
 		
+fg_refresh_tile_row_table:
+	ds.b	64
 fg_refresh_tile_table:
 	ds.b	0x800
 	
@@ -1356,7 +1385,16 @@ osd_update_32_sprite_hw:
 	bne.b	0f
 	* reset number of active bobs only at first call
 	clr.w	nb_active_bobs
-
+	* clear first plane (fg tiles) prior to sprite draw. Because we're going to
+	* apply blitted OR in the end, so if something changes, we need to remove it
+	* also, if a tile is cleared, it's cleared here, and not redrawn
+	*
+	* we can clobber all registers here (we're going to need them)
+	.ifeq	OPT_DISABLE_FG_LAYER
+	move.l	d7,-(a7)
+	jbsr	clear_fg_tiles	
+	move.l	(a7)+,d7
+	.endif
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
@@ -1517,7 +1555,6 @@ osd_update_32_sprite_hw:
 	* this is not very logical but doesn't matter much as we cannot attack
 	* the andor when it's appearing, scrolling down, only visuals matter
 	or.w	#0xFF00,d3
-	LOGPC	204
 	* now the value is negative Y, make it a positive offset
 	neg.w	d3
 	cmp.w	#96,d3
@@ -1621,13 +1658,32 @@ osd_update_32_sprite_hw:
 9:
 	addq.w	#8,a0
 	dbf		d7,6b
+	
+	.ifeq	OPT_DISABLE_FG_LAYER
+	jbsr		redraw_fg_tiles
+	.endif
 
-	.ifdef	FUC
+	
+	* after displaying real hardware sprite, we scan the possible sprites
+	* and decrease the life counter.
+	* if the life counter is zero, clear the sprite positions
+	* this is required because we cannot rely on the previous state to know that
+
+
+
+
+	.endif  | OPT_DISABLE_SPRITES
+	*clr.w	_custom+color
+	
+	rts
+zzz:
+			blitz
+			rts
+
+redraw_fg_tiles:
 	* in the second pass (D0=32), redraw all foreground tiles
 	* where row was marked as "to draw"
-	* TODO:::: clear first plane prior to draw sprites
-	lea		fg_refresh_tile_table(pc),a6
-	LOGPC	100
+	lea		fg_refresh_tile_row_table(pc),a6
 	moveq	#0,d7	| row counter
 	moveq	#0,d6	| "in dirty block" flag
 	bra.b	11f
@@ -1651,10 +1707,11 @@ osd_update_32_sprite_hw:
 	lsl.w	#3,d3	| times 8 (height)
 	move.w	d1,d4
 	mulu	#NB_BYTES_PER_ROW,d4
-	add.w	d4,a0
+	add.w	d4,a0		| offset for source
+	sub.w	#16,d1	| 2 rows offset
 	move.w	#NB_BYTES_PER_ROW,d2
 
-	**jbsr	blit_fg_layer
+	jbsr	blit_fg_layer
 	bra.b	20f
 	* previous rows were clean: looking for a dirty row
 11:
@@ -1666,31 +1723,114 @@ osd_update_32_sprite_hw:
 	* flag as "looking for clean tile"
 	st	d6
 19:
-	* tile has been accounted for: no more dirty
-	
+	* tile has been accounted for, but must leave
+	* dirty flag until the whole row is clear
 20:
 	addq.w	#1,d7
-	cmp.w	#NB_VISIBLE_ROWS+1,d7
+	cmp.w	#NB_VISIBLE_ROWS+5,d7
 	bne.b	10b
-	.endif
-	
-	* after displaying real hardware sprite, we scan the possible sprites
-	* and decrease the life counter.
-	* if the life counter is zero, clear the sprite positions
-	* this is required because we cannot rely on the previous state to know that
-
-
-
-
-	.endif  | OPT_DISABLE_SPRITES
-	*clr.w	_custom+color
-	
 	rts
-zzz:
-			blitz
-			rts
+	
+clear_fg_tiles:
+	* in the first pass (D0=0), clear all foreground tiles
+	* where row was marked as "to clear", then reset the clear flag
 
+	* first condense row info into a single flag
+	* and clean up rows to avoid clearing / blitting again and again
+	* if row is empty
+	lea		fg_refresh_tile_row_table(pc),a6
+	lea		fg_refresh_tile_table(pc),a5
+	moveq	#0,d7	| row counter
+	moveq	#0,d6	| column counter
+	moveq	#0,d5	| "bitmap in row" flag
+1:
+	move.b	(a5)+,d0
+	beq.b	3f
+	bpl.b	2f
+	* negative: bitmap: mark as dirty and that's it
+	bset	#1,(a6)
+	st		d5		| note down that there's some bitmap in that line
+	bra.b	3f
+2:
+	subq	#1,d0
+	move.b	d0,(-1,a5)	| update
+	* space: mark row as dirty : needs clearing
+	bset	#0,(a6)
+3:
+	addq	#1,d6
+	cmp.w	#32,d6
+	bne.b	1b
+	tst		d5
+	bne.b	31f
+	* row is devoid of bitmap now: convert to "clear"
+	bclr	#1,(a6)
+31:
+	moveq	#0,d5	| clear "bitmap in row" flag
+	addq.w	#1,d7
+	cmp.w	#NB_VISIBLE_ROWS+4,d7
+	beq.b	4f
+	moveq	#0,d6
+	addq.w	#1,a6	| next row
+	bra.b	1b
+4:
+	lea		fg_refresh_tile_row_table(pc),a6
 
+	* then use the condensed info to clear rows. This info will also be
+	* used afterwards to OR back non-empty fg tiles
+	* make sure it finds a block end
+	clr.b	(NB_VISIBLE_ROWS,a6)
+	lea		_custom,a5
+	moveq	#0,d7	| row counter
+	moveq	#0,d6	| "in dirty block" flag
+	bra.b	11f
+	* 2 passes: first compute the first dirty tile
+10:
+	tst		d6
+	beq.b	11f
+	move.b	(a6,d7.w),d0
+	bne.b	19f		| still dirty
+	* this row is clean: compute refresh height
+	move.w	d7,d3
+	sub.w	d4,d3	| nb dirty rows
+	* D4: first dirty row
+	* D5: nb of dirty rows
+	clr	d6		| ack flag
+	* now refresh screen
+	move.l	fg_drawed_screen_ptr(pc),a1
+	moveq	#0,d0
+	move.w	d4,d1
+	subq.w	#2,d1	| 2 rows offset
+	lsl.w	#3,d1	| times 8 (start y)
+	lsl.w	#3,d3	| times 8 (height)
+	move.w	d3,d4
+	move.w	#NB_BYTES_PER_ROW,d2
+
+	move.w	d6,-(a7)
+	jbsr	clear_plane_any_blitter_internal
+	move.w	(a7)+,d6
+	bra.b	20f
+	* previous rows were clean: looking for a dirty row
+11:
+	move.b	(a6,d7.w),d0
+	beq.b	20f		| clean, next tile
+	* dirty row found (D7)
+	* mark start in d4
+	move.w	d7,d4
+	* flag as "looking for clean tile"
+	st	d6
+19:
+	* tile has been accounted for: no more dirty for clear
+	* clear bit 0 means that only changes in that row
+	* is a tile clear, value is 0, 
+	* so forget about redrawing something here
+	bclr.b	#0,d0
+	move.b	d0,(a6,d7.w)
+20:
+	addq.w	#1,d7
+	cmp.w	#NB_VISIBLE_ROWS+5,d7
+	bne.b	10b
+	rts
+	
 * show sprite, supports clipping (y offset)
 * < A1: sprite data
 * < A4: pointer on the sprite backup table
