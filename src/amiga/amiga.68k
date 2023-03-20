@@ -1225,6 +1225,7 @@ update_fg_tile:
 	* convert D0 (native game offset, difficult to work with)
 	* into X,Y (native amiga)
 	GET_XY_FROM_OFFSET
+	subq.w	#2,d1
 
 	* mark tile as modified in our amiga-friendly table (32x64,
 	* transposed compared to original table)
@@ -1247,7 +1248,7 @@ update_fg_tile:
 	bne.b	41f
 	moveq	#2,d4
 41:
-	move.b	d4,(a1,d1.w)	| modify offset Y for the whole row
+	move.b	d4,(a1,d0.w)	| modify flag for that tile
 	
 	* we have amiga XY now get plane offset to change tile data
 	GET_PLANE_OFFSET_FROM_XY
@@ -1257,7 +1258,7 @@ update_fg_tile:
 **	sub.w	#40*4,d0
 **1:	
 	lea		fg_tile_layer,a1
-	lea		(a1,d0.w),a1
+	add.w	d0,a1
 	cmp.w	#FG_TILE_DRAW_FULL,d3
 	bne.b	5f   | tile clear
 
@@ -1684,6 +1685,7 @@ redraw_fg_tiles:
 	* in the second pass (D0=32), redraw all foreground tiles
 	* where row was marked as "to draw"
 	lea		fg_refresh_tile_row_table(pc),a6
+	lea		mulNB_BYTES_PER_ROW_table(pc),a5
 	moveq	#0,d7	| row counter
 	moveq	#0,d6	| "in dirty block" flag
 	bra.b	11f
@@ -1705,14 +1707,23 @@ redraw_fg_tiles:
 	move.w	d4,d1
 	lsl.w	#3,d1	| times 8 (y)
 	lsl.w	#3,d3	| times 8 (height)
+	.ifdef	NO68020
 	move.w	d1,d4
-	mulu	#NB_BYTES_PER_ROW,d4
-	add.w	d4,a0		| offset for source
-	sub.w	#16,d1	| 2 rows offset
+	add.w	d4,d4
+	add.w	(a5,d4.w),a0
+	.else
+	add.w	(a5,d1.w*2),a0	| offset for source
+	.endif		
 	move.w	#NB_BYTES_PER_ROW,d2
-
+	* special case for last row: blit 4 pixels higher
+	* as amiga can only display 285 lines (PAL) and not 288
+	* (this allows to see lives & credits fully, not affecting
+	* layout too much)
+	cmp.w	#280,d1
+	bne.b	111f
+	subq.w	#4,d1
+111:
 	jbsr	blit_fg_layer
-	bra.b	20f
 	* previous rows were clean: looking for a dirty row
 11:
 	move.b	(a6,d7.w),d0
@@ -1804,7 +1815,6 @@ clear_fg_tiles:
 	lsl.w	#3,d3	| times 8 (height)
 	move.w	d3,d4
 	move.w	#NB_BYTES_PER_ROW,d2
-
 	move.w	d6,-(a7)
 	jbsr	clear_plane_any_blitter_internal
 	move.w	(a7)+,d6
@@ -2079,7 +2089,7 @@ draw_sprite_part:
 	* count a BOB sprite
 	addq.w	#1,nb_active_bobs
 
-	btst	#7,d2			| X-flip?
+	btst	#3,d2			| X-flip? (Y-flip in spec, but screen is rotated!!)
 	beq.b	3f
 	addq.w	#4,d1		| pointer to mirror planes
 3:
@@ -2710,7 +2720,7 @@ clear_plane_any_cpu_any_height:
 * < A0: data (16 pixels wide, 4+1 planes)
 * < D0: X
 * < D1: Y
-* < D2: bit 6: 0: direct, 1: flip
+* < D2: bit 2: 0: direct, 1: flip
 * < D3: height
 * trashes: D0-D1
 
@@ -2735,7 +2745,7 @@ blit_16x_bob:
 10:
 	move.l	fg_drawed_screen_ptr(pc),a1
 	lea		blit_plane_cookie_cut_16x(pc),a5
-	btst	#6,d2
+	btst	#2,d2
 	beq.b	0f
 	lea		blit_plane_cookie_cut_16x_flipped(pc),a5	
 0:
@@ -2753,22 +2763,6 @@ blit_16x_bob:
 2:
 	movem.l	(a7)+,d2-d6/a0-a5
 	rts
-
-TITLE_X = 52
-TITLE_Y = 128-48
-TITLE_HEIGHT = 48
-TITLE_WIDTH = 176/8+2
-* what: blits XEVIOUS attract mode title
-blit_xevious_title:
-    movem.l d0-d3/a1,-(a7)
-	move.w	#TITLE_X,d0
-	move.w	#TITLE_Y,d1
-	move.w	#TITLE_HEIGHT,d3
-    move.w  #TITLE_WIDTH,d2
-	lea		xevious_title,a0
-	bsr.b	blit_fg_layer
-    movem.l (a7)+,d0-d3/a1
-	rts
 	
 * what: blits parts of fg layer attract mode title
 * A0: data
@@ -2785,18 +2779,15 @@ blit_fg_layer:
 	move.l	fg_drawed_screen_ptr(pc),a2
 	move.l	a2,a1
 	move.l	a0,a3		| mask is the same
-	movem.l	d0-d3/a1,-(a7)
     bsr blit_plane_any_internal_cookie_cut
-	movem.l	(a7)+,d0-d3/a1
 	
 	* remove 1 bits under the title
 	moveq	#2,d7
 0:
+	move.l	a2,a1
 	lea		(FG_SCREEN_PLANE_SIZE.W,a1),a1
 	move.l	a1,a2
- 	movem.l	d0-d3/a1,-(a7)
     bsr blit_plane_any_internal_cookie_cut_blank_source
-	movem.l	(a7)+,d0-d3/a1
 	dbf		d7,0b
 	
     movem.l (a7)+,d0-d7/a1-a5
@@ -2876,7 +2867,7 @@ blit_plane_any_internal_cookie_cut:
     beq.b   2f    | optim
 	.ifdef	NO68020
 	add.w	d1,d1
-    move.w  (a4,d1.w),d1	| y times 40
+    add.w  (a4,d1.w),d1	| y times 40
 	.else
     move.w  (a4,d1.w*2),d1	| y times 40
 	.endif
@@ -3229,7 +3220,7 @@ fg_screen_data_2:
 	
 fg_tile_layer:
 	ds.b	FG_SCREEN_PLANE_SIZE
-	
+	ds.b	NB_BYTES_PER_ROW*16
 	* small margin (I suspect that gas is buggy with ds directive)
 	* plus fg plane shifting can write one byte too far
 	ds.b	100

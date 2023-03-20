@@ -6,13 +6,12 @@
 * can be worked on my own:
 
 - change improve FG tile handling: in progress, partially working
+  => clear not working 100% debug title screen (insert coin flash)
 - make game 20% faster (60Hz): done, must test
-- strange graphical corruption at some point in the level ????
-- bonus flag is mirrored! check flag code, activate cheat and break here
 - hotkey (f1?) to toggle music: not working yet
-- still some flashing (missing sprites, level 14)
+- still some flashing (missing sprites, level 14: blitz because probably fake!!)
 - andor sprite flickers when appearing: log andor Y values
-- andor sprite trashed when it appears
+- andor sprite trashed when it appears if slow amiga
 - andor bombing doesn't work too well: test on MAME
 - implement dip switches screen ??
 - optimize BG draw more
