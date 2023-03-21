@@ -5,16 +5,22 @@
   
 * can be worked on my own:
 
+- bacura swapped again
 - change improve FG tile handling: in progress, partially working
   => clear not working 100% debug title screen (insert coin flash)
 - make game 20% faster (60Hz): done, must test
 - hotkey (f1?) to toggle music: not working yet
 - still some flashing (missing sprites, level 14: blitz because probably fake!!)
-- andor sprite flickers when appearing: log andor Y values
-- andor sprite trashed when it appears if slow amiga
+- andor sprite flickers when appearing: log andor Y values:
+  * first issue: max val 312 is too much (andor killed) explain wierd flashes in the end
+
+- andor sprite trashed when it appears if slow amiga: line backup seems to fail / be late
+  when y value is repeated seems to backup wrong!!
 - andor bombing doesn't work too well: test on MAME
 - implement dip switches screen ??
-
+- bg tile for in-game when needs to refresh at 2 locations maybe
+  detect the end of a row, then blit copy the whole row
+  
 further optims:
 
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles

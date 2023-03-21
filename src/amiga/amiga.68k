@@ -1581,6 +1581,7 @@ osd_update_32_sprite_hw:
 	move.w	d3,d2
 	clr.w	d3		| and displays clipped at y = 0
 49:
+
 	cmp.b	#AS_FIRST,d6
 	bne.b	50f
 	* first left part
