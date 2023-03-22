@@ -11,8 +11,10 @@
 - hotkey (f1?) to toggle music: not working yet
 - andor sprite trashed when it appears if slow amiga: line backup seems to fail / be late
   when y value is repeated seems to backup wrong!!
-- implement dip switches screen ??
+- implement dip switches screen ?? stopping the irq and using xevious font to display a menu,
+   using the fg tile engine (backuping the state before & restoring after). 
 - adapt to Super Xevious
+- don't generate mirror X-sprites like ... at all? do the game use those?
 
 further optims:
 
@@ -21,7 +23,6 @@ further optims:
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
-- don't generate mirror X-sprites if log doesn't tell game is using it
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source

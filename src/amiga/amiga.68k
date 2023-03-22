@@ -2598,22 +2598,6 @@ beamdelay:
 	rts
 
 
-* what: clears a plane of any width (using blitter), 16 height
-* args:
-* < A1: dest
-* < D0: X (not necessarily multiple of 8)
-* < D1: Y
-* trashes: none
-    
-clear_plane_any_blitter_16x16:
-    movem.l d0-d6/a1/a5,-(a7)
-    lea _custom,a5
-    moveq.l #-1,d3
-	moveq	#4,d2
-    move.w  #18,d4	| add 2
-    bsr clear_plane_any_blitter_internal
-    movem.l (a7)+,d0-d6/a1/a5
-    rts
 
 * < A5: custom
 * < D0,D1: x,y
@@ -2625,11 +2609,9 @@ clear_plane_any_blitter_16x16:
 * > A1: even address where blit was done
 clear_plane_any_blitter_internal:
     * pre-compute the maximum of shit here
-    lea mulNB_BYTES_PER_ROW_table(pc),a2
-    swap    d1
-    clr.w   d1
-    swap    d1
+    tst		d1
     beq.b   1f    | optim
+    lea mulNB_BYTES_PER_ROW_table(pc),a2
     add.w   d1,d1
     move.w  (a2,d1.w),d1
 1:
@@ -2647,7 +2629,7 @@ clear_plane_any_blitter_internal:
     lsl.l   #4,d6
     or.l    d6,d5            | add shift
 2:   
-    add.l   d1,a1       | plane position (always even)
+    add.w   d1,a1       | plane position (always even)
 
 	move.w #NB_BYTES_PER_ROW,d0
     sub.w   d2,d0       | blit width
@@ -2883,16 +2865,14 @@ blit_plane_cookie_cut_16x_flipped:
 blit_plane_any_internal_cookie_cut:
     movem.l d0-d6/a2/a4,-(a7)
     * pre-compute the maximum of shit here
-    lea		mulNB_BYTES_PER_ROW_table,a4
 	tst.w	d4
 	bpl.b	1f
 	sub.w	d4,d1	| pre-add height to d1
 	subq.w	#1,d1	| minus one
 1:	
-    swap    d1
-    clr.w   d1
-    swap    d1
+	tst	d1
     beq.b   2f    | optim
+    lea		mulNB_BYTES_PER_ROW_table,a4
 	.ifdef	NO68020
 	add.w	d1,d1
     add.w  (a4,d1.w),d1	| y times 40
@@ -2924,7 +2904,7 @@ blit_plane_any_internal_cookie_cut:
     * make offset even. Blitter will ignore odd address
     * but a 68000 CPU doesn't and since we RETURN A1...
     bclr    #0,d1
-    add.l   d1,a1       | plane position (long: allow unsigned D1)
+    add.w   d1,a1       | plane position (D1 < 0x7FFF, 288*40=0x2D00)
 
     add.w   d6,a2       | X offset for background
 
@@ -2981,16 +2961,14 @@ blit_plane_any_internal_cookie_cut:
 blit_plane_any_internal_cookie_cut_blank_source:
     movem.l d0-d6/a2/a4,-(a7)
     * pre-compute the maximum of shit here
-    lea		mulNB_BYTES_PER_ROW_table,a4
 	tst.w	d4
 	bpl.b	1f
 	sub.w	d4,d1	| pre-add height to d1
 	subq.w	#1,d1	| minus one
 1:	
-    swap    d1
-    clr.w   d1
-    swap    d1
+    tst		d1
     beq   .d1_zero    | optim
+    lea		mulNB_BYTES_PER_ROW_table,a4
 	.ifdef	NO68020
 	add.w	d1,d1
     move.w  (a4,d1.w),d1	| y times 40
@@ -3022,7 +3000,7 @@ blit_plane_any_internal_cookie_cut_blank_source:
     * make offset even. Blitter will ignore odd address
     * but a 68000 CPU doesn't and since we RETURN A1...
     bclr    #0,d1
-    add.l   d1,a1       | plane position (long: allow unsigned D1)
+    add.w   d1,a1       | plane position
 
     add.w   d6,a2       | X offset for background
 
