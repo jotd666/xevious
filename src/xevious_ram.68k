@@ -1,0 +1,272 @@
+.include "xevious.inc"
+
+    .global main_2_fn_tbl_1
+    .global main_30_fn_tbl
+    .global main_2_fn_tbl_2
+    .global obj_tbl
+    .global watermark_0x8000
+    .global vb_semaphore_main
+    .global countup_timer_1
+    .global vb_semaphore_sub
+    .global pseudo_random_seed
+    .global bg_scroll_x_shadow
+    .global scroll_cntr
+    .global area_offset_in_map
+    .global scroll_delta
+    .global dswa
+    .global dswb
+    .global P1_inputs
+    .global P2_inputs
+    .global start_pressed
+    .global pulsing_colour_1
+    .global curr_player
+    .global two_player_game
+    .global is_real_game
+    .global RAM_high_score
+    .global high_score_msb
+    .global attract_mode_stage
+    .global num_credits
+    .global scroll_disabled
+    .global num_flying_enemies
+    .global flying_enemy_type_tbl_offset
+    .global num_bacura
+    .global sheonite_end_flag
+    .global andor_genesis_end_flag
+    .global shot_flag
+    .global shot_timer_init_value
+    .global shot_timer
+    .global andor_genesis_colour
+    .global countdown_timer_1
+    .global next_domogram
+    .global pulsing_colour_2
+    .global solvalou_exploding
+    .global new_high_score_entry_index
+    .global name_entry_char_cnt
+    .global name_entry_curr_char_screen_offset
+    .global name_entry_ptr_curr_char
+    .global curr_player_score_msb
+    .global curr_player_score_Ks
+    .global curr_player_score_lsb
+    .global curr_player_solvalou_left
+    .global area_obj_ptr
+    .global area
+    .global enemy_AI_level
+    .global next_bonus_life_Ks
+    .global solvalou_number
+    .global bonus_life_none
+    .global ffreq_mask_derota
+    .global ffreq_mask_kapi
+    .global ffreq_mask_terrazi
+    .global ffreq_mask_logram
+    .global ffreq_mask_zoshi
+    .global ffreq_mask_boza_logram
+    .global ffreq_mask_domogram
+    .global ffreq_mask_andor_genesis
+    .global gnd_stop_firing_row
+    .global curr_player_filler
+    .global other_player_score_msb
+    .global other_player_solvalou_left
+    .global other_player_filler
+    .global main_fn_tbl_RAM
+    .global watermark_0x8400
+    .global area_object_tbl_tbl_RAM
+    .global bacura_inc_cnt
+    .global one_second_cntr
+    .global str_decrypt_buf
+    .global RAM_test_result_final_score
+    .global name_buffer
+    .global high_score_1st_msb
+    .global high_score_1st_name
+    .global high_score_2nd_msb
+    .global high_score_2nd_name
+    .global high_score_3rd_msb
+    .global high_score_3rd_name
+    .global high_score_4th_msb
+    .global high_score_4th_name
+    .global high_score_5th_msb
+    .global high_score_5th_name
+    .global maincpu_inited
+    .global domogram_tbl
+    .global fg_colorram
+    .global bg_colorram
+    .global fg_videoram
+    .global bg_videoram
+    .global sprite_shadow_msb
+
+    .bss
+    
+* RAM and variables
+
+* $7800-
+
+main_2_fn_tbl_1:                        ds.l  32          | 32 objects
+                                        ds.l  4           | solvalou
+main_30_fn_tbl:                         ds.l  3           | player shots
+main_2_fn_tbl_2:                        ds.l  25          | 25 objects
+
+* $7900-
+
+    .align 0x1000
+* 64 objects, 32 bytes per object
+obj_tbl:                                ds.b  _OBJSIZE*64
+
+* $8000-$83FF
+
+watermark_0x8000:
+vb_semaphore_main:                      ds.b  1
+countup_timer_1:                        ds.b  1
+vb_semaphore_sub:                       ds.b  1
+    .align 2
+pseudo_random_seed:                     ds.w  1
+bg_scroll_x_shadow:                     ds.w  1
+scroll_cntr:                            ds.w  1
+area_offset_in_map:                     ds.b  1
+    .align 2
+scroll_delta:                           ds.w  1
+dswa:                                   ds.b  1
+dswb:                                   ds.b  1
+P1_inputs:                              ds.b  1
+P2_inputs:                              ds.b  1   | must follow P1_inputs
+start_pressed:                          ds.b  1
+pulsing_colour_1:                       ds.b  1
+curr_player:                            ds.b  1
+two_player_game:                        ds.b  1
+is_real_game:                           ds.b  1
+RAM_high_score:
+high_score_msb:                         ds.b  3
+    .align 2
+attract_mode_stage:                     ds.w  1
+num_credits:                            ds.b  1
+scroll_disabled:                        ds.b  1
+num_flying_enemies:                     ds.b  1
+flying_enemy_type_tbl_offset:           ds.b  1
+num_bacura:                             ds.b  1
+sheonite_end_flag:                      ds.b  1
+andor_genesis_end_flag:                 ds.b  1
+shot_flag:                              ds.b  1
+shot_timer_init_value:                  ds.b  1
+shot_timer:                             ds.b  1
+andor_genesis_colour:                   ds.b  1
+countdown_timer_1:                      ds.b  1
+    .align 2
+next_domogram:                          ds.w  1
+pulsing_colour_2:                       ds.b  1
+solvalou_exploding:                     ds.b  1
+new_high_score_entry_index:             ds.b  1
+name_entry_char_cnt:                    ds.b  1
+    .align 2
+name_entry_curr_char_screen_offset:     ds.w  1
+name_entry_ptr_curr_char:               ds.l  1
+*** SPRITERAM_1_SHADOW was here ***
+* current player state information
+* - needs to be at least 64 ($40) bytes
+* - 'other' (below) needs to be the same
+* need to read msb,Ks as a word
+    .align 2
+curr_player_score_msb:                  ds.b  1
+curr_player_score_Ks:                   ds.b  1
+curr_player_score_lsb:                  ds.b  1
+curr_player_solvalou_left:              ds.b  1
+    .align 2                            
+area_obj_ptr:                           ds.l  1
+area:                                   ds.w  1
+enemy_AI_level:                         ds.b  1
+    .align 2                            
+next_bonus_life_Ks:                     ds.w  1
+solvalou_number:                        ds.b  1
+bonus_life_none:                        ds.b  1
+* this value is set from the object table
+* in the SUB CPU as the map is generated
+* used for both Derota & Garu Derota
+* area01=$0F, area03=$03, area05=$07,$0F, area06=$07
+ffreq_mask_derota:                      ds.b  1
+* this value is set from the object table
+* in the SUB CPU as the map is generated
+* area01=$07, area12=$03
+ffreq_mask_kapi:                        ds.b  1
+* this value is set from the object table
+* in SUB CPU as map is generated
+* area01=$07 area12=$03
+ffreq_mask_terrazi:                     ds.b  1
+* this value is set from the object table
+* in SUB CPU as map is generated
+* area01=$FF,$1F area05=$0F
+ffreq_mask_logram:                      ds.b  1
+* this value is set from the object table
+* in SUB CPU as map is generated
+* area01=$1F area12=$0F
+ffreq_mask_zoshi:                      ds.b 1
+* this value is set from the object table
+* in SUB CPU as map is generated
+* area01=$1F area05=$0F area07=$07
+ffreq_mask_boza_logram:                 ds.b  1
+* this value is set from the object table
+* in SUB CPU as map is generated
+* area01=$1F area05=$0F area06=$FF,$0F area07=$3F
+* area08=$FF, area10=$3F, area12=$0F, area16=$1F
+ffreq_mask_domogram:                    ds.b  1
+* this value is set from the object table
+* in SUB CPU as map is generated
+* area04=$2F area09=$0F area14=$0F
+ffreq_mask_andor_genesis:               ds.b  1
+gnd_stop_firing_row:                    ds.b  1
+curr_player_filler:                     ds.b  64
+* other player state information
+* - needs to be at least 64 ($40) bytes
+other_player_score_msb:                 ds.b  3
+other_player_solvalou_left:             ds.b  1
+other_player_filler:                    ds.b  64
+*** SPRITERAM_2_SHADOW was here ***
+    .align 4                            
+main_fn_tbl_RAM:                        ds.l  32
+*** SPRITERAM_3_SHADOW was here ***
+
+* $8400-
+                                        
+watermark_0x8400:
+.align 4
+area_object_tbl_tbl_RAM:                ds.b  16*4
+bacura_inc_cnt:                         ds.b  1
+one_second_cntr:                        ds.b  1
+* buffer for decrypting easter egg messsages
+str_decrypt_buf:                        ds.b  32
+
+* $8500-
+
+* name_buffer MUST follow RAM_test_result_final_score
+RAM_test_result_final_score:            ds.b  3
+name_buffer:                            ds.b  10
+                                        ds.b  3
+high_score_1st_msb:                     ds.b  3
+high_score_1st_name:                    ds.b  10
+                                        ds.b  3
+high_score_2nd_msb:                     ds.b  3
+high_score_2nd_name:                    ds.b  10
+                                        ds.b  3
+high_score_3rd_msb:                     ds.b  3
+high_score_3rd_name:                    ds.b  10
+                                        ds.b  3
+high_score_4th_msb:                     ds.b  3
+high_score_4th_name:                    ds.b  10
+                                        ds.b  3
+high_score_5th_msb:                     ds.b  3
+high_score_5th_name:                    ds.b  10
+                                        ds.b  3
+maincpu_inited:                         ds.b  1
+
+* $9380-
+
+* 12 entries, 64 bytes per entry
+domogram_tbl:                           ds.b  64*12
+
+    .align 0x800
+fg_colorram:                            ds.b  0x800
+bg_colorram:                            ds.b  0x800
+fg_videoram:                            ds.b  0x800
+bg_videoram:                            ds.b  0x800
+
+* hitbox routines use sprite shadow register values
+* - but for efficiency they're in OSD format
+* - so maintain a 'raw' copy of (X{8:0]+8)>>1 & ($EF-Y[7:0])
+* - layout is 64x Y,X pairs
+sprite_shadow_msb:                      ds.b  64*2

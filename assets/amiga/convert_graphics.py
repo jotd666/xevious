@@ -248,15 +248,6 @@ def quantize_palette_16(rgb_tuples,img_type):
 
 # start of main program
 
-# read title as png and convert to 1 bitplane, which is also mask
-xt = Image.open(os.path.join(this_dir,"xevious_title.png"))
-title_data = bitplanelib.palette_image2raw(xt,None,[(0,0,0),(255,255,255)]
-             ,generate_mask=False,blit_pad=True)
-with open(os.path.join(src_dir,"title.68k"),"w") as f:
-    f.write("\t.datachip\n")
-    f.write("\t.align\t8\n\t.global\t{0}\n{0}:".format("xevious_title"))
-    bitplanelib.dump_asm_bytes(title_data,f,mit_format=True)
-    f.write("\t.align\t8\n")
 
 # hackish convert of c gfx table to dict of lists
 with open(os.path.join(this_dir,"xevious_gfx.c")) as f:

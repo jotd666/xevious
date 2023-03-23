@@ -24,7 +24,7 @@ OPT_ENABLE_PROFILING = 0
 * we choose to ignore them as they're completely bogus
 * (ex: 95,12: yellow part of andor genesis, makes no sense)
 
-OPT_LOG_UNKNOWN_SPRITE_CLUT = 0
+OPT_LOG_UNKNOWN_SPRITE_CLUT = 1
 
 * double-buffering is really needed here, else blits fail
 * to race the beam and flicker is very frequent
@@ -420,8 +420,12 @@ demo_game:
 		move		#0x4000,_custom+intena						| disable interrupts
 		move		#0x7FFF,_custom+intreq						| ack all interrupts
 		bsr			platform_init					| amiga-specific init
+		.ifeq	OPT_SUPER
 		jmp			xevious_reset					| pass control to the xevious core
-
+		.else
+		jmp			sxevious_reset					| pass control to the xevious core
+		.endif
+		
 title_display:
 * we're not doing things the NeoGeo way
     rts
@@ -2100,7 +2104,7 @@ draw_sprite_part:
 	tst.b	unknown_sprite_found
 	bne.b	2f
 	st.b	unknown_sprite_found
-	bsr		zzz
+	**bsr		zzz
 	nop
 	.endif
 	bra.b	2f

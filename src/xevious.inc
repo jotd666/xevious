@@ -14,7 +14,7 @@
     * optimisation options
     OPT_SUB_HAS_IRQ=1
     * game options    
-    OPT_START_AREA=14
+    OPT_START_AREA=1
     OPT_LOOP_AREA=0
     OPT_INVINCIBLE=1
     OPT_INFINITE_LIVES=0
@@ -82,51 +82,6 @@
     .equ  GROUND_EXPLOSION_SND,   0x11
     .equ  SOLVALOU_EXPLOSION_SND, 0x12
     
-***
-*** global variables
-***
-    .global vb_semaphore_sub
-    .global two_player_game
-    .global curr_player_score_msb
-    .global area_obj_ptr
-    .global start_pressed
-    .global bg_scroll_x_shadow
-    .global scroll_cntr
-    .global maincpu_inited
-    .global countup_timer_1
-    .global curr_player
-    .global is_real_game
-    .global area
-    .global enemy_AI_level
-    .global solvalou_number
-    .global bacura_inc_cnt
-    .global ffreq_mask_derota
-    .global ffreq_mask_kapi
-    .global ffreq_mask_terrazi
-    .global ffreq_mask_logram
-    .global ffreq_mask_zoshi
-    .global ffreq_mask_boza_logram
-    .global ffreq_mask_domogram
-    .global ffreq_mask_andor_genesis
-    .global gnd_stop_firing_row
-    .global scroll_disabled
-    .global num_flying_enemies
-    .global flying_enemy_type_tbl_offset
-    .global num_bacura
-    .global sheonite_end_flag
-    .global andor_genesis_end_flag
-    .global scroll_delta
-    .global area_offset_in_map
-    .global dswb
-    .global pulsing_colour_1
-    .global pulsing_colour_2
-    .global next_domogram
-    .global domogram_tbl
 
-***
-*** global data structures
-***
-    .global area_offset_in_map_tbl
-    .global sprite_shadow_msb
 
     

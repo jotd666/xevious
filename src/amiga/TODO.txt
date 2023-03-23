@@ -11,10 +11,34 @@
 - hotkey (f1?) to toggle music: not working yet
 - andor sprite trashed when it appears if slow amiga: line backup seems to fail / be late
   when y value is repeated seems to backup wrong!!
-- implement dip switches screen ?? stopping the irq and using xevious font to display a menu,
-   using the fg tile engine (backuping the state before & restoring after). 
-- adapt to Super Xevious
+- implement dip switches screen: using command line / whdload switches
+- Super Xevious: play and log the missing clut/sprites: log in 0x110
 - don't generate mirror X-sprites like ... at all? do the game use those?
+- access fault far in the game
+
+Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD
+
+>d
+001018e8 6730                     beq.b #$30 == $0010191a (F)
+001018ea 5279 0010 5170           addq.w #$01,$00105170 [0012]
+001018f0 0802 0003                btst.l #$0003,d2
+001018f4 6702                     beq.b #$02 == $001018f8 (F)
+001018f6 5841                     addq.w #$04,d1
+001018f8 2073 1002                movea.l (a3,d1.w,$02) == $001fcbcb [cccccccc],a0
+001018fc 3005                     move.w d5,d0
+001018fe 5140                     subq.w #$08,d0
+00101900 3203                     move.w d3,d1
+00101902 3818                     move.w (a0)+ [0020],d4   <===================
+00101904 3618                     move.w (a0)+ [0020],d3
+00101906 3944 0008                move.w d4,(a4,$0008) == $00f814cc [3f1d]
+0010190a 3943 000a                move.w d3,(a4,$000a) == $00f814ce [4cd5]
+0010190e d244                     add.w d4,d1
+00101910 6100 254e                bsr.w #$254e == $00103e60
+00101914 4c9f 001f                movem.w (a7)+,d0-d4
+00101918 4e75                     rts  == $00200020
+0010191a e488                     lsr.l #$02,d0
+0010191c 343c 0010                move.w #$0010,d2
+00101920 3803                     move.w d3,d4
 
 further optims:
 

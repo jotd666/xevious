@@ -11,33 +11,16 @@ NO68020 = 1
 * exports
 
     * ROM
-    .global _start_of_xevious_main_rom
+    *.global _start_of_xevious_main_rom
     .global xevious_im1_irq
     .global xevious_reset
-    .global save_PC_to_fn_tbl_and_ret
-    .global start
-    .global null_fn
-    .global display_char
-    .global _end_of_xevious_main_rom
-	
-    * RAM
-    .global fg_colorram
-    .global bg_colorram
-    .global fg_videoram
-    .global bg_videoram
-    .global num_credits
-    .global	vb_semaphore_main
+    .global sxevious_im1_irq
+    .global sxevious_reset
+    *.global _end_of_xevious_main_rom
     
 * debugging only
-    .global main_loop
-    .global obj_tbl
-    .global obj_handler_tbl
-    .global add_obj_handler
-    .global area_object_tbl_tbl
-    .global area_1_obj_tbl
-    .global _ram_start
-    .global main_debug1
-    .global main_debug2
+    *.global main_debug1
+    *.global main_debug2
 
 .include "xevious.inc"
 
@@ -52,8 +35,13 @@ NO68020 = 1
 
 _start_of_xevious_main_rom:
 
+.ifeq OPT_SUPER
 xevious_reset: | $0000
-    jsr       xevious_sub_reset                 | obviously 68K only
+    bsr       xevious_sub_reset                 | obviously 68K only
+.else
+sxevious_reset: | $0000
+    bsr       sxevious_sub_reset                | obviously 68K only
+.endif
     bra       start
 
 exit_caller: | $001D
@@ -269,7 +257,11 @@ restart_main_loop: | $0437
     *** as vb_sempahore_main above.
     *** Since we only have 1 processor, handle it sequentially here
     ***
-    jsr       xevious_sub_cpu
+.ifeq OPT_SUPER
+    bsr       xevious_sub_cpu
+.else
+    bsr       sxevious_sub_cpu
+.endif
     ***
 
     move.w    #0x20F0,d0                        | green
@@ -724,6 +716,7 @@ wipe_player_start_msgs: | $07B7
     rts                                         | preseverved to document
         
 display_copyright_msgs: | $07DC
+.ifeq OPT_SUPER
     move.w    #0x161f,d0                        | screen col,row
     lea       strCOPYRIGHT,a0
     moveq     #19,d7                            | string length
@@ -734,6 +727,29 @@ display_copyright_msgs: | $07DC
     moveq     #7,d7                             | string length
     bsr       display_string
     move.w    #0x1021,d0                        | screen col,row
+.else
+    move.w    #0x1519,d0                        | screen col,row
+    lea       strCOPYRIGHTII,a0
+    moveq     #17,d7                            | string length
+    moveq     #BANK_FG_VIDEORAM,d2
+    bsr       display_string
+    move.w    #0x151B,d0                        | screen col,row
+    lea       strCOPYRIGHTIV,a0
+    moveq     #17,d7                            | string length
+    moveq     #BANK_FG_VIDEORAM,d2
+    bsr       display_string
+    move.w    #0x161D,d0                        | screen col,row
+    lea       strALLRIGHTSRESERVED,a0
+    moveq     #19,d7                            | string length
+    moveq     #BANK_FG_VIDEORAM,d2
+    bsr       display_string
+    move.w    #0x1020,d0                        | screen col,row
+    lea       strNAMCO,a0
+    moveq     #7,d7                            | string length
+    moveq     #BANK_FG_VIDEORAM,d2
+    bsr       display_string
+    move.w    #0x1020,d0                        | screen col,row
+.endif    
     moveq     #7,d7                             | length
     move.w    #0x1a,d1                          | attr
     moveq     #BANK_FG_COLORRAM,d2
@@ -770,13 +786,21 @@ display_1_only_or_1_2_players: | $0823
     * calc offset
     movea.l   (a0,d0.w*4),a0
     .endif
+.ifeq OPT_SUPER
     move.w    #0x1519,d0                        | screen col,row
+.else
+    move.w    #0x1516,d0                        | screen col,row
+.endif
     moveq     #18,d7                            | string length
     moveq     #BANK_FG_VIDEORAM,d2
     bra       display_string        
     
 display_push_start_button: | $083C
+.ifeq OPT_SUPER
     move.w    #0x1517,d0                        | screen col,row
+.else
+    move.w    #0x1514,d0                        | screen col,row
+.endif
     lea       strPUSH_START_BUTTON,a0
     moveq     #17,d7                            | string length
     moveq     #BANK_FG_VIDEORAM,d2
@@ -819,7 +843,11 @@ display_insert_coin_flashing: | $0881
     lsr.b     #4,d1
     and.b     #1,d1                             | timer to wipe msg?
     beq.b     wipe_insert_coin                  | yes, go
+.ifeq OPT_SUPER
     move.w    #0x121C,d0                        | offset
+.else
+    move.w    #0x1215,d0                        | offset
+.endif
     lea       strINSERT_COIN,a0
     moveq     #11,d7                            | string length
     move.w    #BANK_FG_VIDEORAM,d2
@@ -827,13 +855,20 @@ display_insert_coin_flashing: | $0881
 9:  rts
 
 wipe_insert_coin: | $089E
+.ifeq OPT_SUPER
     move.w    #0x121C,d0                        | offset
+.else
+    move.w    #0x1215,d0                        | offset
+.endif
     moveq     #11,d7                            | string length
     move.w    #BANK_FG_VIDEORAM,d2
     moveq     #0x24,d1                          | tile
     bra       display_char_B_times
         
 display_xevious_logo_flashing: | $08AA
+.ifne OPT_SUPER
+    bsr       display_SUPER
+.endif
     move.w    #4,(bg_scroll_x_shadow)
     moveq     #BANK_BG_VIDEORAM,d2
     move.w    #0x1509,d0                        | screen col,row
@@ -959,7 +994,25 @@ set_colour_xevious_flashing_logo:
     moveq     #16,d7                            | string length
     bra       display_char_B_times
 
+* obviously only for SUPER XEVIOUS
+display_SUPER:
+    move.w    #0x1609,d0                        | screen col,row
+    lea       strSUPER,a0
+    moveq     #BANK_FG_VIDEORAM,d2
+    moveq     #5,d7
+    bsr       display_string
+    move.w    #0x1609,d0                        | screen col,row
+    moveq     #BANK_FG_COLORRAM,d2
+    moveq     #5,d7
+    moveq     #0x1A,d1                          | red
+    bra       display_char_B_times
+strSUPER:       
+    .byte 0x1C, 0x1E, 0x19, 0xE, 0x1B           | "SUPER"
+    .align 2
 display_xevious_logo_yellow: | $09E8
+.ifne OPT_SUPER
+    bsr       display_SUPER
+.endif
     moveq     #BANK_FG_VIDEORAM,d2
     move.w    #0x160A,d0                        | screen col,row
     lea       xevious_logo_yellow_pt1,a0
@@ -1399,7 +1452,11 @@ display_high_score_table: | $1011
     bsr       display_high_score_text
     bsr       display_high_score
     move.w    #0x1615,d0                        | screen col,row
+.ifeq OPT_SUPER    
     lea       strBest_Five_WARRIORS,a0
+.else
+    lea       strBest_Five_GOULZEHG,a0
+.endif    
     moveq     #BANK_FG_VIDEORAM,d2
     moveq     #18,d7                            | string length
     bsr       display_string
@@ -1459,9 +1516,14 @@ display_high_score_table: | $1011
     moveq     #10,d7
     bra       display_string
 
+* XEVIOUS
 strBest_Five_WARRIORS:
     .byte 0xB, 0x3A, 0x48, 0x49, 0x24, 0xF, 0x3E, 0x4B, 0x3A, 0x24, 0x20, 0xA, 0x1B, 0x1B, 0x12, 0x18
     .byte 0x1B, 0x1C                            | "Best Five Warriors"
+* SUPER XEVIOUS
+strBest_Five_GOULZEHG:
+    .byte 0xB, 0x3A, 0x48, 0x49, 0x24, 0xF, 0x3E, 0x4B, 0x3A
+    .byte 0x24, 0x10, 0x18, 0x1E, 0x15, 0x23, 0xE, 0x11, 0x10
 str1st:
     .byte 1, 0x48, 0x49                         | "1st"
 str2nd:
@@ -1490,6 +1552,7 @@ init_high_score_table: | $10D9
 
 ROM_high_score: 
   .byte 0, 0x40, 0
+.ifeq OPT_SUPER
 ROM_high_score_tbl: | $10F0
   .byte 0, 0x40, 0
   .byte 0x16, 0x50, 0x17, 0x36, 0x40, 0x36, 0x42, 0x4A, 0x47, 0x36
@@ -1506,6 +1569,19 @@ ROM_high_score_tbl: | $10F0
   .byte 0, 0x20, 0
   .byte 0x1C, 0x50, 0x14, 0x44, 0x3F, 0x3E, 0x42, 0x36, 0x24, 0x24
   .byte 0, 0, 0
+.else
+ROM_high_score_tbl: | $1121 (super)
+    .byte 0, 0x40, 0, 0x36, 0x43, 0x39, 0x47, 0x44, 0x3E, 0x39
+    .byte 0xE, 0x1F, 0xE, 0, 0, 0
+    .byte 0, 0x35, 0, 0x16, 0x3E, 0x48, 0x36, 0x49, 0x44, 0x24
+    .byte 0x16, 0x50, 0x24, 0, 0, 0
+    .byte 0, 0x30, 0, 0x1C, 0x36, 0x4E, 0x36, 0x40, 0x36, 0x24
+    .byte 0x16, 0x50, 0x24, 0, 0, 0
+    .byte 0, 0x25, 0, 0x16, 0x3E, 0x44, 0x24, 0x1F, 0x3A, 0x3A
+    .byte 0x49, 0x3D, 0x36, 0, 0, 0
+    .byte 0, 0x20, 0, 0xF, 0x3E, 0x41, 0x3E, 0x3A, 0x47, 0x24
+    .byte 0x1D, 0x50, 0x24, 0, 0, 0
+.endif  
   .align 2
 
 check_for_high_score: | $1143
@@ -3030,6 +3106,7 @@ reveal_bonus_flag: | $1F8D
 score_bonus_flag: | $1FA8
     btst.b    #1,(dswb)                         | awards bonus life?
     bne       inc_num_solvalou                  | yes, go
+score_10000_for_bonus_flag_tank: | $1ECF (super)
     lea       pts_10000,a0                      | 10,000 pts
     bsr       add_to_score
     bra.b     remove_bonus_flag
@@ -3058,6 +3135,84 @@ check_flag_collected: | $1FD6
     add.b     #0x0a,d4                          | C = match
 9:  rts
 
+* Jet 0 pts
+* Indestructible. Completely benign. What's the point?
+handle_5A_Jet:
+    move.b    #3,(_STATE,a5)                    | indestructible
+    bsr       gen_random_Y_store_obj            | random Y coord
+    sub.b     #1,d0
+    lsr.b     #2,d0
+    and.w     #7,d0
+    lea       jet_dydx_tbl,a2
+    move.w    d0,d1                             | save for sprite calc
+    move.w    d0,d2
+    bsr       cpy_dY_dX_to_obj                  | set dX,dY from table
+    lea       jet_sprite_tbl,a0
+    add.w     d1,d1                             | table offset
+    lea       (a0,d1.w),a0
+    move.b    (a0)+,(_ATTR,a5)
+    move.b    (a0),(_CODE,a5)
+    move.b    #0,(_PTS,a5)                      | irrelevant
+    move.b    #2,(_COLOUR,a5)
+    jbsr       save_PC_to_fn_tbl_and_ret
+    bsr       move_object_dX_dY
+    bra       add_obj_handler
+jet_sprite_tbl: 
+    .byte 0xB, 0xEC
+    .byte 0xB, 0xE8
+    .byte 0xB, 0xE4
+    .byte 3, 0xE0
+    .byte 3, 0xE4
+    .byte 3, 0xE8
+    .byte 3, 0xEC
+jet_dydx_tbl:   
+    .byte 0x24, 0x35
+    .byte 0x18, 0x3B
+    .byte 0xC, 0x3F
+    .byte 0, 0x40
+    .byte 0xF4, 0x3F
+    .byte 0xE8, 0x3B
+    .byte 0xDC, 0x35
+handle_5B_Helicopter:
+    move.b    #2,(_STATE,a5)
+    move.b    #8,(_ATTR,a5)                     | flipy
+    move.b    #5,(_COLOUR,a5)
+    move.b    #0,(_PTS,a5)
+    jbsr       save_PC_to_fn_tbl_and_ret
+    jsr       is_object_hit                     | hit?
+    beq       bomb_explode_and_zero_player_score    | yes, go
+    move.b    (countup_timer_1),d0
+    lsr.b     #3,d0
+    and.b     #1,d0
+    add.b     #0xf0,d0                          | calc sprite code
+    move.b    d0,(_CODE,a5)
+    jsr       scroll_sprite_X    
+    bra       add_obj_handler
+* Tank 10,000 pts
+* - zeroes player score if bombed
+handle_5C_Tank:
+    move.b    #2,(_STATE,a5)
+    move.b    #8,(_ATTR,a5)                     | flipy
+    move.b    #2,(_COLOUR,a5)
+    move.b    #0xf8,(_CODE,a5)
+    move.b    #0,(_PTS,a5)
+    jbsr       save_PC_to_fn_tbl_and_ret
+    bsr       is_object_hit                     | hit?
+    beq       bomb_explode_and_zero_player_score    | yes, go
+    bsr       check_flag_collected
+    bcs       score_10000_for_bonus_flag_tank
+    bsr       scroll_sprite_X    
+    bra       add_obj_handler
+* Bridge
+* - benign object to 'allow' Domograms to cross a river
+handle_5D_Bridge:
+    move.b    #3,(_STATE,a5)                    | indestructible
+    move.b    #0x0b,(_ATTR,a5)                  | bank=1, size=3 (2x2)
+    move.b    #2,(_COLOUR,a5)
+    move.b    #0xfc,(_CODE,a5)
+    jbsr       save_PC_to_fn_tbl_and_ret
+    bsr       scroll_sprite_X
+    bra       add_obj_handler
 * Toroid (Fleet/Coin) 30 pts
 handle_0A_Toroid: | $2000
     bsr.w     init_toroid
@@ -5052,6 +5207,125 @@ remove_giddo_spario: | $3476
     clr.b     (_STATE,a5)
     clr.b     (_TYPE,a5)
     bra       add_obj_handler      
+* *** NEW OBJECT(S) HERE
+*
+* Galaxian 150 pts
+* - can't see how you can shoot one of these
+* - spawned not in line with Solvalou
+* - and move away before you can get under them
+handle_58_Galaxian: | $3481 (super)
+    move.b    #2,(_STATE,a5)                    | active
+    move.b    #0,(_ATTR,a5)                     | bank=0, size=0 (1x1)
+    bsr       gen_rnd_spriteY
+    move.w    #48,(_dX,a5)
+    move.w    #0,(_dY,a5)
+    move.b    #18,(_PTS,a5)                     | 150 pts
+    move.b    #0x1B,(_CODE,a5)
+    move.b    (ffreq_mask_terrazi),(_FFREQ,a5)
+    bsr       pseudo_random_gen
+    and.b     (_FFREQ,a5),d0
+    move.b    d0,(_TIMER,a5)                    | init shot timer
+    jbsr       save_PC_to_fn_tbl_and_ret
+    bsr       is_object_hit                     | hit?
+    beq       flying_enemy_hit                  | yes, go
+    move.b    (obj_tbl+_OBJSIZE*0x23+_Y),d0     | solvalou sprite Y MSB
+    sub.b     (_Y,a5),d0                        | MSB
+    subq.b    #4,d0
+    addq.b    #8,d0                             | close enough?
+    bcs.b     galaxian_change_dir               | yes, go
+    bsr       chk_timer_fire_bullet_reinit_timer
+    move.b    (pulsing_colour_1),(_COLOUR,a5)
+    bra.b     galaxian_exit
+galaxian_change_dir: | $34CD (super)
+    moveq     #2,d1                             | +2
+    subqb     #4,d0
+    bcs.b     1f
+    moveq     #-2,d1                            | -2
+1:  move.w    d1,(_ddY,a5)                      | update ddY
+    move.b    #15,(_TIMER1,a5)                  | re-init timer1
+    SET_REENTRY_ADDR_HERE
+    bsr       is_object_hit                     | hit?
+    beq       flying_enemy_hit                  | yes, go
+    bsr       chk_timer_fire_bullet_reinit_timer
+    addq.b    #1,(_TIMER1,a5)
+    move.b    (_TIMER1,a5),d0
+    lsr.b     #4,d0
+    and.w     #3,d0                             | time to animate?
+    beq       galaxian_cont                     | no, go
+    move.w    (_ddY,a5),d0
+    lea       galaxian_sprite_tbl_1,a0
+    cmp.w     #0x8000,d0                        | -ve?
+    bcc       2f
+    lea       galaxian_sprite_tbl_2,a0
+2:  move.b    (a0,d0.w),(_CODE,a5)
+galaxian_colour_and_move: | $3518 (super)
+    move.b    (pulsing_colour_1),(_COLOUR,a5)
+    move.w    (_ddY,a5),d0
+    add.w     d0,(_dY,a5)
+galaxian_exit: | $3526 (super)
+    bsr       move_object_dX_dY
+    bra       add_obj_handler
+galaxian_cont: | $352F (super)
+    SET_REENTRY_ADDR_HERE
+    bsr       is_object_hit                     | hit?
+    beq       flying_enemy_hit                  | yes, go
+    bsr       chk_timer_fire_bullet_reinit_timer
+    bra.b     galaxian_colour_and_move
+is_object_hit: | $3546
+    cmp.b     #3,(_STATE,a5)
+    rts
+galaxian_sprite_tbl_2:
+    .byte 0x1B
+    .byte 0x1A
+    .byte 0x19
+    .byte 0x18
+galaxian_sprite_tbl_1:
+    .byte 0x1B
+    .byte 0x1C
+    .byte 0x1D
+    .byte 0x1E
+* Jet - 0 pts
+* - funnily enough, you have to shoot this, and it leaves a crater
+*   as though it were bombed. The only object to do this!
+* - shooting it will zero your score!
+handle_59_Jet_Taking_Off: | $3557 (super)
+    move.b    #2,(_STATE,a5)                    | active
+    move.b    #8,(_ATTR,a5)                     | flipy
+    move.b    #4,(_Y,a5)                        | MSB
+    move.w    #0,(_dY,a5)
+    move.w    #8,(_dX,a5)
+    move.b    #0,(_PTS,a5)                      | 10 pts
+    move.b    #0xf3,(_CODE,a5)
+    move.b    #6,(_COLOUR,a5)
+    move.b    #128,(_TIMER,a5)
+    jbsr       save_PC_to_fn_tbl_and_ret
+    bsr       is_object_hit                     | hit?
+    beq       bomb_explode_and_zero_player_score    | yes, go
+    subq.b    #1,(_TIMER,a5)                    | time to move?
+    beq       move_jet_taking_off               | yes, go
+    bsr       scroll_sprite_X
+    bra       add_obj_handler
+move_jet_taking_off: | $3590 (super)
+    move.b    #2,(_COLOUR)
+    SET_REENTRY_ADDR_HERE
+    bsr       is_object_hit                     | hit?
+    beq       explode_remove_and_zero_player_score    | yes, go
+    addq.w    #1,(_dY,a5)                       | accelerate
+    bsr       move_object_dX_dY
+    bra     add_obj_handler
+bomb_explode_and_zero_player_score: | $35B1 (super)
+    bsr.b     zero_player_score
+    bra       handle_bomb_explosion
+explode_remove_and_zero_player_score: | $35B7 (super)
+    bsr.b     zero_player_score
+    bra       explode_and_remove_object
+zero_player_score: | $35BD (super)
+    lea       curr_player_score_msb,a0
+    move.b    #0,(a0)+
+    move.b    #0,(a0)+
+    move.b    #0,(a0)+
+    bsr       display_player_scores
+    rts
     
 * installed into object #15
 * master andor genesis object
@@ -5694,10 +5968,11 @@ remove_easter_egg: | $3AA5
     bra       add_obj_handler
     
 display_easter_egg: | $3AC9
+.ifeq OPT_SUPER
     lea       str_NAMCO_ORIGINAL,a0
     bsr       cpl_and_display_string_16
     move.w    #0x1921,d0                        | screen col,row
-    moveq     #19,d7
+    moveq     #7,d7
     moveq     #BANK_FG_COLORRAM,d2
     move.w    #0x1a,d1
     bsr       display_char_B_times
@@ -5711,6 +5986,18 @@ display_easter_egg: | $3AC9
     .endif
 .endif
     bra       cpl_and_display_string_24
+.else
+    move.w    #0x1921,d0                        | screen col,row
+    lea       str_SPECIALTHANKSFORYOU,a0
+    moveq     #22,d7                            | length
+    moveq     #BANK_FG_VIDEORAM,d2
+    bsr       display_string
+    move.w    #0x1722,d0                        | screen col,row
+    lea       str_BYGAMEDESIGNEREVEZOO,a0
+    moveq     #24,d7                            | length
+    moveq     #BANK_FG_VIDEORAM,d2
+    bra       display_string
+.endif    
 
 str_NAMCO_ORIGINAL:
     .byte 0xD0, 0xCF, 0xCE, 0xCD, 0xCC, 0xCB, 0xCA                | "NAMCO" (gfx)
@@ -5718,6 +6005,14 @@ str_NAMCO_ORIGINAL:
 str_program_by_EVEZOO:
     .byte 0xDB, 0xDB, 0xDB, 0xDB, 0xDB, 0xBA, 0xB8, 0xBB, 0xC3, 0xB8, 0xC9, 0xBD, 0xDB, 0xC8, 0xB1, 0xDB
     .byte 0xF1, 0xE0, 0xF1, 0xDC, 0xE7, 0xE7, 0xDB, 0xDB          | "     program by EVEZOO  "
+str_SPECIALTHANKSFORYOU:
+    .byte 0x1C, 0x45, 0x3A, 0x38, 0x3E, 0x36, 0x41, 0x24, 0x49
+    .byte 0x3D, 0x36, 0x43, 0x40, 0x48, 0x24, 0x3B, 0x44          | "Special thanks for you"
+    .byte 0x47, 0x24, 0x4E, 0x44, 0x4A
+str_BYGAMEDESIGNEREVEZOO:
+    .byte 0x37, 0x4E, 0x24, 0x3C, 0x36, 0x42, 0x3A, 0x24, 0x39
+    .byte 0x3A, 0x48, 0x3E, 0x3C, 0x43, 0x3A, 0x47, 0x24, 0xE     | "by game designer EVEZOO"
+    .byte 0x1F, 0xE, 0x23, 0x18, 0x18
 .ifdef __neogeo__
 str_NEOGEO_by_tcdev:
     .byte 0xDB, 0xDB, 0xDB, 0xDB, 0xDB, 0xE8, 0xF1, 0xE7, 0xEF, 0xF1, 0xE7, 0xDB, 0xC8, 0xB1, 0xDB, 0xB6
@@ -5728,6 +6023,7 @@ str_AMIGA_by_tcdev_jotd:
     .byte 0xDB, 0xF5, 0xE9, 0xED, 0xEF, 0xF5, 0xDB, 0xC8, 0xB1, 0xDB, 0xB6, 0xC7, 0xC6, 0xC5, 0xB4, 0xDB
     .byte 0xD6, 0xDB, 0xC0, 0xBB, 0xB6, 0xC6, 0xDB, 0xDB          | " AMIGA by tcdev & jotd  "
 .endif
+    .align 2
     
 cpl_and_display_string_16: | $3B48
     lea       str_decrypt_buf,a1
@@ -5774,6 +6070,7 @@ wipe_easter_egg: | $3B7C
     bra       display_char_B_times    
 
 * table of flying enemy types
+.ifeq OPT_SUPER
 flying_enemy_type_tbl: | $3C03
     .byte 0, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xB, 0xB, 0xB, 0xB, 0xB, 0xB, 0x55, 0x55, 0x55
     .byte 0x55, 0x55, 0x55, 0x56, 0x56, 0x56, 0x56, 0x56, 0x56, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xC
@@ -5783,6 +6080,25 @@ flying_enemy_type_tbl: | $3C03
     .byte 0x11, 0x11, 0x11, 0x11, 0x16, 0x16, 0x16, 0x16, 0x17, 0x17, 0x17, 0x17, 0xF, 0xF, 8, 8
     .byte 8, 8, 0x55, 0x55, 0x10, 0x10, 8, 8, 8, 8, 0x11, 0x11, 0x14, 0x14, 0x15, 0x15
     .byte 0x15, 0x15, 8, 8, 8, 8, 0xE, 0xE, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F
+.else
+flying_enemy_type_tbl: | $3CA7 (super)
+    .byte 0, 0xA, 0xA, 0xA, 0xA, 0xB, 0xB, 0xB
+    .byte 0xB, 0xB, 0xB, 0x56, 0x56, 0x56, 0x56, 0x56
+    .byte 0x56, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0xF
+    .byte 0xF, 0xF, 0xF, 0xF, 0xF, 0xC, 0xC, 0xC
+    .byte 0xC, 0xC, 0xC, 0xD, 0xD, 0xD, 0xD, 0xD
+    .byte 0xD, 0xE, 0xE, 0xE, 0xE, 8, 8, 8
+    .byte 8, 8, 8, 0x11, 0x11, 0x11, 0x11, 0x11
+    .byte 0x11, 0x16, 0x16, 0x16, 0x17, 0x17, 0x17, 0x17
+    .byte 0x12, 0x12, 0x12, 0x12, 0x12, 0x13, 0x13, 0x13
+    .byte 0x13, 0x14, 0x14, 0x14, 0x15, 0x15, 0x15, 0x15
+    .byte 0x15, 0x15, 0x55, 0x55, 0x55, 0x55, 0xD, 0xD
+    .byte 8, 8, 8, 8, 0x13, 0x13, 0x15, 0x15
+    .byte 0x15, 0x15, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10
+    .byte 0x55, 0x55, 0x55, 0x55, 0x11, 0x11, 0x11, 0x11
+    .byte 0x15, 0x15, 0xE, 0xE, 0x16, 0x11, 0x11, 0x11
+    .byte 0x11, 0x11, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58
+.endif
 
     .align 4        
 obj_handler_tbl: | $3C83
@@ -5873,6 +6189,13 @@ obj_handler_tbl: | $3C83
     .long     handle_55_Jara_shoots
     .long     handle_56_Jara
     .long     null_fn                           | NOT USED
+* new objects in Super Xevious
+    .long     handle_58_Galaxian
+    .long     handle_59_Jet_Taking_Off
+    .long     handle_5A_Jet
+    .long     handle_5B_Helicopter
+    .long     handle_5C_Tank
+    .long     handle_5D_Bridge
 
 * points per object
 * - object table holds index to value
@@ -6046,187 +6369,26 @@ area_offset_in_map_tbl: | $3EB3
 strHIGH_SCORE: | $3EC3
     .byte 0x11, 0x12, 0x10, 0x11, 0x24, 0x1C, 0xC, 0x18, 0x1B, 0xE
 
+* XEVIOUS
 strCOPYRIGHT: | $3ECD
     .byte 0x2D, 0x2E, 0x28, 0x24, 1, 9, 8, 2, 0x24, 0x17, 0xA, 0x16, 0xC, 0x18, 0x24, 0x15
     .byte 0x1D, 0xD, 0x50
 
+* SUPER XEVIOUS
+strCOPYRIGHTII:
+    .byte 0x2D, 0x2E, 0x16, 0xC, 0x16, 0x15, 0x21, 0x21, 0x21
+    .byte 0x12, 0x12, 0x24, 0x17, 0xA, 0x16, 0xC, 0x18 | "(C)MCMLXXXII NAMCO"
+strCOPYRIGHTIV: 
+    .byte 0x2D, 0x2E, 0x16, 0xC, 0x16, 0x15, 0x21, 0x21, 0x21
+    .byte 0x12, 0x1F, 0x24, 0x17, 0xA, 0x16, 0xC, 0x18 | "(C)MCMLXXXIV NAMCO"
+strALLRIGHTSRESERVED:
+    .byte 0xA, 0x15, 0x15, 0x24, 0x1B, 0x12, 0x10, 0x11, 0x1D
+    .byte 0x1C, 0x24, 0x1B, 0xE, 0x1C, 0xE, 0x1B, 0x1F, 0xE | "ALL RIGHTS RESERVED"
+    .byte 0xD
+    .byte 0x2D, 0x2E, 0x28, 0x24, 1, 9, 8, 2, 0x24, 0x17, 0xA
+    .byte 0x16, 0xC, 0x18, 0x24, 0x15, 0x1D, 0xD, 0x50
 strNAMCO: | $3E0E
     .byte 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35
     
 _end_of_xevious_main_rom:
 
-    .bss
-    
-* RAM and variables
-
-* $7800-
-
-main_2_fn_tbl_1:                        ds.l  32          | 32 objects
-                                        ds.l  4           | solvalou
-main_30_fn_tbl:                         ds.l  3           | player shots
-main_2_fn_tbl_2:                        ds.l  25          | 25 objects
-
-* $7900-
-
-    .align 0x1000
-* 64 objects, 32 bytes per object
-obj_tbl:                                ds.b  _OBJSIZE*64
-
-* $8000-$83FF
-
-watermark_0x8000:
-vb_semaphore_main:                      ds.b  1
-countup_timer_1:                        ds.b  1
-vb_semaphore_sub:                       ds.b  1
-    .align 2
-pseudo_random_seed:                     ds.w  1
-bg_scroll_x_shadow:                     ds.w  1
-scroll_cntr:                            ds.w  1
-area_offset_in_map:                     ds.b  1
-    .align 2
-scroll_delta:                           ds.w  1
-dswa:                                   ds.b  1
-dswb:                                   ds.b  1
-P1_inputs:                              ds.b  1
-P2_inputs:                              ds.b  1   | must follow P1_inputs
-start_pressed:                          ds.b  1
-pulsing_colour_1:                       ds.b  1
-curr_player:                            ds.b  1
-two_player_game:                        ds.b  1
-is_real_game:                           ds.b  1
-RAM_high_score:
-high_score_msb:                         ds.b  3
-    .align 2
-attract_mode_stage:                     ds.w  1
-num_credits:                            ds.b  1
-scroll_disabled:                        ds.b  1
-num_flying_enemies:                     ds.b  1
-flying_enemy_type_tbl_offset:           ds.b  1
-num_bacura:                             ds.b  1
-sheonite_end_flag:                      ds.b  1
-andor_genesis_end_flag:                 ds.b  1
-shot_flag:                              ds.b  1
-shot_timer_init_value:                  ds.b  1
-shot_timer:                             ds.b  1
-andor_genesis_colour:                   ds.b  1
-countdown_timer_1:                      ds.b  1
-    .align 2
-next_domogram:                          ds.w  1
-pulsing_colour_2:                       ds.b  1
-solvalou_exploding:                     ds.b  1
-new_high_score_entry_index:             ds.b  1
-name_entry_char_cnt:                    ds.b  1
-    .align 2
-name_entry_curr_char_screen_offset:     ds.w  1
-name_entry_ptr_curr_char:               ds.l  1
-*** SPRITERAM_1_SHADOW was here ***
-* current player state information
-* - needs to be at least 64 ($40) bytes
-* - 'other' (below) needs to be the same
-* need to read msb,Ks as a word
-    .align 2
-curr_player_score_msb:                  ds.b  1
-curr_player_score_Ks:                   ds.b  1
-curr_player_score_lsb:                  ds.b  1
-curr_player_solvalou_left:              ds.b  1
-    .align 2                            
-area_obj_ptr:                           ds.l  1
-area:                                   ds.w  1
-enemy_AI_level:                         ds.b  1
-    .align 2                            
-next_bonus_life_Ks:                     ds.w  1
-solvalou_number:                        ds.b  1
-bonus_life_none:                        ds.b  1
-* this value is set from the object table
-* in the SUB CPU as the map is generated
-* used for both Derota & Garu Derota
-* area01=$0F, area03=$03, area05=$07,$0F, area06=$07
-ffreq_mask_derota:                      ds.b  1
-* this value is set from the object table
-* in the SUB CPU as the map is generated
-* area01=$07, area12=$03
-ffreq_mask_kapi:                        ds.b  1
-* this value is set from the object table
-* in SUB CPU as map is generated
-* area01=$07 area12=$03
-ffreq_mask_terrazi:                     ds.b  1
-* this value is set from the object table
-* in SUB CPU as map is generated
-* area01=$FF,$1F area05=$0F
-ffreq_mask_logram:                      ds.b  1
-* this value is set from the object table
-* in SUB CPU as map is generated
-* area01=$1F area12=$0F
-ffreq_mask_zoshi:                      ds.b 1
-* this value is set from the object table
-* in SUB CPU as map is generated
-* area01=$1F area05=$0F area07=$07
-ffreq_mask_boza_logram:                 ds.b  1
-* this value is set from the object table
-* in SUB CPU as map is generated
-* area01=$1F area05=$0F area06=$FF,$0F area07=$3F
-* area08=$FF, area10=$3F, area12=$0F, area16=$1F
-ffreq_mask_domogram:                    ds.b  1
-* this value is set from the object table
-* in SUB CPU as map is generated
-* area04=$2F area09=$0F area14=$0F
-ffreq_mask_andor_genesis:               ds.b  1
-gnd_stop_firing_row:                    ds.b  1
-curr_player_filler:                     ds.b  64
-* other player state information
-* - needs to be at least 64 ($40) bytes
-other_player_score_msb:                 ds.b  3
-other_player_solvalou_left:             ds.b  1
-other_player_filler:                    ds.b  64
-*** SPRITERAM_2_SHADOW was here ***
-    .align 4                            
-main_fn_tbl_RAM:                        ds.l  32
-*** SPRITERAM_3_SHADOW was here ***
-
-* $8400-
-                                        
-watermark_0x8400:
-bacura_inc_cnt:                         ds.b  1
-one_second_cntr:                        ds.b  1
-* buffer for decrypting easter egg messsages
-str_decrypt_buf:                        ds.b  32
-
-* $8500-
-
-* name_buffer MUST follow RAM_test_result_final_score
-RAM_test_result_final_score:            ds.b  3
-name_buffer:                            ds.b  10
-                                        ds.b  3
-high_score_1st_msb:                     ds.b  3
-high_score_1st_name:                    ds.b  10
-                                        ds.b  3
-high_score_2nd_msb:                     ds.b  3
-high_score_2nd_name:                    ds.b  10
-                                        ds.b  3
-high_score_3rd_msb:                     ds.b  3
-high_score_3rd_name:                    ds.b  10
-                                        ds.b  3
-high_score_4th_msb:                     ds.b  3
-high_score_4th_name:                    ds.b  10
-                                        ds.b  3
-high_score_5th_msb:                     ds.b  3
-high_score_5th_name:                    ds.b  10
-                                        ds.b  3
-maincpu_inited:                         ds.b  1
-
-* $9380-
-
-* 12 entries, 64 bytes per entry
-domogram_tbl:                           ds.b  64*12
-
-    .align 0x800
-fg_colorram:                            ds.b  0x800
-bg_colorram:                            ds.b  0x800
-fg_videoram:                            ds.b  0x800
-bg_videoram:                            ds.b  0x800
-
-* hitbox routines use sprite shadow register values
-* - but for efficiency they're in OSD format
-* - so maintain a 'raw' copy of (X{8:0]+8)>>1 & ($EF-Y[7:0])
-* - layout is 64x Y,X pairs
-sprite_shadow_msb:                      ds.b  64*2
