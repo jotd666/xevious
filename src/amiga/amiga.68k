@@ -1498,17 +1498,13 @@ osd_update_32_sprite_hw:
 	move.w	(6,a5),d0
 	subq.w	#8,d0		| sprite X offset
 
-	movem.l	d4/a5,-(a7)
+	movem.l	d3/a5,-(a7)
     lea _custom,a5
 
-	move.l		fg_drawed_screen_ptr(pc),a1
-	.rept	4
-	movem.l	a1/d0-d4,-(a7)
-    bsr clear_plane_any_blitter_internal
-	movem.l	(a7)+,a1/d0-d4
-	lea		(FG_SCREEN_PLANE_SIZE.W,a1),a1
-	.endr
-	movem.l	(a7)+,d4/a5
+	move.l	fg_drawed_screen_ptr(pc),a1
+	moveq	#4,d3
+	bsr		clear_planes_any_blitter_internal
+	movem.l	(a7)+,d3/a5
 11:
 	lea		(SPRITE_MEM_SIZE.W,a5),a5
 	dbf		d3,2b
@@ -2601,8 +2597,6 @@ beamdelay:
 	dbf	d0,0b
 	rts
 
-
-
 * < A5: custom
 * < D0,D1: x,y
 * < A1: plane pointer
@@ -2612,6 +2606,16 @@ beamdelay:
 * trashes D0-D6
 * > A1: even address where blit was done
 clear_plane_any_blitter_internal:
+	moveq	#1,d3
+* < A5: custom
+* < D0,D1: x,y
+* < A1: foreground plane pointer (often first plane!)
+* < D2: width in bytes (inc. 2 extra for shifting)
+* < D3: number of planes to clear
+* < D4: blit height
+* < D7: mask (disabled, -1 set at start)
+* trashes D0-D6
+clear_planes_any_blitter_internal:
     * pre-compute the maximum of shit here
     tst		d1
     beq.b   1f    | optim
@@ -2619,7 +2623,7 @@ clear_plane_any_blitter_internal:
     add.w   d1,d1
     move.w  (a2,d1.w),d1
 1:
-    move.l  #0x030A0000,d5   | minterm useC useD & rect clear (0xA) 
+    move.l  #0x010A0000,d5   | minterm useC useD & rect clear (0xA) 
     move    d0,d6
     beq.b   2f
     and.w   #0xF,d6
@@ -2647,16 +2651,29 @@ clear_plane_any_blitter_internal:
     
     * blitter registers set
 	.ifdef	VARIABLE_MASKS_AB_MODS
-    move.l  d3,bltafwm(a5)
+    move.l  d7,bltafwm(a5)
 	.endif
 	
 	move.l d5,bltcon0(a5)	
     move.w  d0,bltdmod(a5)	|D modulo
 	move.w  #-1,bltadat(a5)	|source graphic top left corner
-	move.l a1,bltcpt(a5)	|destination top left corner
+	
+	subq	#1,d3
+	beq.b	4f
+3:
 	move.l a1,bltdpt(a5)	|destination top left corner
 	move.w  d4,bltsize(a5)	|rectangle size, starts blit
+	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
+	WAIT_BLIT
+	dbf		d3,3b
+4:
+	move.l a1,bltdpt(a5)	|destination top left corner
+	move.w  d4,bltsize(a5)	|rectangle size, starts blit
+	
     rts
+
+
+
 
 * what: clears a plane of any width (not using blitter, no shifting, start is multiple of 8), 16 height
 * args:

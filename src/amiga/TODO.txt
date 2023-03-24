@@ -5,10 +5,12 @@
   
 * can be worked on my own:
 
+- optimize clear & blits plane routines aren't good enough
 - change improve FG tile handling: in progress, partially working
   => clear not working 100% debug title screen (insert coin flash)
 - make game 20% faster (60Hz): done, must test
 - hotkey (f1?) to toggle music: not working yet
+- andor sprite briefly appears when destroyable bullets attack player
 - andor sprite trashed when it appears if slow amiga: line backup seems to fail / be late
   when y value is repeated seems to backup wrong!!
 - implement dip switches screen: using command line / whdload switches

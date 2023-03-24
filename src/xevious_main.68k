@@ -2986,7 +2986,11 @@ handle_1D_Sol_Tower: | $1E61
     move.b    #0xb6,(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     .endif
-    move.b    #54,(_PTS,a5)                     | 2,000 pts
+.ifeq OPT_SUPER
+     move.b    #54,(_PTS,a5)                     | 2,000 pts
+.else
+     move.b    #48,(_PTS,a5)                     | 1,000 pts
+.endif
     jbsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq.b     handle_sol_tower_rising           | yes, go
@@ -3037,7 +3041,11 @@ handle_09_Brag_Spario: | $1EF8
     move.b    #2,(_STATE,a5)
     move.b    #0x15,(_CODE,a5)
     move.b    #0x26,(_COLOUR,a5)
-    move.b    #33,(_PTS,a5)                     | 500 pts
+.ifeq OPT_SUPER
+     move.b    #33,(_PTS,a5)                     | 500 pts
+.else
+     move.b    #54,(_PTS,a5)                     | 2,000 pts
+.endif
     jbsr       save_PC_to_fn_tbl_and_ret
     move.b    #2,(_STATE,a5)                    | again?
     clr.w     d0                                | init ddX=0
