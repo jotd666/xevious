@@ -5,16 +5,16 @@
   
 * can be worked on my own:
 
-- optimize clear & blits plane routines aren't good enough
 - change improve FG tile handling: in progress, partially working
   => clear not working 100% debug title screen (insert coin flash)
 - make game 20% faster (60Hz): done, must test
 - hotkey (f1?) to toggle music: not working yet
-- andor sprite briefly appears when destroyable bullets attack player
+- right part of andor sprite briefly appears sometimes when destroyable
+  bullets attack player - blitz/lock when andor is wrongly displayed (stage 15?)
 - andor sprite trashed when it appears if slow amiga: line backup seems to fail / be late
   when y value is repeated seems to backup wrong!!
 - implement dip switches screen: using command line / whdload switches
-- Super Xevious: play and log the missing clut/sprites: log in 0x110
+- Super Xevious: play and log the missing clut/sprites: log in 0x110: in progress
 - don't generate mirror X-sprites like ... at all? do the game use those?
 - access fault far in the game
 

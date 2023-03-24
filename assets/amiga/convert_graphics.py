@@ -74,13 +74,13 @@ def dump_json(data,outname):
             data = {str(k):v for k,v in data.items()}
         json.dump(data,f,indent=2)
 
-def load_names(json_file):
+def load_config(json_file):
     rval = {}
     try:
         with open(json_file) as f:
             d = json.load(f)
 
-        for k,v in d.items():
+        for k,v in d["names"].items():
             if k.isdigit():
                 rng = [int(k)]
             else:
@@ -91,7 +91,7 @@ def load_names(json_file):
 
     except OSError:
         pass
-    return rval
+    return rval,d["bogus_cluts"]
 
 def load_binary_tile_file(infile):
     contents = b""
@@ -280,7 +280,7 @@ with open(os.path.join(this_dir,"xevious_gfx.c")) as f:
 palette = [tuple(x) for x in block_dict["palette"]["data"]]
 
 
-sprite_names = load_names(os.path.join(this_dir,"sprite_names.json"))
+sprite_names,bogus_cluts = load_config(os.path.join(this_dir,"sprite_config.json"))
 
 
 # convert palette indexes to actual colors
