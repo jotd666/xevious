@@ -1265,7 +1265,6 @@ update_fg_tile:
 	* 0xFF: need to delete then update with bitmap data
 	lea		fg_refresh_tile_table(pc),a1
 	* X/Y offsets
-	*add.w	d0,a1
 	move.w	d1,d4
 	lsl.w	#5,d4
 	add.w	d4,a1
@@ -1273,7 +1272,11 @@ update_fg_tile:
 	st	d4
 	cmp.w	#FG_TILE_CLEAR,d3
 	bne.b	41f
-	moveq	#2,d4
+	* set number of times to clear the zone
+	* 2 is the minimum to update both layers (double buffering)
+	* but 3 is safer on slow configurations just in case it skips
+	* a frame
+	moveq	#3,d4
 41:
 	move.b	d4,(a1,d0.w)	| modify flag for that tile
 	
@@ -1762,7 +1765,7 @@ redraw_fg_tiles:
 	* dirty flag until the whole row is clear
 20:
 	addq.w	#1,d7
-	cmp.w	#NB_VISIBLE_ROWS+5,d7
+	cmp.w	#NB_VISIBLE_ROWS,d7
 	bne.b	10b
 	rts
 	
@@ -1812,7 +1815,7 @@ clear_fg_tiles:
 	moveq	#0,d5	| clear "bitmap in row" flag
 	addq.w	#1,d7
 	addq.w	#1,a6
-	cmp.w	#NB_VISIBLE_ROWS+4,d7
+	cmp.w	#NB_VISIBLE_ROWS,d7
 	beq.b	4f
 	moveq	#0,d6
 	bra.b	1b
