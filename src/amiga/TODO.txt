@@ -5,8 +5,7 @@
   
 * can be worked on my own:
 
-- change improve FG tile handling: in progress, partially working
-  => clear not working 100% debug title screen (insert coin flash)
+- one bridge color missing 143,143,98: use sprite
 - make game 20% faster (60Hz): done, must test
 - hotkey (f1?) to toggle music: not working yet
 - right part of andor sprite briefly appears sometimes when destroyable
