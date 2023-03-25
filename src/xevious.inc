@@ -14,7 +14,7 @@
     * optimisation options
     OPT_SUB_HAS_IRQ=1
     * game options    
-    OPT_START_AREA=15
+    OPT_START_AREA=10
     OPT_LOOP_AREA=0
     OPT_INVINCIBLE=1
     OPT_INFINITE_LIVES=0

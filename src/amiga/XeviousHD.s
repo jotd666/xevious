@@ -34,12 +34,9 @@ _expmem
     dc.w    _config-_base
 ;---
 _config
-;;	dc.b    "C1:B:enable permanent cheat mode;"
-;;	dc.b    "C2:X:joypad controls player 1:0;"
-;;	dc.b    "C2:X:joypad controls player 2:1;"    
-;;	dc.b    "C3:L:first course:1,2,3,4,5,6,7;"    
-;;	dc.b    "C4:L:in-game music:no,j.m.d,Lotus 3,Lotus;"
-;;	dc.b    "C5:X:skip intro:0;"
+	dc.b    "C1:L:lives:3,2,1,5;"
+	dc.b    "C2:L:skill level:normal,easy,hard,hardest;"
+	dc.b    "C3:B:flags awards bonus life;"    
 	dc.b	0
 
 	IFD BARFLY
@@ -74,7 +71,7 @@ start:
 	LEA	_resload(PC),A1
 	MOVE.L	A0,(A1)
 	move.l	a0,a2
-    
+
     IFD CHIP_ONLY
     lea  _expmem(pc),a0
     move.l  #CHIPMEMSIZE/2,(a0)

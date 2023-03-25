@@ -5,18 +5,15 @@
   
 * can be worked on my own:
 
-- one bridge color missing 143,143,98: use sprite
+- level 15: one bridge color missing 143,143,98: use sprite
 - make game 20% faster (60Hz): done, must test
 - hotkey (f1?) to toggle music: not working yet
-- right part of andor sprite briefly appears sometimes when destroyable
+- right part of andor sprite briefly appears sometimes when destroyable bullets: level 10 test confirms!!
   bullets attack player - blitz/lock when andor is wrongly displayed (stage 15?)
 - andor sprite trashed when it appears if slow amiga: line backup seems to fail / be late
   when y value is repeated seems to backup wrong!!
 - implement dip switches screen: using command line / whdload switches
 - Super Xevious: play and log the missing clut/sprites: log in 0x110: in progress
-- don't generate mirror X-sprites like ... at all? do the game use those?
-- if no tile can be double width / double height AND simple at the same time
-  generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
 - access fault far in the game
 
 Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD
@@ -45,6 +42,8 @@ Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD
 
 further optims:
 
+- if no tile can be double width / double height AND simple at the same time
+  generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
 - bg tile for in-game when needs to refresh at 2 locations maybe
   detect the end of a row, then blit copy the whole row
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
@@ -52,5 +51,15 @@ further optims:
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 - find a way to make up for those still slightly shaking ground enemies
+- don't generate mirror X-sprites like ... at all? do the game use those?
+  (saves 130kb, not worth it)
   
   
+Super Xevious
+
+    Galaxian; technically worth 150 pts but you can't actually hit it. Always spawns away from the Solvalou, and will turn away before you can get under it. Shoots at you though.
+    Jet; the most pointless addition. Appears once (area 15). Flies down the screen at a random (relatively shallow) angle but is completely and utterly benign. It can't hurt you, and you can't destroy it. What was the point?
+    Helicopter; appears once (area 14). Don't bomb it - you have been warned!
+    Tank; appears once (area 8). Don't bomb it - you have been warned!
+    Bridge; appears once (area 15) and is purely cosmetic (completely benign). 'Allows' the Domograms to cross the river. 
+	

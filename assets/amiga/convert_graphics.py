@@ -55,6 +55,9 @@ block_dict = {}
 
 
 BG_NB_PLANES = 4
+
+# very few/no sprites are really useful as mirrored, but omitting them
+# saves just 130kb so it's not really worth it, we have plenty of memory
 STD_MIRROR_LIST = ("standard","mirror")
 
 # where tile & sprite CLUT used configuration logs are fetch from

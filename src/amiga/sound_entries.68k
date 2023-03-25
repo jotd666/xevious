@@ -18,19 +18,19 @@ FXFREQBASE = 3579564
     .byte    1
     .endm
 
-    SOUND_ENTRY extra_solvalou,10328,3,22050,35
-    SOUND_ENTRY flying_enemy_hit,2257,2,22050,28
-    SOUND_ENTRY garu_zakato,4380,3,22050,16
-    SOUND_ENTRY andor_genesis,19559,3,22050,12
-    SOUND_ENTRY sheonite,13916,3,22050,13
-    SOUND_ENTRY teleport,1089,2,22050,9
-    SOUND_ENTRY bacura_hit,1760,1,22050,23
-    SOUND_ENTRY shot,724,1,22050,13
-    SOUND_ENTRY bomb,8199,1,22050,12
-    SOUND_ENTRY bonus_flag,6551,3,22050,11
-    SOUND_ENTRY coin,5908,1,22050,56
-    SOUND_ENTRY ground_explosion,10473,3,22050,14
-    SOUND_ENTRY solvalou_explosion,19880,3,22050,47
+    SOUND_ENTRY extra_solvalou,11241,3,24000,34
+    SOUND_ENTRY flying_enemy_hit,2457,2,24000,28
+    SOUND_ENTRY garu_zakato,4767,3,24000,14
+    SOUND_ENTRY andor_genesis,21288,3,24000,12
+    SOUND_ENTRY sheonite,15146,3,24000,12
+    SOUND_ENTRY teleport,1186,2,24000,10
+    SOUND_ENTRY bacura_hit,1915,1,24000,24
+    SOUND_ENTRY shot,788,1,24000,12
+    SOUND_ENTRY bomb,8924,1,24000,12
+    SOUND_ENTRY bonus_flag,7130,3,24000,11
+    SOUND_ENTRY coin,6430,1,24000,56
+    SOUND_ENTRY ground_explosion,11399,3,24000,14
+    SOUND_ENTRY solvalou_explosion,21638,3,24000,47
 
 	.global	sound_table
 

@@ -32,7 +32,8 @@ AS_SECOND = 16
 
 # dictionary of sprites which aren't bobs but sprites
 # since game sprites can have more than 3 colors, we have to combine 2 sprites
-real_sprites = {80:[0,1]   # solvalou
+real_sprites = {80:[0,1],   # solvalou
+243:[2,3]   # flying jet
 }
 # bragza: "soul" of the andor genesis
 # only 1 sprite needed but uses a lot of unique colors
