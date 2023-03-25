@@ -2811,14 +2811,9 @@ blit_fg_layer:
 	move.l	a0,a3		| mask is the same
     bsr blit_plane_any_internal_cookie_cut
 	
-	* remove 1 bits under the title
-	moveq	#2,d7
-0:
-	move.l	a2,a1
-	lea		(FG_SCREEN_PLANE_SIZE.W,a1),a1
-	move.l	a1,a2
-    bsr blit_plane_any_internal_cookie_cut_blank_source
-	dbf		d7,0b
+	moveq	#2,d5
+	lea		(FG_SCREEN_PLANE_SIZE,a2),a1
+    bsr blit_planes_any_internal_cookie_cut_blank_source
 	
     movem.l (a7)+,d0-d7/a1-a5
 	rts
@@ -2982,6 +2977,7 @@ blit_planes_any_internal_cookie_cut:
     movem.l (a7)+,d0-d7/a2/a4
     rts
 
+
 * < A5: custom
 * < D0.W,D1.W: x,y
 * < A0: source
@@ -3079,6 +3075,7 @@ blit_plane_any_internal_cookie_cut:
     movem.l (a7)+,d0-d7/a2/a4
     rts
 
+
 * < A5: custom
 * < D0.W,D1.W: x,y
 * < A1: destination
@@ -3086,13 +3083,13 @@ blit_plane_any_internal_cookie_cut:
 * < A3: source mask for cookie cut
 * < D2: width in bytes (inc. 2 extra for shifting)
 * < D3: blit mask
-* < D4: height. If negative, source is copied with negative modulo (flip)*       
+* < D4: height. If negative, source is copied with negative modulo (flip)
+* < D5: number of bitplanes       
 * blit mask set
 * returns: start of destination in A1 (computed from old A1+X,Y)
-* trashes: a1
+* trashes: all
 
-blit_plane_any_internal_cookie_cut_blank_source:
-    movem.l d0-d6/a2/a4,-(a7)
+blit_planes_any_internal_cookie_cut_blank_source:
     * pre-compute the maximum of shit here
 	tst.w	d4
 	bpl.b	1f
@@ -3110,7 +3107,7 @@ blit_plane_any_internal_cookie_cut_blank_source:
 	.endif
 	add.w	d1,a2			| Y plane position for background
 .d1_zero:
-    move.l  #0x0bca0000,d5    | C-A->D cookie cut   
+    move.l  #0x0bca0000,d7    | C-A->D cookie cut   
 
     move    d0,d6
     beq   .d0_zero
@@ -3121,10 +3118,10 @@ blit_plane_any_internal_cookie_cut_blank_source:
 
     lsl.l   #8,d6
     lsl.l   #4,d6
-    or.w    d6,d5            | add shift to mask (bplcon1)
+    or.w    d6,d7            | add shift to mask (bplcon1)
     swap    d6
     clr.w   d6
-    or.l    d6,d5            | add shift
+    or.l    d6,d7            | add shift
 .no_shifting:   
     move.w  d0,d6
     add.w   d0,d1
@@ -3160,18 +3157,30 @@ blit_plane_any_internal_cookie_cut_blank_source:
     move.l  d3,bltafwm(a5)
 	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
 	.endif
-	move.l d5,bltcon0(a5)	| sets con0 and con1
+	move.l d7,bltcon0(a5)	| sets con0 and con1
 
  	move.w  #0,bltbdat(a5)	|B word is zero
 	move.w  d0,bltcmod(a5)	|C modulo
     move.w  d0,bltdmod(a5)	|D modulo
-							
+
+	subq.w	#1,d5
+	beq.b	2f
+	subq.w	#1,d5
+1:
 	move.l a3,bltapt(a5)	|source graphic top left corner (mask)
-	move.l a2,bltcpt(a5)	|pristine background top (bottom) left corner
+	move.l a1,bltcpt(a5)	|pristine background top (bottom) left corner
+	move.l a1,bltdpt(a5)	|destination top (bottom) left corner
+	move.w  d4,bltsize(a5)	|rectangle size, starts blit		
+	lea		(FG_SCREEN_PLANE_SIZE.W,a1),a1
+
+	WAIT_BLIT
+	dbf		d5,1b
+2:
+	move.l a3,bltapt(a5)	|source graphic top left corner (mask)
+	move.l a1,bltcpt(a5)	|pristine background top (bottom) left corner
 	move.l a1,bltdpt(a5)	|destination top (bottom) left corner
 	move.w  d4,bltsize(a5)	|rectangle size, starts blit
     
-    movem.l (a7)+,d0-d6/a2/a4
     rts
 
 
