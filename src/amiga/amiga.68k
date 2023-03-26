@@ -49,6 +49,7 @@ FG_DIRTY_TILES_SIZE = 0x800
 TOTAL_NB_COLORS = 32   | 16+16
 NB_BYTES_PER_ROW = 40
 NB_LINES = 288
+Y_MAX = NB_LINES-2     | last visible
 NB_PLAYFIELD_LINES = 512
 * scrollable planes
 BG_SCREEN_PLANE_SIZE = NB_BYTES_PER_ROW*NB_PLAYFIELD_LINES*2
@@ -1532,7 +1533,7 @@ osd_update_32_sprite_hw:
 41:
 	move.w	(6,a4),d5	| prepare X
 	cmp.w	#31*8,d5
-	bcc		2f			| too much on the right
+	jcc		2f			| too much on the right
 	
 	move.w	(4,a4),d1
 	sub.w	#4*8,d1		| apply Y offset
@@ -1549,13 +1550,18 @@ osd_update_32_sprite_hw:
 	* second bank
 	bset	#8,d0
 5:
-
+	* fixes glitch: sometimes sprite code + 256 > 320
+	* ex: code = 0x7C, attribute = 0x80, X = 0xC0, Y = 0
+	* which triggers strange behaviour afterwards
+	* like andor quickly flashing...
+	cmp.w	#320,d0
+	jcc		2f		| bug: second bank but sprite too high
 	clr.w	d6
 	* tile type (bob, sprite and which sprite type)
 	move.b	(a6,d0.w),d6
 	
 	cmp.b	#AS_TILE,d6
-	beq		2f
+	jeq		2f
 	bcs.b	51f
 
 	* andor genesis sprite
@@ -1589,7 +1595,7 @@ osd_update_32_sprite_hw:
 	move.w	d3,d2
 	clr.w	d3		| and displays clipped at y = 0
 49:
-	cmp.w	#286,d3
+	cmp.w	#Y_MAX,d3
 	jbge	2f			| too low to be seen
 
 	cmp.b	#AS_FIRST,d6
@@ -2005,7 +2011,6 @@ hide_sprite:
 * < D3: Y
 * < D5: X
 draw_andor_sprite:
-	blitz		| TEMP to catch fake andor 
 	move.w	d4,-(a7)
 	move.w	d3,d4		| Y in D4
 	* before drawing sprite, adjust red color
@@ -2662,8 +2667,21 @@ clear_plane_any_blitter_internal:
 * trashes D0-D6
 clear_planes_any_blitter_internal:
     * pre-compute the maximum of shit here
-    tst		d1
+	move.w	d1,d6
     beq.b   1f    | optim
+	* check if y start + height > Y_MAX
+	* (ignores case where y = 0, no risk)
+	add.w	d4,d6
+	sub.w	#Y_MAX,d6
+	bmi.b	0f
+	* y start + height > Y_MAX: clip height
+	sub.w	d6,d4
+	beq.b	10f
+	bpl.b	0f
+10:
+	* null or negative height after clipping: out
+	rts
+0:
     lea mulNB_BYTES_PER_ROW_table(pc),a2
     add.w   d1,d1
     move.w  (a2,d1.w),d1
