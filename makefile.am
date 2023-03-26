@@ -19,7 +19,7 @@ WHDASM = vasmm68k_mot -DDATETIME -I$(HDBASE)/amiga39_JFF_OS/include -I$(WHDBASE)
 
 
 # leave MAIN_OBJ first
-OBJS = $(MAIN_OBJ) xevious_ram.o sprite_specific.o title.o sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
+OBJS = $(MAIN_OBJ) xevious_ram.o hw_sprite_specific.o title.o sounds.o xevious_main.o graphics.o xevious_sub.o map_rom.o ReadJoyPad.o ptplayer.o 
 all: $(AMIGASRC)/graphics.68k $(AMIGASRC)/sounds.68k $(MAIN) $(WHDLOADER) $(WHDLOADER_CHIP)
 
 clean:
@@ -42,10 +42,10 @@ xevious_sub.o: xevious_sub.68k xevious.inc
 	$(ASM)  xevious_sub.68k -o xevious_sub.o
 xevious_ram.o: xevious_ram.68k  xevious.inc
 	$(ASM)  xevious_ram.68k -o xevious_ram.o
-amiga.o: $(AMIGASRC)/amiga.68k $(AMIGASRC)/sound_entries.68k xevious.inc $(AMIGASRC)/ReadJoyPad.i $(AMIGASRC)/palette.68k
+amiga.o: $(AMIGASRC)/amiga.68k $(AMIGASRC)/hw_sprite_types.68k $(AMIGASRC)/sound_entries.68k xevious.inc $(AMIGASRC)/ReadJoyPad.i $(AMIGASRC)/palette.68k
 	$(ASM) -Iamiga $(AMIGASRC)/amiga.68k -o amiga.o
-sprite_specific.o: $(AMIGASRC)/sprite_specific.68k
-	$(ASM) $(AMIGASRC)/sprite_specific.68k -o sprite_specific.o
+hw_sprite_specific.o: $(AMIGASRC)/hw_sprite_specific.68k
+	$(ASM) $(AMIGASRC)/hw_sprite_specific.68k -o hw_sprite_specific.o
 ptplayer.o: $(AMIGASRC)/ptplayer.68k
 	$(ASM) -I$(AMIGASRC) $(AMIGASRC)/ptplayer.68k -o ptplayer.o
 sounds.o: $(AMIGASRC)/sounds.68k

@@ -3,18 +3,17 @@
 - still some explosion "replica" on the top of screen, only happens
   when shooting enemies: probably animation frame of previous exploding toroid reused for new
   appearing toroid and not reset
-
+- where does galaxian appear?? what's it's tile code?
   
 * can be worked on my own:
 
-- flying jet is backwards: sprite mirrored!!! make special case when ripping
-- level 15: one bridge color missing 143,143,98: use special sprite
+- andor sprite trash when appearing
+- Super Xevious: play and log the missing clut/sprites: log in 0x110: rip galaxian
+- TEST: flying jet is backwards: sprite mirrored!!! make special case when ripping: 
+- level 15 bridge: use special assembled sprite: wrong x size WTF
+- tank & heli (levl 14) wrong colors / blinking: maybe dump sprite config & test
 - make game 20% faster (60Hz): done, not working...
 - hotkey (f1?) to toggle music: not working yet
-- andor sprite trashed when it appears if slow amiga: line backup seems to fail / be late
-  when y value is repeated seems to backup wrong!!
-- Super Xevious: play and log the missing clut/sprites: log in 0x110: in progress
-  missing tank and heli
 - access fault far in the game
 
 Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD

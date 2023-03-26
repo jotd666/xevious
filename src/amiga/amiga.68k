@@ -1391,7 +1391,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-	*.include	"ag_test.68k"
+	**.include	"ag_test.68k"
 
 out:
 	rts
@@ -1407,11 +1407,7 @@ out:
 * just store the previous positions only by half (because the
 * others aren't updated anyway)
 
-AS_NONE = 0
-AS_OTHER = 4
-AS_TILE = 8
-AS_FIRST = 12
-AS_SECOND = 16
+	.include	"hw_sprite_types.68k"
 
 
 osd_update_32_sprite_hw:
@@ -1434,12 +1430,12 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	*lea		ag_sprites(pc),a4
-
+	**lea		ag_sprites(pc),a4
+	**LOGPC	140
 	move.l		previous_sprite_state_ptr(pc),a5
 	lea			is_hw_sprite_table,a6
 	
-	* first restore all background tiles behind the previous
+	* first clear playfield behind the previous
 	* positions of the previously active objects
 	* only if D0=0 (ground objects pass)
 	tst.w	d7
@@ -1450,10 +1446,10 @@ osd_update_32_sprite_hw:
 	cmp.b	#STATE_INACTIVE,(a5)
 	beq.w	11f
 	clr		d0
-	move.b	(2,a5),d0
+	move.b	(2,a5),d0    | sprite tile code (8 first bits)
 	tst.b		(1,a5)   | sprite attributes	
 	bpl.b	222f
-	* second bank
+	* second bank: add 256 to sprite tile code
 	bset	#8,d0
 222:
 	tst.b	(a6,d0.w)
@@ -1559,12 +1555,15 @@ osd_update_32_sprite_hw:
 	clr.w	d6
 	* tile type (bob, sprite and which sprite type)
 	move.b	(a6,d0.w),d6
-	
-	cmp.b	#AS_TILE,d6
+**	cmp.b	#HW_OTHER,d6
+**	beq		51f		| temp uncomment test bridge
+
+	cmp.w	#HW_OTHER,d6
+	jle		60f		| bob or 16x16 sized sprite: skip specific sprite part
+	cmp.b	#HW_BRIDGE_TILE,d6
 	jeq		2f
 	bcs.b	51f
-
-	* andor genesis sprite
+	* andor genesis or bridge sprite
 	* left or right part
 	* D1 is the color code
 	
@@ -1598,7 +1597,7 @@ osd_update_32_sprite_hw:
 	cmp.w	#Y_MAX,d3
 	jbge	2f			| too low to be seen
 
-	cmp.b	#AS_FIRST,d6
+	cmp.b	#HW_ANDOR_FIRST,d6
 	bne.b	50f
 	* first left part
 	* may be off screen (too high)
@@ -1608,6 +1607,8 @@ osd_update_32_sprite_hw:
 	move.l	(a7)+,a3
 	bra.b	2f
 50:
+	cmp.b	#HW_ANDOR_SECOND,d6
+	bne.b	51f
 	* second right part
 	move.l	a3,-(a7)
 	lea		andor_genesis_right,a3
@@ -1615,7 +1616,11 @@ osd_update_32_sprite_hw:
 	move.l	(a7)+,a3
 	bra.b	2f
 51:
+	* it has to be bridge
+	bsr		draw_bridge_sprite
+	bra.b	2f
 
+60:
 	* BOB (not a hardware sprite)
 	cmp.w	#NB_LINES-15,d3
 	bgt.w	2f		| too low
@@ -1910,11 +1915,12 @@ show_sprite:
 	move.w	(actsprite_y_clipping,a4),d5	| previous y clipping offset
 	beq.b	7f			| no clipping to restore from previous
 	cmp.w	D3,d5
-	beq.b	7f			| no need to save or restore: sprite has the same pos
+	beq.b	7f			| no need to restore: sprite has the same pos
 	* restore previous sprite bitmap line
 	lea	(actsprite_saved_line.W,a4),a2	| source
 	lsl.l	#4,d5
 	lea		(a1,d5.l),a5	| destination
+	lsr.l	#4,D5	| restore D5 value for correctness (D3 and D5 are compared again)
 	* copy 16 bytes back to restore sprite line
 	move.l	(a2)+,(a5)+
 	move.l	(a2)+,(a5)+
@@ -1936,7 +1942,15 @@ show_sprite:
 	* add offset to sprite pointer to start by that line
 	add.l	D3,a1
 	lsr.l	#4,D3	| restore D3 value for next loop
+
+	* don't save: sprite has the same pos as before, this
+	* would clobber the backup
+	
+	cmp.w	D3,d5
+	beq.b	8f
+
 	move.l	a1,a2	| source
+	
 	* copy 16 bytes to sprite line backup space
 	* and zero that sprite line so 
 	* it can be used as X/Y sprite first line
@@ -2025,6 +2039,24 @@ draw_andor_sprite:
 	addq.w	#2,d5	| make up for shift (strange!!)
 	bsr	draw_hw_sprite
 	move.w	(a7)+,d4
+	rts
+
+* < D0: sprite index times 64 (for backup/clipping table)
+* < D2: y offset for clipping (0 if no clipping)
+* < D3: Y
+* < D5: X
+draw_bridge_sprite:
+	move.l	a3,-(a7)
+	lea		bridge,a3
+	move.w	d4,-(a7)
+	move.w	d3,d4		| Y in D4
+	clr.w	d1			| fake color config 0 (we change it dynamically just above)
+	move.w	d2,d3	| y-clipping in D3
+	move.w	#32,d2
+	addq.w	#2,d5	| make up for shift (strange!!)
+	bsr	draw_hw_sprite
+	move.w	(a7)+,d4
+	move.l	(a7)+,a3
 	rts
 
 	
@@ -2359,7 +2391,7 @@ direction_table:
 
 * < d0.w: x
 * < d1.w: y
-* < d2.w: sprite height: 16, 32, 64, 96 are supported
+* < d2.w: sprite height: 16, 32, 96 are supported
 * > d0.L: control word
 store_sprite_pos:
     movem.l  d2/a0-a1,-(a7)
@@ -2409,17 +2441,17 @@ HW_SpriteYTable_\height:
 
 	DEF_HW_SPRITE_Y_TABLE	16
 	DEF_HW_SPRITE_Y_TABLE	32
-	DEF_HW_SPRITE_Y_TABLE	48
-	DEF_HW_SPRITE_Y_TABLE	64
-	DEF_HW_SPRITE_Y_TABLE	72
+	*DEF_HW_SPRITE_Y_TABLE	48
+	*DEF_HW_SPRITE_Y_TABLE	64
+	*DEF_HW_SPRITE_Y_TABLE	80
 	DEF_HW_SPRITE_Y_TABLE	96
 
 sprite_y_tables:
 	.long	HW_SpriteYTable_16
 	.long	HW_SpriteYTable_32
-	.long	HW_SpriteYTable_48
-	.long	HW_SpriteYTable_64
-	.long	HW_SpriteYTable_72
+	.long	HW_SpriteYTable_16 | unused should be HW_SpriteYTable_48
+	.long	HW_SpriteYTable_16 | unused should be HW_SpriteYTable_64
+	.long	HW_SpriteYTable_16 | unused should be HW_SpriteYTable_80
 	.long	HW_SpriteYTable_96
 	
 * set_bitplanes

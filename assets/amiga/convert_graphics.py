@@ -569,7 +569,12 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                 if p != transparent_color:
                     colors_found.add(p)
 
-        sprite_nums = sprite_specific.real_sprites[tile_index]
+        sprite_config = sprite_specific.real_sprites[tile_index]
+        sprite_nums = sprite_config["sprites"]
+        # real sprite don't come as mirrored, forced mirrored
+        # when required
+        mirror = sprite_config.get("mirror",False)
+
         if int((len(colors_found)/3)+0.5) > len(sprite_nums):
             raise Exception("{}: {} colors for image, expecting max {}".format(
                             tile_index,len(colors_found),len(sprite_nums)*3))
@@ -591,6 +596,8 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                     p = the_tile.getpixel((x,y))
                     if p in this_sprite_palette_set:
                         the_partial_sprite.putpixel((x,y),p)
+            if mirror:
+                the_partial_sprite = ImageOps.mirror(the_partial_sprite)
             sprite_out = bitplanelib.palette_image2sprite(the_partial_sprite,None,this_sprite_palette,sprite_fmode=3)
             elementary_sprites.append({"bitmap":sprite_out,"number":s,"palette":this_sprite_palette})
 
@@ -599,7 +606,11 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
 
     else:
         sprite_dict["bitmap_type"] = BT_BOB
-        if is_sprite and sprite_specific.sprite_table[tile_index] >= sprite_specific.AS_TILE:
+        if is_sprite and sprite_specific.sprite_table[tile_index] >= sprite_specific.HW_ANDOR_TILE:
+            # fake it, special sprite, overrides normal engine
+            raw = bytes(2)
+            sprite_dict.update({"standard":raw,"mirror":raw})
+        elif is_sprite and sprite_specific.sprite_table[tile_index] in (sprite_specific.HW_BRIDGE,sprite_specific.HW_BRIDGE_TILE):
             # fake it, special sprite, overrides normal engine
             raw = bytes(2)
             sprite_dict.update({"standard":raw,"mirror":raw})
