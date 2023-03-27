@@ -1,0 +1,11 @@
+.key nope
+set game xevious
+propack p a $game
+copy $game.RNC DF0:$game
+protect DF0:$game RWED
+copy $game.slave DF0:
+;copy $game.info DF0:
+copy README.md df0:
+delete $game.rnc
+delete df0:$game.high
+

@@ -36,7 +36,8 @@ _expmem
 _config
 	dc.b    "C1:L:lives:3,2,1,5;"
 	dc.b    "C2:L:skill level:normal,easy,hard,hardest;"
-	dc.b    "C3:B:flags awards bonus life;"    
+	dc.b    "C3:X:flag awards bonus life:0;"    
+	dc.b    "C3:X:no in-game music:1;"    
 	dc.b	0
 
 	IFD BARFLY

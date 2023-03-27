@@ -324,6 +324,7 @@ _user:
 	lea	(_tag,pc),a0
 	jsr	(resload_Control,a2)
 
+	
     bra		.no_forbid
 .standard:
 	lea		_custom,a5
@@ -382,6 +383,17 @@ _user:
 	*move.l	#-1,pr_WindowPtr(A0)	| no more system requesters (insert volume, write protected...)
 
 .no_forbid:
+	move.l	start_lives(pc),d2
+	neg.w	d2
+	addq	#3,d2
+	lsl.w	#5,d2
+	move.w	d2,start_lives_dsw
+	
+	move.l	difficulty_level(pc),d2
+	neg.w	d2
+	addq	#3,d2
+	lsl.w	#5,d2
+	move.w	d2,difficulty_level_dsw
 	
 	* soundfx lib
 	lea		_custom,a6
@@ -479,6 +491,12 @@ _vblank:
 	* only music that doesn't loop: intro music
 	* now it's over so let other tunes play
 	clr.b	sound_lock
+	move.l	misc_flags(pc),d2
+	btst	#1,d2
+	beq.b	13f
+	* don't play in-game loop
+	move.w	#SOLVALOU_SND,d0
+	bsr		osd_sound_stop
 13:
 	move.w	#0x20,_custom+intreq	
 	bra.b	3f
@@ -563,6 +581,13 @@ osd_sound_start:
 	move.w	(a0,d0.w),d1	| sound type
 	beq.b	1f		| no sound
 
+	cmp.w	#SOLVALOU_SND*8,d0
+	bne.b	10f
+	move.l	misc_flags(pc),d2
+	btst	#1,d2
+	beq.b	2f
+	bra.b	1f		| don't play annoying sound loop
+10:
 	cmp.w	#ANDOR_GENESIS_SND*8,d0
 	bne.b	11f
 	* andor genesis is also special, we need to workaround
@@ -1763,7 +1788,7 @@ redraw_fg_tiles:
 	* as amiga can only display 285 lines (PAL) and not 288
 	* (this allows to see lives & credits fully, not affecting
 	* layout too much)
-	cmp.w	#280,d1
+	cmp.w	#NB_LINES-8,d1
 	bne.b	111f
 	subq.w	#4,d1
 111:
@@ -1869,6 +1894,11 @@ clear_fg_tiles:
 	lsl.w	#3,d3	| times 8 (height)
 	move.w	d3,d4
 	move.w	#NB_BYTES_PER_ROW,d2
+	cmp.w	#NB_LINES-8,d1
+	bne.b	100f
+	* adjust last line clear (as amiga can't display up to 288)
+	subq.w	#4,d1
+100:
 	* clear only first plane
 	movem.w	d6,-(a7)
 	jbsr	clear_plane_any_blitter_internal
@@ -2308,19 +2338,12 @@ draw_hw_sprite:
 osd_read_dipswitches:
 	move.w	#0x1F,d0
 	move.w	d0,d1
-	move.l	start_lives(pc),d2
-	neg.w	d2
-	addq	#3,d2
-	lsl.w	#5,d2
-	or.w	d2,d0
+	* precomputed DSW bits
+	or.w	start_lives_dsw(pc),d0
+	or.w	difficulty_level_dsw(pc),d1
 	
-	move.l	difficulty_level(pc),d2
-	neg.w	d2
-	addq	#3,d2
-	lsl.w	#5,d2
-	or.w	d2,d1
-	
-	move.l	flag_awards_bonus_life(pc),d2
+	move.l	misc_flags(pc),d2
+	btst	#0,d2		| awards bonus life
 	bne.b	0f
 	bclr	#1,d1
 0:
@@ -2341,11 +2364,18 @@ start_lives:
 difficulty_level:
 	.long	0
 		.long	WHDLTAG_CUSTOM3_GET
-flag_awards_bonus_life:
+		* bit 0: DSW flag awards bonus life
+		* bit 1: no looped music
+misc_flags:
+
 	.long	0
 	.long	0
 
-		
+start_lives_dsw:
+	.word	0
+difficulty_level_dsw:
+	.word	0
+	
 bit_UP = 0
 bit_DOWN = 1
 bit_LEFT = 2
@@ -2617,7 +2647,7 @@ level2_interrupt:
 	LEA	0x00BFD000,A5
 	MOVEQ	#0x08,D0
 	AND.B	0x1D01(A5),D0
-	BEQ	.nokey
+	BEQ.b	1f
 	MOVE.B	0x1C01(A5),D0
 	NOT.B	D0
 	ROR.B	#1,D0		| raw key code here
@@ -2626,45 +2656,20 @@ level2_interrupt:
 	
     bclr    #7,d0
     seq (a0,d0.w)       | updates keyboard table
-    bne.b   .no_playing     | we don't care about key release
+    bne.b   0f     | we don't care about key release
     
     cmp.b   #0x19,d0	| "P" key
-    bne.b   .no_kb_pause
+    bne.b   0f
 
     bsr	toggle_pause
-.no_kb_pause:
-	* this is not working yet
-	.ifdef	F1_KEY
-	cmp.b	#0x50,d0	| F1 key
-	bne.b	.no_playing
-	move.w	music_track_start_number(pc),d0
-	cmp.w	#1,d0
-	bne.b	.no_playing
-	movem.l	d1-a6,-(a7)
-	eor.b	#1,music_muted
-	bne.b	.do_mute
-	| unmute
-	bsr		play_music
-	bra.b	1f
-.do_mute:
-	tst.b	music_playing
-	beq.b	1f
-	lea		_custom,a6
-    clr.w   music_tick   | not playing anymore
-    jsr		_mt_end
-1:
-	.endif
-	
-	movem.l	(a7)+,d1-a6
-.no_playing:
-
+0:
 
 	BSET	#0x06,0x1E01(A5)
 	move.l	#2,d0
 	bsr	beamdelay
 	BCLR	#0x06,0x1E01(A5)	| acknowledge key
 
-.nokey:
+1:
 	movem.l	(a7)+,d0/a0/a5
 	move.w	#8,_custom+intreq
 	rte

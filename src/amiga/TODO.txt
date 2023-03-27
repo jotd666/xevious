@@ -6,11 +6,17 @@
   
 * can be worked on my own:
 
+* critical:
+
 - number of credits not erased (pixels accumulate)
+
+* not urgent
+
 - andor sprite flashing when appearing sometimes
 - hotkey (f1?) to toggle music: not working yet, disabled
 - make game 20% faster (60Hz): done, not working...
 - random?: access fault far in the game (in draw_sprite_part)
+- highscore yellow highlight shifted
 
 Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD
 00101900 3203                     move.w d3,d1

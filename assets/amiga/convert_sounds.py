@@ -24,7 +24,7 @@ sound_dict = {
 "MAIN_THEME_SND"          :{"index":0x01,"pattern":0,"ticks":324,"loops":False,"volume":32},
 "HIGHEST_SCORE_SND"      :{"index":0x02,"pattern":3,"loops":True,"volume":32},
 "HIGH_SCORE_SND"         :{"index":0x03,"pattern":2,"loops":True,"volume":32},
-"EXTRA_SOLVALOU_SND"     :{"index":0x04,"channel":3,"sample_rate":hq_sample_rate},
+"EXTRA_SOLVALOU_SND"     :{"index":0x04,"channel":3,"sample_rate":hq_sample_rate,"priority":10},
 "FLYING_ENEMY_HIT_SND"   :{"index":0x05,"channel":2,"sample_rate":hq_sample_rate},
 "GARU_ZAKATO_SND"        :{"index":0x06,"channel":3,"sample_rate":hq_sample_rate},
 "ANDOR_GENESIS_SND"      :{"index":0x07,"channel":3,"sample_rate":hq_sample_rate},
@@ -57,13 +57,13 @@ snd_header = rf"""
 #
 FXFREQBASE = 3579564
 
-    .macro    SOUND_ENTRY    sound_name,size,channel,soundfreq,volume
+    .macro    SOUND_ENTRY    sound_name,size,channel,soundfreq,volume,priority
 \sound_name\()_sound:
     .long    \sound_name\()_raw
     .word   \size
     .word   FXFREQBASE/\soundfreq,\volume
     .byte    \channel
-    .byte    1
+    .byte    \priority
     .endm
 
 """
@@ -108,6 +108,7 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
 
 
         used_sampling_rate = details["sample_rate"]
+        used_priority = details.get("priority",1)
 
         cmd = get_sox_cmd(used_sampling_rate,raw_file)
 
@@ -124,7 +125,7 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
         amp_ratio = max(maxsigned,abs(minsigned))/128
 
         wav = os.path.splitext(wav_name)[0]
-        sound_table[sound_index] = "    SOUND_ENTRY {},{},{},{},{}\n".format(wav,len(signed_data)//2,channel,used_sampling_rate,int(64*amp_ratio))
+        sound_table[sound_index] = "    SOUND_ENTRY {},{},{},{},{},{}\n".format(wav,len(signed_data)//2,channel,used_sampling_rate,int(64*amp_ratio),used_priority)
         sound_table_simple[sound_index] = f"\t.long\t0x00010000,{wav}_sound"
 
         maxed_contents = [int(x/amp_ratio) for x in signed_data]
