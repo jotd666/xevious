@@ -539,6 +539,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
             first_non_black_y = 0
         # crop image to reduce size
         # saves memory and blitter bandwidth
+
         height = last_non_black_y-first_non_black_y+1
 
         if first_non_black_y != 0 or last_non_black_y != side:

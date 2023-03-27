@@ -3,42 +3,27 @@
 - still some explosion "replica" on the top of screen, only happens
   when shooting enemies: probably animation frame of previous exploding toroid reused for new
   appearing toroid and not reset
-- where does galaxian appear?? what's it's tile code?
   
 * can be worked on my own:
 
-- andor sprite trash when appearing
-- Super Xevious: play and log the missing clut/sprites: log in 0x110: rip galaxian
-- TEST: flying jet is backwards: sprite mirrored!!! make special case when ripping: 
-- level 15 bridge: use special assembled sprite: wrong x size WTF
-- tank & heli (levl 14) wrong colors / blinking: maybe dump sprite config & test
+- number of credits not erased (pixels accumulate)
+- andor sprite flashing when appearing sometimes
+- hotkey (f1?) to toggle music: not working yet, disabled
 - make game 20% faster (60Hz): done, not working...
-- hotkey (f1?) to toggle music: not working yet
-- access fault far in the game
+- random?: access fault far in the game (in draw_sprite_part)
 
 Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD
-
->d
-001018e8 6730                     beq.b #$30 == $0010191a (F)
-001018ea 5279 0010 5170           addq.w #$01,$00105170 [0012]
-001018f0 0802 0003                btst.l #$0003,d2
-001018f4 6702                     beq.b #$02 == $001018f8 (F)
-001018f6 5841                     addq.w #$04,d1
-001018f8 2073 1002                movea.l (a3,d1.w,$02) == $001fcbcb [cccccccc],a0
-001018fc 3005                     move.w d5,d0
-001018fe 5140                     subq.w #$08,d0
 00101900 3203                     move.w d3,d1
 00101902 3818                     move.w (a0)+ [0020],d4   <===================
 00101904 3618                     move.w (a0)+ [0020],d3
-00101906 3944 0008                move.w d4,(a4,$0008) == $00f814cc [3f1d]
-0010190a 3943 000a                move.w d3,(a4,$000a) == $00f814ce [4cd5]
-0010190e d244                     add.w d4,d1
-00101910 6100 254e                bsr.w #$254e == $00103e60
-00101914 4c9f 001f                movem.w (a7)+,d0-d4
-00101918 4e75                     rts  == $00200020
-0010191a e488                     lsr.l #$02,d0
-0010191c 343c 0010                move.w #$0010,d2
-00101920 3803                     move.w d3,d4
+
+* Super Xevious only
+
+- play and log the missing clut/sprites: log in 0x110: rip galaxian
+- level 15 bridge: use special assembled sprite: wrong x size WTF
+- tank & heli (levl 14) wrong colors / blinking: maybe dump sprite config & test
+- dynamic Xevious/Super Xevious config at launch (whdload)
+- where does galaxian appear?? what's it's tile code?
 
 further optims:
 

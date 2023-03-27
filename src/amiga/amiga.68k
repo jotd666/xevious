@@ -10,6 +10,8 @@
 .include "dos_lvos.i"
 .include "graphics_lvos.i"
 
+RELEASE = 1
+
 STATE_ACTIVE = 2
 STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
@@ -18,14 +20,18 @@ SPRITE_LIFETIME = 2
 
 NB_VISIBLE_ROWS = 36
 
+	.ifdef	RELEASE
+OPT_ENABLE_PROFILING = 0
+OPT_ENABLE_LOGGING = 0
+	.else
 OPT_ENABLE_LOGGING = 1
 OPT_ENABLE_PROFILING = 0
 * Xevious still has some strange sprite/clut combinations
 * we choose to ignore them as they're completely bogus
 * (ex: 95,12: yellow part of andor genesis, makes no sense)
 
-OPT_LOG_UNKNOWN_SPRITE_CLUT = 1
-
+	.endif
+	
 * double-buffering is really needed here, else blits fail
 * to race the beam and flicker is very frequent
 OPT_ENABLE_DOUBLE_BUFFERING = 1
@@ -1288,10 +1294,7 @@ update_fg_tile:
 	* we have amiga XY now get plane offset to change tile data
 	GET_PLANE_OFFSET_FROM_XY
 	
-**	cmp.w	#(40*280),d1
-**	bcs.b	1f
-**	sub.w	#40*4,d0
-**1:	
+
 	lea		fg_tile_layer,a1
 	add.w	d0,a1
 	cmp.w	#FG_TILE_DRAW_FULL,d3
@@ -1563,6 +1566,8 @@ osd_update_32_sprite_hw:
 	cmp.b	#HW_BRIDGE_TILE,d6
 	jeq		2f
 	bcs.b	51f
+	cmp.b	#HW_ANDOR_TILE,d6
+	jeq		2f
 	* andor genesis or bridge sprite
 	* left or right part
 	* D1 is the color code
@@ -1597,6 +1602,7 @@ osd_update_32_sprite_hw:
 	cmp.w	#Y_MAX,d3
 	jbge	2f			| too low to be seen
 
+	
 	cmp.b	#HW_ANDOR_FIRST,d6
 	bne.b	50f
 	* first left part
@@ -1776,7 +1782,8 @@ redraw_fg_tiles:
 	* dirty flag until the whole row is clear
 20:
 	addq.w	#1,d7
-	cmp.w	#NB_VISIBLE_ROWS,d7
+	* one more row, else it misses the last one
+	cmp.w	#NB_VISIBLE_ROWS+1,d7
 	bne.b	10b
 	rts
 	
@@ -1885,7 +1892,7 @@ clear_fg_tiles:
 	move.b	d0,(a6,d7.w)
 20:
 	addq.w	#1,d7
-	cmp.w	#NB_VISIBLE_ROWS+5,d7
+	cmp.w	#NB_VISIBLE_ROWS+1,d7
 	bne.b	10b
 	rts
 	
@@ -2080,14 +2087,16 @@ sprite_draw_jump_table:
 * < A4: sprite structure (to update height & y-offset)
 * trashed registers: A0
 sprite_draw_double_width:
+	and.w	#3,d2			| cancel attributes others than double width/height
 	bsr		draw_sprite_part
 	add.w	#16,d3
 	addq.w	#1,d0	| neighbour tile
 	bra		draw_sprite_part
 	
 sprite_draw_double_width_and_height:
+	move.w	#3,d2			| cancel attributes others than double width/height
 	and.w	#0x1FC,d0	| mask 2 lower bits
-	add.w	#16,d3
+	add.w	#16,d3		| Y += 16
 	addq	#3,d0
 	bsr		draw_sprite_part
 	subq	#2,d0
@@ -2102,6 +2111,7 @@ sprite_draw_double_width_and_height:
 	bra		draw_sprite_part
 	
 sprite_draw_double_height:
+	and.w	#3,d2			| cancel attributes others than double width/height
 	add.w	#16,d5
 	bsr		draw_sprite_part
 	sub.w	#16,d5
@@ -2142,8 +2152,10 @@ draw_sprite_part:
 	add.l	d0,a0		| row offset
 	move.w	(a0,d1.w),d1	| col offset
 	bne.b	7f
-	.ifne	OPT_LOG_UNKNOWN_SPRITE_CLUT
+	.ifne	OPT_ENABLE_LOGGING
 	* sprite is not known with that CLUT configuration: blue flash
+	* can also happen with bogus sprite+clut configuration
+	* (transcode bug?)
 	move.w	#BASE_BPLCON3_VALUE,bplcon3+_custom
 	move.w	#0xF,color+_custom
 	tst.b	unknown_sprite_found
@@ -2177,8 +2189,8 @@ draw_sprite_part:
 	move.l	(2,a3,d1.w),a0		| get pointer on bitplane pointer list
 	move.w	d5,d0		| restore x
 	subq.w	#8,d0		| sprite X offset
-	move.w	d3,d1		| restore y
 	* bob: get params
+	move.w	d3,d1		| restore y
 	move.w	(a0)+,d4	| y offset
 	move.w	(a0)+,d3	| height
 	* update sprite structure (to optimize single width/height
@@ -2621,6 +2633,8 @@ level2_interrupt:
 
     bsr	toggle_pause
 .no_kb_pause:
+	* this is not working yet
+	.ifdef	F1_KEY
 	cmp.b	#0x50,d0	| F1 key
 	bne.b	.no_playing
 	move.w	music_track_start_number(pc),d0
@@ -2639,6 +2653,8 @@ level2_interrupt:
     clr.w   music_tick   | not playing anymore
     jsr		_mt_end
 1:
+	.endif
+	
 	movem.l	(a7)+,d1-a6
 .no_playing:
 
