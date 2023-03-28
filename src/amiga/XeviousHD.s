@@ -34,7 +34,7 @@ _expmem
     dc.w    _config-_base
 ;---
 _config
-	dc.b    "C1:L:lives:3,2,1,5;"
+	dc.b    "C1:L:lives:3,1,2,5;"
 	dc.b    "C2:L:skill level:normal,easy,hard,hardest;"
 	dc.b    "C3:X:flag awards bonus life:0;"    
 	dc.b    "C3:X:no in-game music:1;"    

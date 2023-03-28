@@ -10,7 +10,7 @@
 .include "dos_lvos.i"
 .include "graphics_lvos.i"
 
-RELEASE = 1
+**RELEASE = 1
 
 STATE_ACTIVE = 2
 STATE_DO_NOT_UPDATE_SHADOW = 1
@@ -1458,6 +1458,7 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
+	**move.l	a4,0x140
 	**lea		ag_sprites(pc),a4
 	**LOGPC	140
 	move.l		previous_sprite_state_ptr(pc),a5
@@ -1489,7 +1490,7 @@ osd_update_32_sprite_hw:
 	* also add -2 y offset to allow proper erase too
 	sub.w	#4*8+2,d1
 	bpl.b		3f
-	moveq	#0,d1		| fix issues with non deleted objects at top
+	moveq	#0,d1		| fix issues with non deleted objects at top	
 3:
 	
 	move.w	#4,d2	| width
@@ -1561,6 +1562,15 @@ osd_update_32_sprite_hw:
 	
 	move.w	(4,a4),d1
 	sub.w	#4*8,d1		| apply Y offset
+	bpl.b	42f
+	* explosion too high on screen, probably game
+	* bug which reuses previous slot, don't show
+	* explosion tiles (113 to 127)
+	cmp.w	#113,d0
+	bcs.b	42f
+	cmp.w	#128,d0
+	jcs	2f
+42:
 	* at this point, Y can be negative, but
 	* we allow this as blitter routine is able
 	* to perform Y-clipping in that case
@@ -2570,9 +2580,19 @@ osd_read_coin:
 	bne.b	0f
 	move.b	#0,d0
 	move.l	_joypad_state(pc),d1
+	move.l	_previous_joypad_state(pc),d2
+	tst.b	ingame_palette_loaded
+	bne.b	2f
+	* we're in menu, we allow fire to insert
+	* coin and start the game
+
+	btst	#JPB_BTN_BLU,d1
+	beq.b	2f
+	btst	#JPB_BTN_BLU,d2	
+	beq.b	0f
+2:
 	btst	#JPB_BTN_GRN,d1	
 	beq.b	1f
-	move.l	_previous_joypad_state(pc),d2
 	btst	#JPB_BTN_GRN,d2	
 	bne.b	1f
 0:
@@ -2603,11 +2623,17 @@ osd_read_start:
 0:
 	move.l	d1,-(a7)
 	move.l	_joypad_state(pc),d1
+	tst.b	ingame_palette_loaded
+	bne.b	3f
+	btst	#JPB_BTN_RED,d1
+	bne.b	2f
+3:
 	btst	#JPB_BTN_YEL,d1
-	movem.l	(a7)+,d1
 	beq.b	1f
+2:
 	bset	#0,d0
 1:
+	movem.l	(a7)+,d1
 	tst.b	d0
 	rts
 		

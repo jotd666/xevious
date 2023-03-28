@@ -8,12 +8,12 @@
 
 * critical:
 
-- number of credits not erased (pixels accumulate)
+- provide HD archive (unpacked, whdload) and floppy (packed, no whdload)
+- update documentation on controls
 
 * not urgent
 
 - andor sprite flashing when appearing sometimes
-- hotkey (f1?) to toggle music: not working yet, disabled
 - make game 20% faster (60Hz): done, not working...
 - random?: access fault far in the game (in draw_sprite_part)
 - highscore yellow highlight shifted
@@ -25,8 +25,8 @@ Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD
 
 * Super Xevious only
 
-- play and log the missing clut/sprites: log in 0x110: rip galaxian
-- level 15 bridge: use special assembled sprite: wrong x size WTF
+- level 15 bridge: use special assembled sprite: wrong x size WTF check auto resize
+  in bitplanelib
 - tank & heli (levl 14) wrong colors / blinking: maybe dump sprite config & test
 - dynamic Xevious/Super Xevious config at launch (whdload)
 - where does galaxian appear?? what's it's tile code?

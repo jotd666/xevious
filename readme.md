@@ -16,7 +16,7 @@ The core transcode is 100% complete. One "last" gameplay bug to be confirmed.
 
 The Neo Geo target is playable with sound on an emulator and also on real hardware (tested on an AES with NeoSD cartridge and NGCD). Beta1 has been released (https://tcdev.itch.io/xevious).
 
-The Amiga target is playable.
+The Amiga target is playable. A1200 with fast memory is recommended.
 
 FEATURES:
 
@@ -33,6 +33,14 @@ CREDITS:
 - Jean-Francois Fabre (aka jotd): Amiga code and assets
 - Andrzej Dobrowolski (aka no9): Amiga music
 - Namco: original game :)
+
+CONTROLS (Amiga: 2-button joystick required):
+
+- red/fire: fire/start game (from menu)
+- blue/2nd button: bomb/insert coin (from menu)
+- green/5 key: insert coin
+- yellow/1 key: start game
+- play/P key: pause
 
 REBUILDING FROM SOURCES:
 
