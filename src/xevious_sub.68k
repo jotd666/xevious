@@ -52,16 +52,7 @@ xevious_sub_irq:
 save_PC_to_fn_tbl_and_ret: | $0030
     move.l    (a7)+,(a6)                        | pop return and store in table
     rts                                         | return up the call stack
-* d0 holds col,row
-calc_colour_video_ram_offset: | $0038
-    move.w    d0,d6
-    addq.w    #3,d6
-    and.w     #0x003f,d6
-    add.w     #0x0300,d0
-    lsr.w     #2,d0
-    and.w     #0x07C0,d0
-    or.w      d6,d0
-    rts
+
 
 sub_start: | $0165
     * Z80 copied area object table from ROM to RAM
@@ -284,13 +275,21 @@ get_map_row: | $02D4
     move.b    d1,(xevious_bs0)                  | map row
     move.b    d2,(xevious_bs1)                  | map col
     movem.l   d0-d2,-(a7)
-    bsr.w     calc_colour_video_ram_offset      |
+	* d0 holds col,row
+	* inlined calc_colour_video_ram_offset: | $0038
+    move.w    d0,d6
+    addq.w    #3,d6
+    and.w     #0x003f,d6
+    add.w     #0x0300,d0
+    lsr.w     #2,d0
+    and.w     #0x07C0,d0
+    or.w      d6,d0
     moveq     #0,d6
-    bsr.w     xevious_bb_r                      | d6=attr
+    jbsr     xevious_bb_r                      | d6=attr
     move.w    d6,d1
     jsr       osd_w_bg_colorram
     moveq     #1,d6
-    bsr.w     xevious_bb_r                      | d6=tile
+    jbsr     xevious_bb_r                      | d6=tile
     move.w    d6,d1
     jsr       osd_w_bg_videoram
     movem.l   (a7)+,d0-d2

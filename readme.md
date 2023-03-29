@@ -32,6 +32,8 @@ CREDITS:
 - Mark McDougall (aka tcdev): reverse-engineering, core and Neo Geo code and assets
 - Jean-Francois Fabre (aka jotd): Amiga code and assets
 - Andrzej Dobrowolski (aka no9): Amiga music
+- DanyPPC: Amiga icon
+- phx: ptplayer sound/music replay Amiga code
 - Namco: original game :)
 
 CONTROLS (Amiga: 2-button joystick required):

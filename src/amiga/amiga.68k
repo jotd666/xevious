@@ -962,7 +962,7 @@ osd_w_bg_videoram:
 	.ifne	BG_MIRROR
 	move.b	d0,(1*NB_BYTES_PER_ROW+offset,a2)
 	.endif
-	lsr.l	#8,d0
+	lsr.w	#8,d0
 	move.b	d0,(offset,a1)
 	.ifne	BG_MIRROR
 	move.b	d0,(offset,a2)
@@ -974,6 +974,8 @@ osd_w_bg_videoram:
 .macro	FLIPPED_BG_TILE
 	.set	offset,NB_BYTES_PER_ROW*4
 	.rept	2
+	* get all planes at once in d0
+	* then shift bits to get individual bytes
 	move.l	(a0)+,d0
 	move.b	d0,(offset,a1)
 	.ifne	BG_MIRROR
@@ -989,7 +991,7 @@ osd_w_bg_videoram:
 	.ifne	BG_MIRROR
 	move.b	d0,(2*NB_BYTES_PER_ROW+offset,a2)
 	.endif
-	lsr.l	#8,d0
+	lsr.w	#8,d0
 	move.b	d0,(3*NB_BYTES_PER_ROW+offset,a1)
 	.ifne	BG_MIRROR
 	move.b	d0,(3*NB_BYTES_PER_ROW+offset,a2)
@@ -1004,8 +1006,8 @@ osd_w_bg_videoram:
 update_bg_tile:
 	* first check if we must toggle lower 16 palette between title
 	* and in-game
-	lea		bg_videoram,a0
-	cmp.b	#0xCD,(0x60E,a0)
+	* (also changes behaviour of the buttons)
+	cmp.b	#0xCD,bg_videoram+0x60E
 	beq.b	2f
 	* in-game
 	tst.b	ingame_palette_loaded
@@ -1115,11 +1117,11 @@ update_bg_tile:
 	move.l	(a0),a0			 | tile data
 	* draw
 	btst	#6,d2    | Y-flip
-	bne	5f
+	jne	5f
 
 4:
 	tst.b	(a0)+
-	beq	6f
+	jeq	6f
 BG_MIRROR=1
 	STRAIGHT_BG_TILE
 1:
@@ -1179,7 +1181,7 @@ bg_no_mirror:
 	bne	5f
 4:
 	tst.b	(a0)+
-	jbeq	6f
+	jeq	6f
 	STRAIGHT_BG_TILE
 1:
     lea   (BG_SCREEN_PLANE_SIZE.W,a1),a1
@@ -1374,6 +1376,9 @@ osd_update_sprite_shadow:
 	cmp.b	#STATE_INACTIVE,d0
 	bne.b	11f
 	* deactivate
+    move.b    #0xef,(0,a2)   | code from Mark to avoid spurious
+    move.b    #(8>>1),(1,a2) | explosions when creating objects
+	 
 	move.b	#STATE_DO_NOT_UPDATE_SHADOW,(_STATE,a5)
 	clr.w	(_X,a5)
 	clr.w	(_Y,a5)
@@ -2618,8 +2623,7 @@ osd_read_start:
 	tst.b	(1,a0)		| "1" key like in MAME
 	beq.b	0f
 	clr.b	(1,a0)
-	bset	#0,d0
-	bra.b	1f
+	bra.b	2f
 0:
 	move.l	d1,-(a7)
 	move.l	_joypad_state(pc),d1

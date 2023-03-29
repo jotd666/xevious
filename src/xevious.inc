@@ -14,9 +14,9 @@
     * optimisation options
     OPT_SUB_HAS_IRQ=1
     * game options    
-    OPT_START_AREA=1
+    OPT_START_AREA=14
     OPT_LOOP_AREA=0
-    OPT_INVINCIBLE=0
+    OPT_INVINCIBLE=1
     OPT_INFINITE_LIVES=0
     * score is BCD format
     OPT_START_SCORE=0x0000000
