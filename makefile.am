@@ -12,6 +12,12 @@ ASSETS = ..\assets\amiga
 AMIGASRC = amiga
 SOURCE = $(AMIGASRC)/$(PROGNAME)HD.s
 
+ifdef RELEASE_BUILD
+OPT_RELEASE = --defsym RELEASE=1
+endif
+
+
+
 # those 2 are defined for my PC, should include whdload.i
 # and system includes.
 HDBASE = K:\jff\AmigaHD
@@ -44,7 +50,7 @@ xevious_sub.o: xevious_sub.68k xevious.inc
 xevious_ram.o: xevious_ram.68k  xevious.inc
 	$(ASM)  xevious_ram.68k -o xevious_ram.o
 amiga.o: $(AMIGASRC)/amiga.68k $(AMIGASRC)/hw_sprite_types.68k $(AMIGASRC)/sound_entries.68k xevious.inc $(AMIGASRC)/ReadJoyPad.i $(AMIGASRC)/palette.68k
-	$(ASM) -Iamiga  $(OPT_SUPER) $(AMIGASRC)/amiga.68k -o amiga.o
+	$(ASM) -Iamiga $(OPT_RELEASE) $(OPT_SUPER) $(AMIGASRC)/amiga.68k -o amiga.o
 hw_sprite_specific.o: $(AMIGASRC)/hw_sprite_specific.68k
 	$(ASM) $(AMIGASRC)/hw_sprite_specific.68k -o hw_sprite_specific.o
 ptplayer.o: $(AMIGASRC)/ptplayer.68k

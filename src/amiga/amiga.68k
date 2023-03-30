@@ -10,7 +10,6 @@
 .include "dos_lvos.i"
 .include "graphics_lvos.i"
 
-**RELEASE = 1
 
 STATE_ACTIVE = 2
 STATE_DO_NOT_UPDATE_SHADOW = 1
