@@ -169,6 +169,8 @@ mul\value\()_table:
 	
 * debug macro that colors the screen until LMB pressed
 .macro 	blitz_bypass
+	move.w	d0,-(a7)
+	clr.w	d0
 loop\@:
 	move.w	#BASE_BPLCON3_VALUE,_custom+bplcon3	| really color 0
 	move.w	d0,_custom+color
@@ -186,8 +188,6 @@ out\@:
 w\@:
 	btst	#6,0xbfe001
 	beq.b	w\@
-	move.w	d0,-(a7)
-	clr.w	d0
 	blitz_bypass
 .endm
 
@@ -1605,7 +1605,7 @@ osd_update_32_sprite_hw:
 	jle		60f		| bob or 16x16 sized sprite: skip specific sprite part
 	cmp.b	#HW_BRIDGE_TILE,d6
 	jeq		2f
-	bcs.b	51f
+	jcs		51f
 	cmp.b	#HW_ANDOR_TILE,d6
 	jeq		2f
 	* andor genesis or bridge sprite
@@ -1618,9 +1618,13 @@ osd_update_32_sprite_hw:
 	moveq	#0,d2	| default: no y clipping offset
 	
 	* debugging that gives strange results. Andor is first displayed at
-	* y=$FFE0 (-32 but first 4 tiles aren't visible so it's more like -64, still
-	* not -96 like we would expect), then it switches to $77A->$7DF, then
+	* y=$FFE0 the first tile (-32 but first 4 tiles aren't visible so it's more like -64, still
+	* not -96 like we would expect so it triggers a bogus display), then it switches to $77A->$7DF, then
 	* $FFE0->$FFFF->0 now it's positive...
+	* we have to filter out the first appearance where $FFE0 is just bogus.
+	* filtering FFE0 all the time leads to a nasty flash when
+	* FFE0 is legit (appearing, offset = 32)...	
+	* this is handled in "show_sprite" instead
 	
 	and.w	#0x7FF,d3
 	
@@ -1648,6 +1652,7 @@ osd_update_32_sprite_hw:
 	* first left part
 	* may be off screen (too high)
 	move.l	a3,-(a7)
+
 	lea		andor_genesis_left,a3
 	bsr		draw_andor_sprite
 	move.l	(a7)+,a3
@@ -1941,13 +1946,19 @@ clear_fg_tiles:
 	bne.b	10b
 	rts
 	
+	.macro	WAIT_BEAM_SPRITE
+w\@:
+	cmp.w	#0x1D00,vhposr+_custom
+	bcs.b	w\@
+	.endm
+	
 * show sprite, supports clipping (y offset)
 * < A1: sprite data
 * < A4: pointer on the sprite backup table
 * < D0: X
 * < D1: Y
 * < D2: height
-* < D3: y offset
+* < D3: y offset (clipping)
 * < D6: amiga sprite number (0-7)
 
 show_sprite:
@@ -1965,7 +1976,14 @@ show_sprite:
 	
 	moveq	#0,d5
 	move.w	(actsprite_y_clipping,a4),d5	| previous y clipping offset
-	beq.b	7f			| no clipping to restore from previous
+	* here handle bogus Y clip = 32 out of nowhere
+	bne.b	0f
+	* previous y clip = 0, current clip 32: bogus first
+	* andor position, skip display
+	cmp.w	#32,d3
+	jeq		10f
+	bra.b	7f			| no clipping to restore from previous
+0:
 	cmp.w	D3,d5
 	beq.b	7f			| no need to restore: sprite has the same pos
 	* restore previous sprite bitmap line
@@ -1974,6 +1992,11 @@ show_sprite:
 	lea		(a1,d5.l),a5	| destination
 	lsr.l	#4,D5	| restore D5 value for correctness (D3 and D5 are compared again)
 	* copy 16 bytes back to restore sprite line
+	* but we have to make sure that the beam is not too high
+	* else sprite flickers a lot. Ironically this happens
+	* with fast machines, not with slow machines
+	WAIT_BEAM_SPRITE
+	
 	move.l	(a2)+,(a5)+
 	move.l	(a2)+,(a5)+
 	move.l	(a2)+,(a5)+
@@ -1982,15 +2005,16 @@ show_sprite:
 	* store a1 in backup BEFORE adding offset to it
 	move.l	a1,(actsprite_orig_ptr,a4)
 
-	tst.w	D3
+	move.w	D3,(actsprite_y_clipping,a4)  | store previous offset
 	beq.b	8f
 	* clipping enabled
 
+	swap	d3
+	clr		d3
+	swap	d3
 	* must move sprite start & put position here
 	* first we back up sprite data
-	move.w	D3,(actsprite_y_clipping,a4)  | store previous offset
 	lsl.l	#4,D3
-	lea	(actsprite_saved_line.W,a4),a5			| destination
 	* add offset to sprite pointer to start by that line
 	add.l	D3,a1
 	lsr.l	#4,D3	| restore D3 value for next loop
@@ -2001,11 +2025,13 @@ show_sprite:
 	cmp.w	D3,d5
 	beq.b	8f
 
+	lea	(actsprite_saved_line.W,a4),a5			| destination
 	move.l	a1,a2	| source
 	
 	* copy 16 bytes to sprite line backup space
 	* and zero that sprite line so 
 	* it can be used as X/Y sprite first line
+	WAIT_BEAM_SPRITE
 	.rept	4
 	move.l	(a2),(a5)+
 	clr.l	(a2)+
@@ -2025,6 +2051,7 @@ show_sprite:
 	move.w	d0,(6,a1)
 	swap	d0
 	move.w	d0,(2,a1)
+10:
 	movem.l	(a7)+,d2-d6/a0/a2-a5
 	
 	rts
@@ -2063,6 +2090,9 @@ hide_sprite:
 	move.l	(a3)+,(a2)+
 	move.l	(a3)+,(a2)+
 	move.l	(a3),(a2)
+	* zero clipping to be coherent
+	* (we're using it as "previous clipping offset" too)
+	clr.w	(actsprite_y_clipping,a1)
 11:
 	movem.l	(a7)+,d0/a2-a3
 	rts
@@ -2093,6 +2123,7 @@ draw_andor_sprite:
 	move.w	(a7)+,d4
 	rts
 
+	
 * < D0: sprite index times 64 (for backup/clipping table)
 * < D2: y offset for clipping (0 if no clipping)
 * < D3: Y
@@ -2618,6 +2649,7 @@ osd_read_coin:
 	*
 		* D0 bit0=P1, bit1=P2.
 osd_read_start:
+	move.l	d1,-(a7)
 	move.b	#0,d0
 	lea keyboard_table(pc),a0
 	tst.b	(1,a0)		| "1" key like in MAME
@@ -2625,7 +2657,6 @@ osd_read_start:
 	clr.b	(1,a0)
 	bra.b	2f
 0:
-	move.l	d1,-(a7)
 	move.l	_joypad_state(pc),d1
 	tst.b	ingame_palette_loaded
 	bne.b	3f
@@ -2637,7 +2668,7 @@ osd_read_start:
 2:
 	bset	#0,d0
 1:
-	movem.l	(a7)+,d1
+	move.l	(a7)+,d1
 	tst.b	d0
 	rts
 		

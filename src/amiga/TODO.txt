@@ -6,11 +6,11 @@
 * critical:
 
 - provide HD archive (unpacked, whdload + icon) and floppy (packed, no whdload)
-- andor sprite flashing when appearing sometimes: log andor X+Y and analyse first value if flash
-- highscore yellow highlight shifted (change score and run with 1 life)
 
 * not urgent
 
+- highscore yellow highlight shifted (change score and run with 1 life)
+- optim: fg tile draw compute min & max X for current box
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 - make game 20% faster (60Hz): done, probably not working...
 - random?: access fault far in the game (in draw_sprite_part)
