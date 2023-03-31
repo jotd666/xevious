@@ -1,10 +1,10 @@
 .key nope
 set game xevious
-propack p a $game
-copy $game.RNC DF0:$game
+; doesn't work on that exe, using cranker... propack p a $game
+copy $game.rnc DF0:$game
 protect DF0:$game RWED
-copy readme.md df0:
-copy instructions.txt df0:
-delete $game.rnc
+copy readme.md instructions.txt df0:
+
+;delete $game.rnc
 delete df0:$game.high
 

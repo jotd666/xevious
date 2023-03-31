@@ -38,6 +38,7 @@ _config
 	dc.b    "C2:L:skill level:normal,easy,hard,hardest;"
 	dc.b    "C3:X:flag awards bonus life:0;"    
 	dc.b    "C3:X:no in-game music:1;"    
+	dc.b    "C4:L:game:Xevious,Super Xevious;"
 	dc.b	0
 
 	IFD BARFLY
@@ -45,7 +46,7 @@ _config
 	ENDC
 
 DECL_VERSION:MACRO
-	dc.b	"1.0"
+	dc.b	"1.1"
 	IFD BARFLY
 		dc.b	" "
 		INCBIN	"T:date"
@@ -56,8 +57,8 @@ DECL_VERSION:MACRO
 	ENDC
 	ENDM
 _data   dc.b    0
-_name	dc.b	'Xevious',0
-_copy	dc.b	'1982 Namco',0
+_name	dc.b	'Xevious / Super Xevious',0
+_copy	dc.b	'1982-1984 Namco',0
 _info
     dc.b	"68k transcode & design by Mark Mc Dougall",10
     dc.b	"Amiga port by JOTD",0

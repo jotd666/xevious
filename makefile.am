@@ -4,7 +4,6 @@ MAIN = ..\$(PROGNAME)
 # Bebbo's package usually installs itself there
 GCC_BIN = C:\amiga-gcc\bin
 ASM = $(GCC_BIN)/m68k-amigaos-as -c --defsym __amiga__=1
-OPT_SUPER = --defsym OPT_SUPER=0
 MAIN_OBJ = amiga.o
 WHDLOADER = ..\$(PROGNAME).slave
 WHDLOADER_CHIP = ..\$(PROGNAME)_chip.slave
@@ -42,15 +41,15 @@ $(MAIN): $(OBJS)
 	$(GCC_BIN)/m68k-amigaos-ld -o $(MAIN) $(OBJS)
 
 xevious_main.o: xevious_main.68k xevious.inc
-	$(ASM) $(OPT_SUPER) xevious_main.68k -o xevious_main.o
+	$(ASM) xevious_main.68k -o xevious_main.o
 map_rom.o: map_rom.68k xevious.inc
 	$(ASM) map_rom.68k -o map_rom.o
 xevious_sub.o: xevious_sub.68k xevious.inc
-	$(ASM)  $(OPT_SUPER) xevious_sub.68k -o xevious_sub.o
+	$(ASM) xevious_sub.68k -o xevious_sub.o
 xevious_ram.o: xevious_ram.68k  xevious.inc
 	$(ASM)  xevious_ram.68k -o xevious_ram.o
 amiga.o: $(AMIGASRC)/amiga.68k $(AMIGASRC)/hw_sprite_types.68k $(AMIGASRC)/sound_entries.68k xevious.inc $(AMIGASRC)/ReadJoyPad.i $(AMIGASRC)/palette.68k
-	$(ASM) -Iamiga $(OPT_RELEASE) $(OPT_SUPER) $(AMIGASRC)/amiga.68k -o amiga.o
+	$(ASM) -Iamiga $(OPT_RELEASE) $(AMIGASRC)/amiga.68k -o amiga.o
 hw_sprite_specific.o: $(AMIGASRC)/hw_sprite_specific.68k
 	$(ASM) $(AMIGASRC)/hw_sprite_specific.68k -o hw_sprite_specific.o
 ptplayer.o: $(AMIGASRC)/ptplayer.68k

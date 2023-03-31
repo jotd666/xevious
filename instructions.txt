@@ -8,3 +8,37 @@ Amiga controls:
 - fire/red to fire
 - 2nd button/blue to launch a bomb
 - P key or CD32 play to pause the game
+
+Command line arguments (no whdload)
+
+Usage:
+
+xevious STARTLIVES/K/N,SKILL/K/N,FLAGXTRA/S,NOMUSIC/S,SUPER/S
+
+STARTLIVES: caution this is not the number of lives but DSW setting
+    0: 3 lives
+    1: 1 life
+    2: 2 lives
+    3: 5 lives
+
+SKILL: 
+    0: normal
+    1: easy
+    2: hard
+    3: hardest
+	
+FLAGXTRA: collecting hidden flag awards extra life
+
+NOMUSIC: some find the in-game music annoying. Turn it off
+
+SUPER: enable Super Xevious game variant
+
+Examples: 
+
+* easiest setting, max lives, flag awards extra life
+
+xevious STARTLIVES=3 FLAGXTRA SKILL=1
+
+* hardest setting, min lives, super xevious
+
+xevious STARTLIVES=1 SKILL=3 SUPER

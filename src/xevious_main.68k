@@ -15,7 +15,7 @@ NO68020 = 1
     .global xevious_im1_irq
     .global xevious_reset
     .global sxevious_im1_irq
-    .global sxevious_reset
+    .global is_super_xevious
     *.global _end_of_xevious_main_rom
     
 * debugging only
@@ -35,13 +35,19 @@ NO68020 = 1
 
 _start_of_xevious_main_rom:
 
-.ifeq OPT_SUPER
 xevious_reset: | $0000
-    bsr       xevious_sub_reset                 | obviously 68K only
-.else
-sxevious_reset: | $0000
-    bsr       sxevious_sub_reset                | obviously 68K only
-.endif
+    bsr     xevious_sub_reset                 | obviously 68K only
+	tst.w	is_super_xevious
+	bne.b	0f
+	lea		flying_enemy_type_tbl_normal,a0
+	lea		ROM_high_score_tbl_normal,a1
+	bra		1f
+0:
+	lea		flying_enemy_type_tbl_super,a0
+	lea		ROM_high_score_tbl_super,a1
+1:
+	move.l	a0,flying_enemy_type_tbl_pointer
+	move.l	a1,ROM_high_score_tbl_pointer
     bra       start
 
 exit_caller: | $001D
@@ -257,11 +263,7 @@ restart_main_loop: | $0437
     *** as vb_sempahore_main above.
     *** Since we only have 1 processor, handle it sequentially here
     ***
-.ifeq OPT_SUPER
     bsr       xevious_sub_cpu
-.else
-    bsr       sxevious_sub_cpu
-.endif
     ***
 
     move.w    #0x20F0,d0                        | green
@@ -460,7 +462,7 @@ main_gameplay_loop: | $0593
     lea       area_offset_in_map_tbl,a0
     move.b    (a0,d0.w),(area_offset_in_map)
     move.w    #0xd00,(scroll_cntr)
-    lea       area_object_tbl_tbl,a0
+    move.l       area_object_tbl_tbl_pointer,a0
     .ifdef	NO68020
     add.w     d0,d0
     add.w     d0,d0                             | offset for area in table
@@ -716,7 +718,8 @@ wipe_player_start_msgs: | $07B7
     rts                                         | preseverved to document
         
 display_copyright_msgs: | $07DC
-.ifeq OPT_SUPER
+	tst.w	is_super_xevious
+	bne.b	0f
     move.w    #0x161f,d0                        | screen col,row
     lea       strCOPYRIGHT,a0
     moveq     #19,d7                            | string length
@@ -727,7 +730,8 @@ display_copyright_msgs: | $07DC
     moveq     #7,d7                             | string length
     bsr       display_string
     move.w    #0x1021,d0                        | screen col,row
-.else
+	bra.b	1f
+0:
     move.w    #0x1519,d0                        | screen col,row
     lea       strCOPYRIGHTII,a0
     moveq     #17,d7                            | string length
@@ -749,7 +753,7 @@ display_copyright_msgs: | $07DC
     moveq     #BANK_FG_VIDEORAM,d2
     bsr       display_string
     move.w    #0x1020,d0                        | screen col,row
-.endif    
+1:
     moveq     #7,d7                             | length
     move.w    #0x1a,d1                          | attr
     moveq     #BANK_FG_COLORRAM,d2
@@ -786,21 +790,25 @@ display_1_only_or_1_2_players: | $0823
     * calc offset
     movea.l   (a0,d0.w*4),a0
     .endif
-.ifeq OPT_SUPER
+	tst.w	is_super_xevious
+	bne.b	0f
     move.w    #0x1519,d0                        | screen col,row
-.else
+	bra.b	1f
+0:
     move.w    #0x1516,d0                        | screen col,row
-.endif
+1:
     moveq     #18,d7                            | string length
     moveq     #BANK_FG_VIDEORAM,d2
     bra       display_string        
     
 display_push_start_button: | $083C
-.ifeq OPT_SUPER
+	tst.w	is_super_xevious
+	bne.b	0f
     move.w    #0x1517,d0                        | screen col,row
-.else
+	bra.b	1f
+0:
     move.w    #0x1514,d0                        | screen col,row
-.endif
+1:
     lea       strPUSH_START_BUTTON,a0
     moveq     #17,d7                            | string length
     moveq     #BANK_FG_VIDEORAM,d2
@@ -843,11 +851,13 @@ display_insert_coin_flashing: | $0881
     lsr.b     #4,d1
     and.b     #1,d1                             | timer to wipe msg?
     beq.b     wipe_insert_coin                  | yes, go
-.ifeq OPT_SUPER
+	tst.w	is_super_xevious
+	bne.b	0f
     move.w    #0x121C,d0                        | offset
-.else
+	bra.b	1f
+0:
     move.w    #0x1215,d0                        | offset
-.endif
+1:
     lea       strINSERT_COIN,a0
     moveq     #11,d7                            | string length
     move.w    #BANK_FG_VIDEORAM,d2
@@ -855,20 +865,23 @@ display_insert_coin_flashing: | $0881
 9:  rts
 
 wipe_insert_coin: | $089E
-.ifeq OPT_SUPER
+	tst.w	is_super_xevious
+	bne.b	0f
     move.w    #0x121C,d0                        | offset
-.else
+	bra.b	1f
+0:
     move.w    #0x1215,d0                        | offset
-.endif
+1:
     moveq     #11,d7                            | string length
     move.w    #BANK_FG_VIDEORAM,d2
     moveq     #0x24,d1                          | tile
     bra       display_char_B_times
         
 display_xevious_logo_flashing: | $08AA
-.ifne OPT_SUPER
+	tst.w	is_super_xevious
+	beq.b	0f
     bsr       display_SUPER
-.endif
+0:
     move.w    #4,(bg_scroll_x_shadow)
     moveq     #BANK_BG_VIDEORAM,d2
     move.w    #0x1509,d0                        | screen col,row
@@ -1010,9 +1023,10 @@ strSUPER:
     .byte 0x1C, 0x1E, 0x19, 0xE, 0x1B           | "SUPER"
     .align 2
 display_xevious_logo_yellow: | $09E8
-.ifne OPT_SUPER
+	tst.w	is_super_xevious
+	beq.b	0f
     bsr       display_SUPER
-.endif
+0:
     moveq     #BANK_FG_VIDEORAM,d2
     move.w    #0x160A,d0                        | screen col,row
     lea       xevious_logo_yellow_pt1,a0
@@ -1279,7 +1293,7 @@ attract_mode_gameplay: | $0D35
     move.b    (a0,d0.w),(area_offset_in_map)
     move.w    #0xd00,(scroll_cntr)
     clr.w     d0                                | area 1 (offset=0)
-    lea       area_object_tbl_tbl,a0
+    move.l       area_object_tbl_tbl_pointer,a0
     .ifdef	NO68020
     add.w     d0,d0
     add.w     d0,d0                             | redundant
@@ -1452,11 +1466,11 @@ display_high_score_table: | $1011
     bsr       display_high_score_text
     bsr       display_high_score
     move.w    #0x1615,d0                        | screen col,row
-.ifeq OPT_SUPER    
     lea       strBest_Five_WARRIORS,a0
-.else
+	tst.w	is_super_xevious
+	beq.b	0f
     lea       strBest_Five_GOULZEHG,a0
-.endif    
+0:
     moveq     #BANK_FG_VIDEORAM,d2
     moveq     #18,d7                            | string length
     bsr       display_string
@@ -1538,7 +1552,7 @@ str5th:
     .align 2
 
 init_high_score_table: | $10D9
-    lea       ROM_high_score_tbl,a0
+    move.l    ROM_high_score_tbl_pointer(pc),a0
     lea       high_score_1st_msb,a1             | byte-swapped
     moveq     #0x50-1,d7
 1:  move.b    (a0)+,(a1)+
@@ -1550,10 +1564,13 @@ init_high_score_table: | $10D9
     dbf       d7,2b
     rts
 
+ROM_high_score_tbl_pointer:
+	.long	0
+	
 ROM_high_score: 
   .byte 0, 0x40, 0
-.ifeq OPT_SUPER
-ROM_high_score_tbl: | $10F0
+
+ROM_high_score_tbl_normal: | $10F0
   .byte 0, 0x40, 0
   .byte 0x16, 0x50, 0x17, 0x36, 0x40, 0x36, 0x42, 0x4A, 0x47, 0x36
   .byte 0, 0, 0
@@ -1569,8 +1586,8 @@ ROM_high_score_tbl: | $10F0
   .byte 0, 0x20, 0
   .byte 0x1C, 0x50, 0x14, 0x44, 0x3F, 0x3E, 0x42, 0x36, 0x24, 0x24
   .byte 0, 0, 0
-.else
-ROM_high_score_tbl: | $1121 (super)
+
+ROM_high_score_tbl_super: | $1121 (super)
     .byte 0, 0x40, 0, 0x36, 0x43, 0x39, 0x47, 0x44, 0x3E, 0x39
     .byte 0xE, 0x1F, 0xE, 0, 0, 0
     .byte 0, 0x35, 0, 0x16, 0x3E, 0x48, 0x36, 0x49, 0x44, 0x24
@@ -1581,7 +1598,7 @@ ROM_high_score_tbl: | $1121 (super)
     .byte 0x49, 0x3D, 0x36, 0, 0, 0
     .byte 0, 0x20, 0, 0xF, 0x3E, 0x41, 0x3E, 0x3A, 0x47, 0x24
     .byte 0x1D, 0x50, 0x24, 0, 0, 0
-.endif  
+
   .align 2
 
 check_for_high_score: | $1143
@@ -2986,11 +3003,13 @@ handle_1D_Sol_Tower: | $1E61
     move.b    #0xb6,(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
     .endif
-.ifeq OPT_SUPER
+	tst.w	is_super_xevious
+	bne.b	0f
      move.b    #54,(_PTS,a5)                     | 2,000 pts
-.else
+	 bra.b	1f
+0:
      move.b    #48,(_PTS,a5)                     | 1,000 pts
-.endif
+1:
     jbsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq.b     handle_sol_tower_rising           | yes, go
@@ -3041,11 +3060,13 @@ handle_09_Brag_Spario: | $1EF8
     move.b    #2,(_STATE,a5)
     move.b    #0x15,(_CODE,a5)
     move.b    #0x26,(_COLOUR,a5)
-.ifeq OPT_SUPER
+	tst.w	is_super_xevious
+	bne.b	0f
      move.b    #33,(_PTS,a5)                     | 500 pts
-.else
+	 bra.b	1f
+0:
      move.b    #54,(_PTS,a5)                     | 2,000 pts
-.endif
+1:
     jbsr       save_PC_to_fn_tbl_and_ret
     move.b    #2,(_STATE,a5)                    | again?
     clr.w     d0                                | init ddX=0
@@ -5136,7 +5157,7 @@ main_fn_4__spawn_flying_enemies: | $33B3
     beq.b     9f
     moveq     #0,d0
     move.b    (flying_enemy_type_tbl_offset),d0
-    lea       flying_enemy_type_tbl,a0
+    move.l    flying_enemy_type_tbl_pointer,a0
     lea       (a0,d0.w),a0
     lea       obj_tbl+_OBJSIZE*0x3a,a1          | flying enemies
     subq.b    #1,d7                             | adjust for 68K
@@ -5976,7 +5997,8 @@ remove_easter_egg: | $3AA5
     bra       add_obj_handler
     
 display_easter_egg: | $3AC9
-.ifeq OPT_SUPER
+	tst.w	is_super_xevious
+	bne.b	0f
     lea       str_NAMCO_ORIGINAL,a0
     bsr       cpl_and_display_string_16
     move.w    #0x1921,d0                        | screen col,row
@@ -5994,7 +6016,7 @@ display_easter_egg: | $3AC9
     .endif
 .endif
     bra       cpl_and_display_string_24
-.else
+0:
     move.w    #0x1921,d0                        | screen col,row
     lea       str_SPECIALTHANKSFORYOU,a0
     moveq     #22,d7                            | length
@@ -6005,7 +6027,7 @@ display_easter_egg: | $3AC9
     moveq     #24,d7                            | length
     moveq     #BANK_FG_VIDEORAM,d2
     bra       display_string
-.endif    
+  
 
 str_NAMCO_ORIGINAL:
     .byte 0xD0, 0xCF, 0xCE, 0xCD, 0xCC, 0xCB, 0xCA                | "NAMCO" (gfx)
@@ -6077,9 +6099,14 @@ wipe_easter_egg: | $3B7C
     moveq     #BANK_FG_VIDEORAM,d2
     bra       display_char_B_times    
 
+is_super_xevious:
+	.word	0
+flying_enemy_type_tbl_pointer:
+	.long	0
+	
 * table of flying enemy types
-.ifeq OPT_SUPER
-flying_enemy_type_tbl: | $3C03
+
+flying_enemy_type_tbl_normal: | $3C03
     .byte 0, 0xA, 0xA, 0xA, 0xA, 0xA, 0xA, 0xB, 0xB, 0xB, 0xB, 0xB, 0xB, 0x55, 0x55, 0x55
     .byte 0x55, 0x55, 0x55, 0x56, 0x56, 0x56, 0x56, 0x56, 0x56, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xC
     .byte 0xC, 0xC, 0xC, 0xC, 0xC, 0xB, 0xB, 8, 8, 8, 8, 8, 8, 0xD, 0xD, 0xD
@@ -6088,8 +6115,8 @@ flying_enemy_type_tbl: | $3C03
     .byte 0x11, 0x11, 0x11, 0x11, 0x16, 0x16, 0x16, 0x16, 0x17, 0x17, 0x17, 0x17, 0xF, 0xF, 8, 8
     .byte 8, 8, 0x55, 0x55, 0x10, 0x10, 8, 8, 8, 8, 0x11, 0x11, 0x14, 0x14, 0x15, 0x15
     .byte 0x15, 0x15, 8, 8, 8, 8, 0xE, 0xE, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F
-.else
-flying_enemy_type_tbl: | $3CA7 (super)
+
+flying_enemy_type_tbl_super: | $3CA7 (super)
     .byte 0, 0xA, 0xA, 0xA, 0xA, 0xB, 0xB, 0xB
     .byte 0xB, 0xB, 0xB, 0x56, 0x56, 0x56, 0x56, 0x56
     .byte 0x56, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0xF
@@ -6106,7 +6133,6 @@ flying_enemy_type_tbl: | $3CA7 (super)
     .byte 0x55, 0x55, 0x55, 0x55, 0x11, 0x11, 0x11, 0x11
     .byte 0x15, 0x15, 0xE, 0xE, 0x16, 0x11, 0x11, 0x11
     .byte 0x11, 0x11, 0x58, 0x58, 0x58, 0x58, 0x58, 0x58
-.endif
 
     .align 4        
 obj_handler_tbl: | $3C83

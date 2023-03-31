@@ -5,7 +5,7 @@
 
 * critical:
 
-- provide HD archive (unpacked, whdload + icon) and floppy (packed, no whdload)
+- game => menu palette: also clear both double buffered screens
 
 * not urgent
 

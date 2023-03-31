@@ -326,9 +326,6 @@ _user:
 	
     bra		.no_forbid
 .standard:
-	lea		_custom,a5
-	lea		debug_copperlist,a0
-	move.l	a0,cop1lc(a5)
 	
     * open dos library, graphics library
     move.l  0x4.W,a6
@@ -337,6 +334,55 @@ _user:
     jsr _LVOOpenLibrary(a6)
     move.l  d0,_dosbase
 
+	move.l	#read_args_string,d1
+	move.l	#program_args,d2
+	moveq.l	#0,d3
+	move.l	_dosbase,A6
+	jsr	_LVOReadArgs(a6)
+
+	move.l	d0,rdargs_struct		| NULL is OK
+	bne	0f
+	jmp		_LVOExit(a6)
+0:	
+	lea		program_args,a0
+	move.l	(A0)+,D0	| STARTLIVES/K/N
+	beq.b	1f
+	move.l	d0,a1
+	move.l	(a1),d0
+	and.l	#3,d0
+	move.l	d0,start_lives
+1:
+	move.l	(A0)+,D0	| SKILL/K/N
+	beq.b	1f
+	move.l	d0,a1
+	move.l	(a1),d0
+	and.l	#3,d0
+	move.l	d0,difficulty_level
+1:
+	* bit 0: DSW flag awards bonus life
+	* bit 1: no looped music
+
+	move.l	(A0)+,D0	| FLAGXTRA/S
+	beq.b	1f
+	or.l	#1,misc_flags
+1:
+	move.l	(A0)+,D0	| NOMUSIC/S
+	beq.b	1f
+	or.l	#2,misc_flags
+1:
+	move.l	(A0)+,D0	| SUPER
+	beq.b	1f
+	move.l	#1,xevious_or_super
+1:
+
+	move.l	rdargs_struct,d1
+	jsr		_LVOFreeArgs(a6)
+
+	lea		_custom,a5
+	lea		debug_copperlist,a0
+	move.l	a0,cop1lc(a5)
+
+	move.l	4.W,A6
 	lea graphicsname(pc),a1
     moveq.l #0,d0
     jsr _LVOOpenLibrary(a6)
@@ -442,11 +488,8 @@ demo_game:
 		move		#0x4000,_custom+intena						| disable interrupts
 		move		#0x7FFF,_custom+intreq						| ack all interrupts
 		bsr			platform_init					| amiga-specific init
-		.ifeq	OPT_SUPER
+		move.w	xevious_or_super+2,is_super_xevious
 		jmp			xevious_reset					| pass control to the xevious core
-		.else
-		jmp			sxevious_reset					| pass control to the xevious core
-		.endif
 		
 title_display:
 * we're not doing things the NeoGeo way
@@ -2414,6 +2457,9 @@ difficulty_level:
 misc_flags:
 
 	.long	0
+		.long	WHDLTAG_CUSTOM4_GET
+xevious_or_super:
+	.long	0
 	.long	0
 
 start_lives_dsw:
@@ -3376,6 +3422,13 @@ previous_sprite_state_1:
 previous_sprite_state_2:
 	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 	.endif
+	
+rdargs_struct:
+	dc.l	0
+program_args:
+	ds.l	40,0	
+read_args_string:
+	.asciz	"STARTLIVES/K/N,SKILL/K/N,FLAGXTRA/S,NOMUSIC/S,SUPER/S"
 
 unknown_tile_found:
 	dc.b	0
@@ -3385,6 +3438,7 @@ ingame_palette_loaded:
 	dc.b	0
 no_gfx_update:
 	dc.b	0
+	.align	2
 	* sound variables
 sound_lock:
 	.word	0
