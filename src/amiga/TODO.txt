@@ -6,6 +6,7 @@
 * critical:
 
 - game => menu palette: also clear both double buffered screens
+- sxev: bridge doesn't appear: dump object list & debug
 
 * not urgent
 
@@ -25,7 +26,6 @@ Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD
 - level 15 bridge: use special assembled sprite: wrong x size WTF check auto resize
   in bitplanelib
 - tank & heli (levl 14) wrong colors / blinking: maybe dump sprite config & test
-- dynamic Xevious/Super Xevious config at launch (whdload)
 
 further optims:
 
@@ -41,7 +41,8 @@ further optims:
   
 Super Xevious
 
-    Jet; the most pointless addition. Appears once (area 15). Flies down the screen at a random (relatively shallow) angle but is completely and utterly benign. It can't hurt you, and you can't destroy it. What was the point?
+    Jet; the most pointless addition. Appears once (area 15). 
+	Flies down the screen at a random (relatively shallow) angle but is completely and utterly benign. It can't hurt you, and you can't destroy it. What was the point?
     Helicopter; appears once (area 14). Don't bomb it - you have been warned!
     Tank; appears once (area 8). Don't bomb it - you have been warned!
     Bridge; appears once (area 15) and is purely cosmetic (completely benign). 'Allows' the Domograms to cross the river. 

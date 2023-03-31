@@ -1640,6 +1640,9 @@ osd_update_32_sprite_hw:
 	clr.w	d6
 	* tile type (bob, sprite and which sprite type)
 	move.b	(a6,d0.w),d6
+	
+	LOGPC	200
+	
 **	cmp.b	#HW_OTHER,d6
 **	beq		51f		| temp uncomment test bridge
 

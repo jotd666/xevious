@@ -42,7 +42,7 @@ real_sprites = {80:{"sprites":[0,1]},   # solvalou
 243:{"sprites":[2,3],"mirror":True},   # flying jet
 248:{"sprites":[2,3],"mirror":True},   # tank
 249:{"sprites":[2,3],"mirror":True},   # tank
-252:{"sprites":[4,5]},   # bridge start
+254:{"sprites":[4,5]},   # bridge start
 }
 # bragza: "soul" of the andor genesis
 # only 1 sprite needed but uses a lot of unique colors
@@ -64,6 +64,9 @@ for start,stop in ((88,91),(128,159)):  # 92-96 are glowing hulls, we need to di
     sprite_table[start:stop+1] = [HW_ANDOR_TILE]*(stop-start+1)
 for r in real_sprites:
     sprite_table[r] = HW_OTHER
+
+# sets bridge tiles. top left tile is 254 (controls HW sprite) other tiles shouldn't be displayed
+sprite_table[252:256] = [HW_BRIDGE_TILE,HW_BRIDGE_TILE,HW_BRIDGE,HW_BRIDGE_TILE]
 
 
 def split_sprite(palette,img):
@@ -183,7 +186,7 @@ def doit():
 
 
     # brige: much simpler: just assemble 4 parts for 32x32 sprite
-    bridge = Image.new("RGB",(64,32),color=transparent)
+    bridge = Image.new("RGB",(32,32),color=transparent)
     for n,xo,yo in ((254,0,0),(252,1,0),(255,0,1),(253,1,1)):
         source = os.path.join(dump_dir,"bridge_{}_2.png".format(n))
         src = Image.open(source)
