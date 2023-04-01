@@ -787,10 +787,8 @@ platform_init:
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
 	* set blitter parameters once and for all
-	.ifndef	VARIABLE_MASKS_AB_MODS
+	.ifndef	VARIABLE_MASKS
     move.l  #-1,bltafwm(a5)
-	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
-	clr.w bltbmod(a5)		|B modulo=bytes to skip between lines
 	.endif
 	
 	* restrict borders: we don't see bobs on the borders!
@@ -1102,15 +1100,6 @@ update_bg_tile:
 	* title
 	tst.b	ingame_palette_loaded
 	beq.b	3f
-	* added screen clear to remove remnants of bobs
-	* on both backbuffer and drawn buffer
-	* (nothing should be drawn anyway, except for score
-	* maybe but at least there aren't flashing bits of
-	* bobs during title screen after a game over)
-	move.l	fg_drawed_screen_ptr(pc),a1
-	bsr		clear_fg_screen
-	move.l	fg_displayed_screen_ptr(pc),a1
-	bsr		clear_fg_screen
 	bsr		load_title_tile_palette
 	clr.b	ingame_palette_loaded	
 3:	
@@ -1971,11 +1960,11 @@ clear_fg_tiles:
 	bclr	#1,(a6)
 31:
 	* next row
-	moveq	#0,d5	| clear "bitmap in row" flag
 	addq.w	#1,d7
-	addq.w	#1,a6
 	cmp.w	#NB_VISIBLE_ROWS,d7
 	beq.b	4f
+	addq.w	#1,a6
+	moveq	#0,d5	| clear "bitmap in row" flag
 	moveq	#0,d6
 	bra.b	1b
 4:
@@ -1999,13 +1988,12 @@ clear_fg_tiles:
 	move.w	d7,d3
 	sub.w	d4,d3	| nb dirty rows
 	* D4: first dirty row
-	* D5: nb of dirty rows
+	* D3: nb of dirty rows
 	clr	d6		| ack flag
 	* now refresh screen
 	move.l	fg_drawed_screen_ptr(pc),a1
 	moveq	#0,d0
 	move.w	d4,d1
-	**subq.w	#2,d1	| 2 rows offset
 	lsl.w	#3,d1	| times 8 (start y)
 	lsl.w	#3,d3	| times 8 (height)
 	move.w	d3,d4
@@ -2794,6 +2782,10 @@ osd_write_high_scores:
 	movem.l	d0-d7/a0-a6,-(a7)
 	move.l	_resload(pc),d0
 	beq.b	0f
+	tst.l	cheat_flags		| don't save score if cheat on
+	bne.b	0f
+	tst.l	start_area_option	| don't save score if cheat on
+	bne.b	0f
 	move.l	d0,a2
 	move.l	#16*5,d0
 	move.l	a0,a1
@@ -2864,6 +2856,7 @@ beamdelay:
 
 * < A1: planes start
 clear_fg_screen:
+	rts
 	movem.l	d0-a6,-(a7)
 	lea		_custom,a5
 	moveq	#0,d0
@@ -2913,7 +2906,7 @@ clear_planes_any_blitter_internal:
     add.w   d1,d1
     move.w  (a2,d1.w),d1
 1:
-    move.l  #0x010A0000,d5   | minterm useD & rect clear (0xA) 
+    move.l  #0x01000000,d5   | minterm useD & rect clear (0xA) 
     move    d0,d6
     beq.b   2f
     and.w   #0xF,d6
@@ -2940,13 +2933,12 @@ clear_planes_any_blitter_internal:
 	WAIT_BLIT
     
     * blitter registers set
-	.ifdef	VARIABLE_MASKS_AB_MODS
+	.ifdef	VARIABLE_MASKS
     move.l  d7,bltafwm(a5)
 	.endif
 	
 	move.l d5,bltcon0(a5)	
     move.w  d0,bltdmod(a5)	|D modulo
-	move.w  #-1,bltadat(a5)	|source graphic top left corner
 	
 	subq	#1,d3
 	beq.b	4f
@@ -3229,11 +3221,11 @@ blit_planes_any_internal_cookie_cut:
     
     * blitter registers set
 
-	.ifdef	VARIABLE_MASKS_AB_MODS
+	.ifdef	VARIABLE_MASKS
     move.l  d7,bltafwm(a5)
-	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
-	clr.w bltbmod(a5)		|A modulo=bytes to skip between lines
 	.endif
+	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
+	clr.w bltbmod(a5)		|B modulo=bytes to skip between lines
 	move.l d5,bltcon0(a5)	| sets con0 and con1
 	move.w	(a7)+,d5
 	
@@ -3347,11 +3339,11 @@ blit_plane_any_internal_cookie_cut:
     
     * blitter registers set
 
-	.ifdef	VARIABLE_MASKS_AB_MODS
+	.ifdef	VARIABLE_MASKS
     move.l  d7,bltafwm(a5)
+	.endif
 	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
 	clr.w bltbmod(a5)		|A modulo=bytes to skip between lines
-	.endif
 	move.l d5,bltcon0(a5)	| sets con0 and con1
 
     move.w  d0,bltcmod(a5)	|C modulo
@@ -3444,10 +3436,10 @@ blit_planes_any_internal_cookie_cut_blank_source:
     
     * blitter registers set
 
-	.ifdef	VARIABLE_MASKS_AB_MODS
+	.ifdef	VARIABLE_MASKS
     move.l  d3,bltafwm(a5)
-	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
 	.endif
+	clr.w bltamod(a5)		|A modulo=bytes to skip between lines
 	move.l d7,bltcon0(a5)	| sets con0 and con1
 
  	clr.w	bltbdat(a5)	|B word is zero
