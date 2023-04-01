@@ -5,26 +5,16 @@
 
 * critical:
 
-- game => menu palette: also clear both double buffered screens
+- optim: fg tile draw compute min & max X for current box
+- Super Xevious: trashed fg tile refresh
+- Super Xevious: tank & heli (levl 14) wrong colors / blinking: maybe dump sprite config & test
 
 * not urgent
 
-- highscore yellow highlight shifted (change score and run with 1 life)
-- optim: fg tile draw compute min & max X for current box
+- highscore yellow highlight shifted for entry 3 (change score and run with 1 life)
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 - make game 20% faster (60Hz): done, probably not working...
-- random?: access fault far in the game (in draw_sprite_part)
 
-Exception "Access Fault" ($7008) PC = $101902 Word Read from $680016BD
-00101900 3203                     move.w d3,d1
-00101902 3818                     move.w (a0)+ [0020],d4   <===================
-00101904 3618                     move.w (a0)+ [0020],d3
-
-* Super Xevious only
-
-- level 15 bridge: use special assembled sprite: wrong x size WTF check auto resize
-  in bitplanelib
-- tank & heli (levl 14) wrong colors / blinking: maybe dump sprite config & test
 
 further optims:
 
@@ -38,11 +28,11 @@ further optims:
   (saves 130kb, not worth it)
   
   
-Super Xevious
+Super Xevious additions (taken from http://retroports.blogspot.com/)
 
-    Jet; the most pointless addition. Appears once (area 15). 
-	Flies down the screen at a random (relatively shallow) angle but is completely and utterly benign. It can't hurt you, and you can't destroy it. What was the point?
+[DONE]    Galaxian; technically worth 150 pts but you can't actually hit it. Always spawns away from the Solvalou, and will turn away before you can get under it. Shoots at you though.
+    Jet Taking Off; appears once (area 10). Unique in that it is a flying enemy, but shooting it results in a crater on the ground. You can't get close enough for it to hit the Solvalou before it leaves the screen, Don't shoot it - you have been warned!
+    Jet; the most pointless addition. Appears once (area 15). Flies down the screen at a random (relatively shallow) angle but is completely and utterly benign. It can't hurt you, and you can't destroy it. What was the point?
     Helicopter; appears once (area 14). Don't bomb it - you have been warned!
     Tank; appears once (area 8). Don't bomb it - you have been warned!
-    Bridge; appears once (area 15) and is purely cosmetic (completely benign). 'Allows' the Domograms to cross the river. 
-	
+[DONE]    Bridge; appears once (area 15) and is purely cosmetic (completely benign). 'Allows' the Domograms to cross the river. 

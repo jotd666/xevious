@@ -33,6 +33,8 @@ NOMUSIC: some find the in-game music annoying. Turn it off
 
 SUPER: enable Super Xevious game variant
 
+STARTAREA: 1-16 (this is a cheat!)
+
 Examples: 
 
 * easiest setting, max lives, flag awards extra life

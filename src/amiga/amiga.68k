@@ -391,7 +391,15 @@ _user:
 1:
 	move.l	(A0)+,D0	| SUPER
 	beq.b	1f
-	move.l	#1,xevious_or_super
+	or.l	#4,misc_flags
+1:
+	move.l	(A0)+,D0	| STARTAREA/K/N
+	beq.b	1f
+	move.l	d0,a1
+	move.l	(a1),d0
+	subq.l	#1,d0
+	and.l	#0xF,d0
+	move.l	d0,start_area_option
 1:
 
 	move.l	rdargs_struct,d1
@@ -507,7 +515,21 @@ demo_game:
 		move		#0x4000,_custom+intena						| disable interrupts
 		move		#0x7FFF,_custom+intreq						| ack all interrupts
 		bsr			platform_init					| amiga-specific init
-		move.w	xevious_or_super+2,is_super_xevious
+		move.l	misc_flags(pc),d0
+		btst	#2,d0
+		sne		is_super_xevious
+		move.l	cheat_flags(pc),d0
+		btst	#0,D0
+		sne		invincible_flag
+		btst	#1,D0
+		sne		infinite_lives_flag
+		btst	#2,D0
+		sne		reveal_sol_tower_flag
+		btst	#3,D0
+		sne		reveal_bonus_flag_flag
+		
+0:
+		move.w	start_area_option+2,start_area
 		jmp			xevious_reset					| pass control to the xevious core
 		
 title_display:
@@ -919,7 +941,7 @@ osd_disable_vblank_interrupt:
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_fg_colorram:
     .ifeq OPT_DISABLE_FG_LAYER
-	movem.l	d0-d5/a0-a1,-(a7)
+	movem.l	d0-d7/a0-a1,-(a7)
 	lea		fg_colorram,a1
 	move.b	d1,(a1,d0.w)	| store color X/Y flip attribute in fg table
 	lea		fg_videoram,a1
@@ -928,21 +950,21 @@ osd_w_fg_colorram:
 	* now update tile to reflect the color change
 	moveq	#FG_TILE_DRAW_COLOR,d3
 	bsr	update_fg_tile
-	movem.l	(a7)+,d0-d5/a0-a1
+	movem.l	(a7)+,d0-d7/a0-a1
    .endif | OPT_DISABLE_FG_LAYER
 	rts
 
 * d0=offset (preserved), d1=attribute (preserved)
 osd_w_bg_colorram:
     .ifeq OPT_DISABLE_BG_LAYER
-	movem.l	d0-d5/a0-a1,-(a7)
+	movem.l	d0-d7/a0-a1,-(a7)
 	lea		bg_colorram,a1
 	move.b	d1,(a1,d0.w)	| store attribute in bg table
 	lea		bg_videoram,a1
 	move.b	d1,d2
 	move.b	(a1,d0.w),d1	| fetch tile from character grid
 	bsr	update_bg_tile
-	movem.l	(a7)+,d0-d5/a0-a1
+	movem.l	(a7)+,d0-d7/a0-a1
    .endif | OPT_DISABLE_BG_LAYER
 	rts
 		
@@ -952,7 +974,7 @@ osd_w_bg_colorram:
 * d0=offset (preserved), d1=tile (preserved)
 osd_w_fg_videoram:
     .ifeq OPT_DISABLE_FG_LAYER
-	movem.l	d0-d5/a0-a2,-(a7)
+	movem.l	d0-d7/a0-a2,-(a7)
 	lea		fg_videoram,a2
 	* optimization: if wants to write the same tile, just don't
 	* also avoids that sprites are (too much) trashed on the top row
@@ -968,7 +990,7 @@ osd_w_fg_videoram:
 	moveq	#FG_TILE_DRAW_FULL,d3
 	bsr		update_fg_tile
 1:
-	movem.l	(a7)+,d0-d5/a0-a2
+	movem.l	(a7)+,d0-d7/a0-a2
     .endif | OPT_DISABLE_FG_LAYER
 	rts
 
@@ -1080,6 +1102,15 @@ update_bg_tile:
 	* title
 	tst.b	ingame_palette_loaded
 	beq.b	3f
+	* added screen clear to remove remnants of bobs
+	* on both backbuffer and drawn buffer
+	* (nothing should be drawn anyway, except for score
+	* maybe but at least there aren't flashing bits of
+	* bobs during title screen after a game over)
+	move.l	fg_drawed_screen_ptr(pc),a1
+	bsr		clear_fg_screen
+	move.l	fg_displayed_screen_ptr(pc),a1
+	bsr		clear_fg_screen
 	bsr		load_title_tile_palette
 	clr.b	ingame_palette_loaded	
 3:	
@@ -2469,7 +2500,7 @@ osd_read_dipswitches:
 
 _tag:
 		.long	WHDLTAG_CUSTOM1_GET
-start_lives:
+cheat_flags:
 		.long	0
 		.long	WHDLTAG_CUSTOM2_GET
 difficulty_level:
@@ -2478,10 +2509,12 @@ difficulty_level:
 		* bit 0: DSW flag awards bonus life
 		* bit 1: no looped music
 misc_flags:
-
-	.long	0
+		.long	0
 		.long	WHDLTAG_CUSTOM4_GET
-xevious_or_super:
+start_lives:
+		.long	0
+		.long	WHDLTAG_CUSTOM5_GET
+start_area_option:
 	.long	0
 	.long	0
 
@@ -2829,11 +2862,23 @@ beamdelay:
 	dbf	d0,0b
 	rts
 
+* < A1: planes start
+clear_fg_screen:
+	movem.l	d0-a6,-(a7)
+	lea		_custom,a5
+	moveq	#0,d0
+	moveq	#0,d1
+	move.w	#NB_BYTES_PER_ROW,d2
+	moveq	#4,d3
+	move.w	#Y_MAX,d4
+	bsr		clear_planes_any_blitter_internal
+	movem.l	(a7)+,d0-a6
+	rts
+	
 * < A5: custom
 * < D0,D1: x,y
 * < A1: plane pointer
 * < D2: width in bytes (inc. 2 extra for shifting)
-* < D3: blit mask
 * < D4: blit height
 * trashes D0-D6
 * > A1: even address where blit was done
@@ -3451,7 +3496,7 @@ rdargs_struct:
 program_args:
 	ds.l	40,0	
 read_args_string:
-	.asciz	"STARTLIVES/K/N,SKILL/K/N,FLAGXTRA/S,NOMUSIC/S,SUPER/S"
+	.asciz	"STARTLIVES/K/N,SKILL/K/N,FLAGXTRA/S,NOMUSIC/S,SUPER/S,STARTAREA/K/N"
 
 unknown_tile_found:
 	dc.b	0

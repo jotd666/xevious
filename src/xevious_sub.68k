@@ -28,7 +28,7 @@ _start_of_xevious_sub_rom:
 xevious_sub_reset: | $0000
 	lea		area_object_tbl_tbl_super(pc),a0
 	lea		flying_enemy_type_offset_tbl_super(pc),a1
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
 	lea		area_object_tbl_tbl_normal(pc),a0	
 	lea		flying_enemy_type_offset_tbl_normal(pc),a1

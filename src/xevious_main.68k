@@ -16,6 +16,11 @@ NO68020 = 1
     .global xevious_reset
     .global sxevious_im1_irq
     .global is_super_xevious
+    .global infinite_lives_flag
+    .global invincible_flag
+    .global reveal_sol_tower_flag
+    .global reveal_bonus_flag_flag
+	.global	start_area
     *.global _end_of_xevious_main_rom
     
 * debugging only
@@ -37,7 +42,7 @@ _start_of_xevious_main_rom:
 
 xevious_reset: | $0000
     bsr     xevious_sub_reset                 | obviously 68K only
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
 	lea		flying_enemy_type_tbl_normal,a0
 	lea		ROM_high_score_tbl_normal,a1
@@ -409,7 +414,7 @@ coined_up:
     and.w     #3,d0                             | lives setting
     move.b    (d0.w,a0),d0                      | lives   
     move.b    d0,(curr_player_solvalou_left)
-    move.w    #OPT_START_AREA-1,(area)
+    move.w    start_area,(area)
     clr.b     (enemy_AI_level)
     move.b    (dswa),d0
     rol.b     #3,d0
@@ -457,7 +462,12 @@ coined_up:
     jsr       osd_sound_start
 
 main_gameplay_loop: | $0593
+	.ifeq	  OPT_INFINITE_LIVES   | added by JOTD
+	tst.b	infinite_lives_flag
+	bne.b	0f
     subq.b    #1,(curr_player_solvalou_left)
+0:
+	.endif
     move.w    (area),d0
     lea       area_offset_in_map_tbl,a0
     move.b    (a0,d0.w),(area_offset_in_map)
@@ -718,7 +728,7 @@ wipe_player_start_msgs: | $07B7
     rts                                         | preseverved to document
         
 display_copyright_msgs: | $07DC
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
     move.w    #0x161f,d0                        | screen col,row
     lea       strCOPYRIGHT,a0
@@ -754,6 +764,7 @@ display_copyright_msgs: | $07DC
     bsr       display_string
     move.w    #0x1020,d0                        | screen col,row
 1:
+	* color "namco" logo
     moveq     #7,d7                             | length
     move.w    #0x1a,d1                          | attr
     moveq     #BANK_FG_COLORRAM,d2
@@ -790,7 +801,7 @@ display_1_only_or_1_2_players: | $0823
     * calc offset
     movea.l   (a0,d0.w*4),a0
     .endif
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
     move.w    #0x1519,d0                        | screen col,row
 	bra.b	1f
@@ -802,7 +813,7 @@ display_1_only_or_1_2_players: | $0823
     bra       display_string        
     
 display_push_start_button: | $083C
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
     move.w    #0x1517,d0                        | screen col,row
 	bra.b	1f
@@ -851,7 +862,7 @@ display_insert_coin_flashing: | $0881
     lsr.b     #4,d1
     and.b     #1,d1                             | timer to wipe msg?
     beq.b     wipe_insert_coin                  | yes, go
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
     move.w    #0x121C,d0                        | offset
 	bra.b	1f
@@ -865,7 +876,7 @@ display_insert_coin_flashing: | $0881
 9:  rts
 
 wipe_insert_coin: | $089E
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
     move.w    #0x121C,d0                        | offset
 	bra.b	1f
@@ -878,7 +889,7 @@ wipe_insert_coin: | $089E
     bra       display_char_B_times
         
 display_xevious_logo_flashing: | $08AA
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	beq.b	0f
     bsr       display_SUPER
 0:
@@ -1023,7 +1034,7 @@ strSUPER:
     .byte 0x1C, 0x1E, 0x19, 0xE, 0x1B           | "SUPER"
     .align 2
 display_xevious_logo_yellow: | $09E8
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	beq.b	0f
     bsr       display_SUPER
 0:
@@ -1467,7 +1478,7 @@ display_high_score_table: | $1011
     bsr       display_high_score
     move.w    #0x1615,d0                        | screen col,row
     lea       strBest_Five_WARRIORS,a0
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	beq.b	0f
     lea       strBest_Five_GOULZEHG,a0
 0:
@@ -1564,6 +1575,9 @@ init_high_score_table: | $10D9
     dbf       d7,2b
     rts
 
+start_area:
+	dc.w	OPT_START_AREA-1
+	
 ROM_high_score_tbl_pointer:
 	.long	0
 	
@@ -2005,7 +2019,9 @@ update_solvalou: | $14F7
     bcc       9f
 .else
     rts
-.endif  
+.endif
+	tst.b	invincible_flag
+	jne		9f
     * solvalou hit/dead
     moveq     #SOLVALOU_SND,d0
     jsr       osd_sound_stop
@@ -2997,19 +3013,24 @@ boza_logram_outer_sprite_tbl: | $1E5A
 handle_1D_Sol_Tower: | $1E61
     move.b    #2,(_STATE,a5)
     clr.b     (_ATTR,a5)                        | bank=0,size=1x1
-    .ifeq OPT_REVEAL_SOL_TOWER
+    .ifne OPT_REVEAL_SOL_TOWER
+	bra.b	0f
+	.endif
+	tst.b	reveal_sol_tower_flag
+	bne.b	0f
     clr.b     (_CODE,a5)                        | invisible
-    .else
+	bra.b	1f
+0:
     move.b    #0xb6,(_CODE,a5)
     move.b    (pulsing_colour_1),(_COLOUR,a5)
-    .endif
-	tst.w	is_super_xevious
-	bne.b	0f
-     move.b    #54,(_PTS,a5)                     | 2,000 pts
-	 bra.b	1f
-0:
-     move.b    #48,(_PTS,a5)                     | 1,000 pts
 1:
+	tst.b	is_super_xevious
+	bne.b	2f
+     move.b    #54,(_PTS,a5)                     | 2,000 pts
+	 bra.b	3f
+2:
+     move.b    #48,(_PTS,a5)                     | 1,000 pts
+3:
     jbsr       save_PC_to_fn_tbl_and_ret
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq.b     handle_sol_tower_rising           | yes, go
@@ -3060,7 +3081,7 @@ handle_09_Brag_Spario: | $1EF8
     move.b    #2,(_STATE,a5)
     move.b    #0x15,(_CODE,a5)
     move.b    #0x26,(_COLOUR,a5)
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
      move.b    #33,(_PTS,a5)                     | 500 pts
 	 bra.b	1f
@@ -3117,6 +3138,8 @@ handle_54_Bonus_Flag: | $1F5C
     .ifne OPT_REVEAL_BONUS_FLAG   
     bra.b     reveal_bonus_flag
     .endif
+	tst.b	reveal_bonus_flag_flag
+	beq.b	reveal_bonus_flag
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq.b     reveal_bonus_flag                 | yes, go   
     bsr       scroll_sprite_X
@@ -5997,7 +6020,7 @@ remove_easter_egg: | $3AA5
     bra       add_obj_handler
     
 display_easter_egg: | $3AC9
-	tst.w	is_super_xevious
+	tst.b	is_super_xevious
 	bne.b	0f
     lea       str_NAMCO_ORIGINAL,a0
     bsr       cpl_and_display_string_16
@@ -6100,7 +6123,16 @@ wipe_easter_egg: | $3B7C
     bra       display_char_B_times    
 
 is_super_xevious:
-	.word	0
+	.byte	0
+invincible_flag:
+	.byte	0
+infinite_lives_flag:
+	.byte	0
+reveal_sol_tower_flag:
+	.byte	0
+reveal_bonus_flag_flag:
+	.byte	0
+	.align	2
 flying_enemy_type_tbl_pointer:
 	.long	0
 	
