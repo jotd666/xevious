@@ -65,8 +65,10 @@ for start,stop in ((88,91),(128,159)):  # 92-96 are glowing hulls, we need to di
 for r in real_sprites:
     sprite_table[r] = HW_OTHER
 
-# sets bridge tiles. top left tile is 254 (controls HW sprite) other tiles shouldn't be displayed
-sprite_table[252:256] = [HW_BRIDGE_TILE,HW_BRIDGE_TILE,HW_BRIDGE,HW_BRIDGE_TILE]
+# sets bridge tiles. top left tile is 254 but since sprite has double width/double height
+# tile 252 is the key and controls HW sprite other tiles shouldn't be displayed or dumped
+# as BOBs
+sprite_table[252:256] = [HW_BRIDGE,HW_BRIDGE_TILE,HW_BRIDGE_TILE,HW_BRIDGE_TILE]
 
 
 def split_sprite(palette,img):

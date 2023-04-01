@@ -6,7 +6,6 @@
 * critical:
 
 - game => menu palette: also clear both double buffered screens
-- sxev: bridge doesn't appear: dump object list & debug
 
 * not urgent
 

@@ -22,6 +22,23 @@ NB_VISIBLE_ROWS = 36
 	.ifdef	RELEASE
 OPT_ENABLE_PROFILING = 0
 OPT_ENABLE_LOGGING = 0
+	* check most used options in release mode
+	* to avoid creating a version with cheats on!
+	.ifne	OPT_INVINCIBLE
+	.error	"cheat option in release mode"
+	.endif
+	.ifne	OPT_START_AREA-1
+	.error	"level select option in release mode"
+	.endif
+	.ifne	OPT_START_SCORE
+	.error	"nonzero score option in release mode"
+	.endif
+	.ifne	OPT_REVEAL_SOL_TOWER
+	.error	"reveal sol tower option in release mode"
+	.endif
+	.ifne	OPT_REVEAL_BONUS_FLAG
+	.error	"reveal bonus flag option in release mode"
+	.endif
 	.else
 OPT_ENABLE_LOGGING = 1
 OPT_ENABLE_PROFILING = 0
@@ -82,10 +99,12 @@ ACTIVE_SPRITE_STRUCT_BITS = 6    | 1<<6 = 64: can hold a slb struct
 
 | write current PC value to some address
 .macro LOGPC	address
+	.ifndef	RELEASE
      bsr    .next_\@
 .next_\@:
       addq.l    #6,(a7) | skip this & next instruction
       move.l    (a7)+,0x\address
+	.endif
 .endm
 
 .macro	WAIT_BLIT
@@ -1505,7 +1524,8 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
-	**move.l	a4,0x140
+	move.l	a4,0x140
+	** S sprite_log <address> !12*!64
 	**lea		ag_sprites(pc),a4
 	**LOGPC	140
 	move.l		previous_sprite_state_ptr(pc),a5
