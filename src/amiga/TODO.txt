@@ -30,9 +30,9 @@ further optims:
   
 Super Xevious additions (taken from http://retroports.blogspot.com/)
 
-[DONE]    Galaxian; technically worth 150 pts but you can't actually hit it. Always spawns away from the Solvalou, and will turn away before you can get under it. Shoots at you though.
-[DONE]    Jet Taking Off; appears once (area 10). Unique in that it is a flying enemy, but shooting it results in a crater on the ground. You can't get close enough for it to hit the Solvalou before it leaves the screen, Don't shoot it - you have been warned!
-    Jet; the most pointless addition. Appears once (area 15). Flies down the screen at a random (relatively shallow) angle but is completely and utterly benign. It can't hurt you, and you can't destroy it. What was the point?
-[DONE]    Helicopter; appears once (area 14). Don't bomb it - you have been warned!
-[DONE]    Tank; appears once (area 8). Don't bomb it - you have been warned!
-[DONE]    Bridge; appears once (area 15) and is purely cosmetic (completely benign). 'Allows' the Domograms to cross the river. 
+Galaxian; technically worth 150 pts but you can't actually hit it. Always spawns away from the Solvalou, and will turn away before you can get under it. Shoots at you though.
+Jet Taking Off; appears once (area 10). Unique in that it is a flying enemy, but shooting it results in a crater on the ground. You can't get close enough for it to hit the Solvalou before it leaves the screen, Don't shoot it - you have been warned!
+Jet; the most pointless addition. Appears once (area 15). Flies down the screen at a random (relatively shallow) angle but is completely and utterly benign. It can't hurt you, and you can't destroy it. What was the point?
+Helicopter; appears once (area 14). Don't bomb it - you have been warned!
+Tank; appears once (area 8). Don't bomb it - you have been warned!
+Bridge; appears once (area 15) and is purely cosmetic (completely benign). 'Allows' the Domograms to cross the river. 
