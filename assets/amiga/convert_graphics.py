@@ -587,12 +587,12 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
         elementary_sprites = []
 
         for s in sprite_nums:
-            this_sprite_palette = [black]
+            this_sprite_palette = [transparent_color]
             for i in range(3):
-                nc = next(colors_found,black)
+                nc = next(colors_found,transparent_color)
                 this_sprite_palette.append(nc)
             # draw a filtered image of pic with only those colors
-            the_partial_sprite = Image.new("RGB",the_tile.size)
+            the_partial_sprite = Image.new("RGB",the_tile.size,transparent_color)
             this_sprite_palette_set = set(this_sprite_palette)
             for x in range(the_tile.size[0]):
                 for y in range(the_tile.size[1]):
@@ -601,6 +601,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                         the_partial_sprite.putpixel((x,y),p)
             if mirror:
                 the_partial_sprite = ImageOps.mirror(the_partial_sprite)
+
             sprite_out = bitplanelib.palette_image2sprite(the_partial_sprite,None,this_sprite_palette,sprite_fmode=3)
             elementary_sprites.append({"bitmap":sprite_out,"number":s,"palette":this_sprite_palette})
 
@@ -609,11 +610,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
 
     else:
         sprite_dict["bitmap_type"] = BT_BOB
-        if is_sprite and sprite_specific.sprite_table[tile_index] >= sprite_specific.HW_ANDOR_TILE:
-            # fake it, special sprite, overrides normal engine
-            raw = bytes(2)
-            sprite_dict.update({"standard":raw,"mirror":raw})
-        elif is_sprite and sprite_specific.sprite_table[tile_index] in (sprite_specific.HW_BRIDGE,sprite_specific.HW_BRIDGE_TILE):
+        if is_sprite and sprite_specific.sprite_table[tile_index] >= sprite_specific.HW_MASKED_TILE:
             # fake it, special sprite, overrides normal engine
             raw = bytes(2)
             sprite_dict.update({"standard":raw,"mirror":raw})
@@ -733,6 +730,7 @@ if dump_graphics:
         img.save(os.path.join(dump_root,"sprites.png"))
     used_sprite_cluts = get_used_sprite_cluts()
     sprite_used_colors = clut_dict_to_rgb(sprite_tile_clut,used_sprite_cluts)
+
 
     print("sprites: {} original colors used, some trimming down is required!".format(len(sprite_used_colors)))
 

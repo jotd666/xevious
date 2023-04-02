@@ -25,12 +25,14 @@ src_dir = os.path.join(this_dir,"../../src/amiga")
 
 hw_dict = dict(HW_NONE = 0,
 HW_OTHER = 4,
-HW_BRIDGE_TILE = 8,
-HW_ANDOR_TILE = 12,
+HW_MASKED_TILE = 12,  # tile not displayed (bridge, andor, jet): do not change value
 # special big size sprites from "HW_BRIDGE"
+HW_SPECIAL_SPRITES = 14,  # not real just to delimit special sprites
 HW_BRIDGE = 16,
-HW_ANDOR_FIRST = 20,
-HW_ANDOR_SECOND = 24)
+HW_FLYING_JET_1 = 18,
+HW_FLYING_JET_2 = 19,
+HW_ANDOR_FIRST = 20,   # do not change value, present in bin dump to create big andor sprite
+HW_ANDOR_SECOND = 24)  # ""
 
 globals().update(hw_dict)
 
@@ -39,9 +41,10 @@ globals().update(hw_dict)
 real_sprites = {80:{"sprites":[0,1]},   # solvalou
 240:{"sprites":[2,3],"mirror":True},   # helicopter
 241:{"sprites":[2,3],"mirror":True},   # helicopter
-243:{"sprites":[2,3],"mirror":True},   # flying jet
+243:{"sprites":[2,3],"mirror":True},   # taking off jet
+230:{"sprites":[2,3],"mirror":True},   # flying jet 1
+234:{"sprites":[2,3],"mirror":True},   # flying jet 2
 248:{"sprites":[2,3],"mirror":True},   # tank
-249:{"sprites":[2,3],"mirror":True},   # tank
 254:{"sprites":[4,5]},   # bridge start
 }
 # bragza: "soul" of the andor genesis
@@ -61,14 +64,16 @@ for i in range(304,320):
 # special ones (andor genesis)
 sprite_table = [HW_NONE]*320
 for start,stop in ((88,91),(128,159)):  # 92-96 are glowing hulls, we need to display them
-    sprite_table[start:stop+1] = [HW_ANDOR_TILE]*(stop-start+1)
+    sprite_table[start:stop+1] = [HW_MASKED_TILE]*(stop-start+1)
 for r in real_sprites:
     sprite_table[r] = HW_OTHER
 
 # sets bridge tiles. top left tile is 254 but since sprite has double width/double height
 # tile 252 is the key and controls HW sprite other tiles shouldn't be displayed or dumped
 # as BOBs
-sprite_table[252:256] = [HW_BRIDGE,HW_BRIDGE_TILE,HW_BRIDGE_TILE,HW_BRIDGE_TILE]
+sprite_table[252:256] = [HW_BRIDGE,HW_MASKED_TILE,HW_MASKED_TILE,HW_MASKED_TILE]
+sprite_table[228:231] = [HW_FLYING_JET_1,HW_MASKED_TILE,HW_MASKED_TILE,HW_MASKED_TILE]
+sprite_table[232:236] = [HW_FLYING_JET_2,HW_MASKED_TILE,HW_MASKED_TILE,HW_MASKED_TILE]
 
 
 def split_sprite(palette,img):
@@ -104,7 +109,7 @@ def doit():
 
 
     def is_andor_genesis(code):
-        return bool(sprite_table[code] in [HW_ANDOR_TILE,HW_ANDOR_FIRST,HW_ANDOR_SECOND])
+        return bool(sprite_table[code] in [HW_MASKED_TILE,HW_ANDOR_FIRST,HW_ANDOR_SECOND])
 
     ag_blocks = []
 
@@ -186,39 +191,43 @@ def doit():
         for k,v in hw_dict.items():
             f.write("{} = {}\n".format(k,v))
 
+    dict_32x32 = {}
 
-    # brige: much simpler: just assemble 4 parts for 32x32 sprite
-    bridge = Image.new("RGB",(32,32),color=transparent)
-    for n,xo,yo in ((254,0,0),(252,1,0),(255,0,1),(253,1,1)):
-        source = os.path.join(dump_dir,"bridge_{}_2.png".format(n))
-        src = Image.open(source)
-        x_offset = 16*xo
-        y_offset = 16*yo
-        bridge.paste(src,(x_offset,y_offset))
-    bridge.save(os.path.join(dump_dir,"..","bridge.png"))
+    for name,tiles in [("bridge",((254,0,0),(252,1,0),(255,0,1),(253,1,1))),
+    ("flying_jet_1",((230,0,0),(228,1,0),(231,0,1),(229,1,1))),
+    ("flying_jet_2",((234,0,0),(232,1,0),(235,0,1),(233,1,1)))
+    ]:
+        # brige: much simpler: just assemble 4 parts for 32x32 sprite
+        big_32x32 = Image.new("RGB",(32,32),color=transparent)
+        for n,xo,yo in tiles:
+            source = os.path.join(dump_dir,"{}_{}_2.png".format(name,n))
+            src = Image.open(source)
+            x_offset = 16*xo
+            y_offset = 16*yo
+            big_32x32.paste(src,(x_offset,y_offset))
+        big_32x32.save(os.path.join(dump_dir,"..","{}.png".format(name)))
 
-    (first_half_bridge,fimg),(second_half_bridge,simg) = split_sprite(bitplanelib.palette_extract(bridge),bridge)
+        (first_half,fimg),(second_half,simg) = split_sprite(bitplanelib.palette_extract(big_32x32),big_32x32)
 
-    # now create 2 overlayed sprites
-    # (32x32)
+        # now create 2 overlayed sprites
+        # (32x32)
 
-    bridge_sprites = []
-    for pal,img in [(first_half_bridge,fimg),(second_half_bridge,simg)]:
-        sprite = bitplanelib.palette_image2sprite(img,None,pal,sprite_fmode=3)
-        bridge_sprites.append(sprite)
+        xx_sprites = []
+        for pal,img in [(first_half,fimg),(second_half,simg)]:
+            sprite = bitplanelib.palette_image2sprite(img,None,pal,sprite_fmode=3)
+            xx_sprites.append(sprite)
+
+        dict_32x32[name] = {"sprites":xx_sprites,"first_half":first_half,
+        "second_half":second_half}
 
     with open(srcout,"w") as f:
         f.write("* table:\n")
-        f.write("* 0: not a HW sprite\n")
-        f.write("* 4: standard 16x16 sprite (non andor, non bridge)\n")
-        f.write("* 8: bridge sprite origin\n")
-        f.write("* 12: bridge tile (others, do not display)\n")
-        f.write("* 16: andor tile, do not display\n")
-        f.write("* 20: origin andor tile (first sprite)\n")
-        f.write("* 24: second origin andor tile (second sprite)\n")
+        f.write("* refer to HW_xxx enums for meaning\n")
         for d in ("left","right"):
             f.write("\t.global\tandor_genesis_{}\n".format(d))
-        f.write("\t.global\tbridge\n")
+        for extra_32x32 in dict_32x32:
+            f.write("\t.global\t{}\n".format(extra_32x32))
+
         f.write("\n\t.global\t{0}\n\n{0}:\n".format("red_color_table"))
         for i,r in enumerate([0,0,255,174,143,88,0]):
             f.write("\t.byte\t0x{:x},0x{:x}  | config #{}\n".format((r>>4),r&0xF,i))
@@ -246,26 +255,30 @@ def doit():
     .long    andor_genesis_01_{0}
     .word    -1   | end of sprite(s)
 """.format(d))
-        f.write("* bridge sprite\n")
-        f.write("""bridge:
+
+        for k,v in dict_32x32.items():
+            f.write("* {} sprite\n".format(k))
+            f.write("""{}:
     .word    BT_SPRITE
 * 2 sprite(s)
-    .word    {0}   | sprite number
+    .word    {}   | sprite number
 * palette
-""".format(4))
-        bitplanelib.palette_dump(first_half_bridge,f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
-        f.write("""
+""".format(k,4))
+            bitplanelib.palette_dump(v["first_half"],f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
+            f.write("""
 * bitmap
-    .long    bridge_00
-    .word    {0}   | sprite number
+    .long    {}_00
+    .word    {}   | sprite number
 * palette
-""".format(5))
-        bitplanelib.palette_dump(second_half_bridge,f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
-        f.write("""
+""".format(k,5))
+            bitplanelib.palette_dump(v["second_half"],f,bitplanelib.PALETTE_FORMAT_ASMGNU,high_precision = True)
+            f.write("""
 * bitmap
-    .long    bridge_01
+    .long    {}_01
     .word    -1   | end of sprite(s)
-""")
+""".format(k))
+
+
         f.write("\t.datachip\n")
         f.write("\t.align\t8\n")
         for j,d in enumerate(("left","right")):
@@ -280,16 +293,18 @@ def doit():
                 f.write("\t.endr\n")
                 f.write("\t.long\t0,0,0,0\n")
 
-        for i in range(2):
-            sp = bridge_sprites[i]
-            f.write("bridge_{:02d}:\n".format(i))
-            f.write("\t.word\t0,0,0,0,0,0,0,0")
-            bitplanelib.dump_asm_bytes(sp,f,mit_format=True)
-            f.write("* add 32 blank rows so the clipping works\n")
-            f.write("\t.rept\t32*2\n")
-            f.write("\t.byte    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00\n")
-            f.write("\t.endr\n")
-            f.write("\t.long\t0,0,0,0\n")
+        for k,v in dict_32x32.items():
+            sprites = v["sprites"]
+            for i in range(2):
+                sp = sprites[i]
+                f.write("{}_{:02d}:\n".format(k,i))
+                f.write("\t.word\t0,0,0,0,0,0,0,0")
+                bitplanelib.dump_asm_bytes(sp,f,mit_format=True)
+                f.write("* add 32 blank rows so the clipping works\n")
+                f.write("\t.rept\t32*2\n")
+                f.write("\t.byte    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00\n")
+                f.write("\t.endr\n")
+                f.write("\t.long\t0,0,0,0\n")
         f.write("\t.align\t8\n")
 if __name__ == "__main__":
     doit()

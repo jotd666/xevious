@@ -1674,6 +1674,12 @@ osd_update_32_sprite_hw:
 	* second bank
 	bset	#8,d0
 5:
+* to test a given tile, replace solvalou by that sprite
+*	cmp.w	#80,d0
+*	bne.b	666f
+*	move.w	#248,d0  | tank
+*	moveq	#2,d1    | clut 2
+*666:
 	* fixes glitch: sometimes sprite code + 256 > 320
 	* ex: code = 0x7C, attribute = 0x80, X = 0xC0, Y = 0
 	* which triggers strange behaviour afterwards
@@ -1684,18 +1690,20 @@ osd_update_32_sprite_hw:
 	* tile type (bob, sprite and which sprite type)
 	move.b	(a6,d0.w),d6
 	
-	LOGPC	200
 	
 **	cmp.b	#HW_OTHER,d6
 **	beq		51f		| temp uncomment test bridge
 
 	cmp.w	#HW_OTHER,d6
 	jle		60f		| bob or 16x16 sized sprite: skip specific sprite part
-	cmp.b	#HW_BRIDGE_TILE,d6
+	cmp.b	#HW_MASKED_TILE,d6
 	jeq		2f
-	jcs		51f
-	cmp.b	#HW_ANDOR_TILE,d6
-	jeq		2f
+	cmp.b	#HW_BRIDGE,d6
+	jeq		51f
+	cmp.b	#HW_FLYING_JET_1,d6
+	jeq		52f
+	cmp.b	#HW_FLYING_JET_2,d6
+	jeq		53f
 	* andor genesis or bridge sprite
 	* left or right part
 	* D1 is the color code
@@ -1744,7 +1752,7 @@ osd_update_32_sprite_hw:
 	lea		andor_genesis_left,a3
 	bsr		draw_andor_sprite
 	move.l	(a7)+,a3
-	bra.b	2f
+	jra		2f
 50:
 	cmp.b	#HW_ANDOR_SECOND,d6
 	bne.b	51f
@@ -1755,12 +1763,26 @@ osd_update_32_sprite_hw:
 	move.l	(a7)+,a3
 	bra.b	2f
 51:
-	* it has to be bridge
-	bsr		draw_bridge_sprite
+	move.l	a3,-(a7)
+	lea		bridge,a3
+	bsr		draw_32x32_hw_sprite
+	move.l	(a7)+,a3
+	bra.b	2f
+52:
+	move.l	a3,-(a7)
+	lea		flying_jet_1,a3
+	bsr		draw_32x32_hw_sprite
+	move.l	(a7)+,a3
+	bra.b	2f
+53:
+	move.l	a3,-(a7)
+	lea		flying_jet_2,a3
+	bsr		draw_32x32_hw_sprite
+	move.l	(a7)+,a3
 	bra.b	2f
 
 60:
-	* BOB (not a hardware sprite)
+	* BOB or 16x16 sprite (not a special hardware sprite)
 	cmp.w	#NB_LINES-15,d3
 	bgt.w	2f		| too low
 
@@ -2211,13 +2233,25 @@ draw_andor_sprite:
 	rts
 
 	
+
 * < D0: sprite index times 64 (for backup/clipping table)
 * < D2: y offset for clipping (0 if no clipping)
 * < D3: Y
 * < D5: X
-draw_bridge_sprite:
+draw_jet_1_sprite:
 	move.l	a3,-(a7)
-	lea		bridge,a3
+	lea		flying_jet_1,a3
+	bsr		draw_32x32_hw_sprite
+	move.l	(a7)+,a3
+	rts
+draw_jet_2_sprite:
+	move.l	a3,-(a7)
+	lea		flying_jet_2,a3
+	bsr		draw_32x32_hw_sprite
+	move.l	(a7)+,a3
+	rts
+	
+draw_32x32_hw_sprite:
 	move.w	d4,-(a7)
 	move.w	d3,d4		| Y in D4
 	clr.w	d1			| fake color config 0 (we change it dynamically just above)
@@ -2226,8 +2260,9 @@ draw_bridge_sprite:
 	addq.w	#2,d5	| make up for shift (strange!!)
 	bsr	draw_hw_sprite
 	move.w	(a7)+,d4
-	move.l	(a7)+,a3
 	rts
+	
+
 
 	
 * < D3: Y-offset (for clipping in the top area)
