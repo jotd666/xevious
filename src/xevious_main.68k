@@ -3139,7 +3139,7 @@ handle_54_Bonus_Flag: | $1F5C
     bra.b     reveal_bonus_flag
     .endif
 	tst.b	reveal_bonus_flag_flag
-	beq.b	reveal_bonus_flag
+	bne.b	reveal_bonus_flag
     cmp.b     #3,(_STATE,a5)                    | hit?
     beq.b     reveal_bonus_flag                 | yes, go   
     bsr       scroll_sprite_X

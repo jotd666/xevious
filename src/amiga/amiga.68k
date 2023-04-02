@@ -1589,18 +1589,21 @@ osd_update_32_sprite_hw:
 	* and height)
 	*
 	* the erase optimization is already very efficient with
-	* solvalou and enemy bullets which have a small height
+	* solvalou shots and enemy bullets which have a small height
 	*
 	tst.w	d1
 	beq.b	30f
 	and.b	#3,d0
 	beq.b	310f
 30:
-    move.w  #16,d4	| max height
+    move.w  #16,d4		| max single size height
 	
 	btst	#0,d0		| double width (height on rotated display)
 	beq.b	31f
-	add.w	#16,d4
+	* add to max height (add 1 to make up for remaining pixels not
+	* erased at the bottom when solvalou explodes, not sure
+	* why it's needed, probably doesn't hurt...)
+	add.w	#17,d4
 31:
 	btst	#1,d0		| double height (width on rotated display)
 	beq.b	32f
@@ -1992,12 +1995,12 @@ clear_fg_tiles:
 	clr	d6		| ack flag
 	* now refresh screen
 	move.l	fg_drawed_screen_ptr(pc),a1
-	moveq	#0,d0
+	move.w	#16,d0
 	move.w	d4,d1
 	lsl.w	#3,d1	| times 8 (start y)
 	lsl.w	#3,d3	| times 8 (height)
 	move.w	d3,d4
-	move.w	#NB_BYTES_PER_ROW,d2
+	move.w	#NB_BYTES_PER_ROW-8,d2	| no need to clear hidden columns
 	cmp.w	#NB_LINES-8,d1
 	bne.b	100f
 	* adjust last line clear (as amiga can't display up to 288)
@@ -2853,20 +2856,6 @@ beamdelay:
 	move.w	(a7)+,d0
 	dbf	d0,0b
 	rts
-
-* < A1: planes start
-clear_fg_screen:
-	rts
-	movem.l	d0-a6,-(a7)
-	lea		_custom,a5
-	moveq	#0,d0
-	moveq	#0,d1
-	move.w	#NB_BYTES_PER_ROW,d2
-	moveq	#4,d3
-	move.w	#Y_MAX,d4
-	bsr		clear_planes_any_blitter_internal
-	movem.l	(a7)+,d0-a6
-	rts
 	
 * < A5: custom
 * < D0,D1: x,y
@@ -2909,15 +2898,15 @@ clear_planes_any_blitter_internal:
     move.l  #0x01000000,d5   | minterm useD & rect clear (0xA) 
     move    d0,d6
     beq.b   2f
-    and.w   #0xF,d6
+    MOVEQ #15,D6
+    AND.W D0,D6
     and.w   #0x1F0,d0
     lsr.w   #3,d0
     add.w   d0,d1
+    LSL.W #8,D6
+    LSL.W #4,D6
 
     swap    d6
-    clr.w   d6
-    lsl.l   #8,d6
-    lsl.l   #4,d6
     or.l    d6,d5            | add shift
 2:   
     add.w   d1,a1       | plane position (always even)
