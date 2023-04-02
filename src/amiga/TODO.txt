@@ -5,13 +5,12 @@
 
 * critical:
 
-- Super Xevious: tank wrong colors
+- Super Xevious: tank wrong colors: python script extracts only 4 colors!!!!
 - heli (levl 14) wrong colors / blinking: maybe dump sprite config & test
 - jet taking off level 15?
 
 * not urgent
 
-- better blitter clear bitplanes routine ?
 - highscore yellow highlight shifted for entry 3 (change score and run with 1 life)
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 - make game 20% faster (60Hz): done, probably not working...

@@ -391,7 +391,7 @@ def write_tiles(t,matrix,f,is_sprite):
                 f.write(blankptr)
             else:
                 f.write("{1}_pic_{0:03d}-{1}_picbase".format(len(pic_list),t))
-                pic_list.append(item)
+                pic_list.append({"index":i,"item":item})
             c += 1
             if c == 8:
                 c = 0
@@ -407,13 +407,14 @@ def write_tiles(t,matrix,f,is_sprite):
 
     if is_sprite:
         # sprite or bob (game objects)
-        for i,item_data in enumerate(pic_list):
+        for i,item_dict in enumerate(pic_list):
             if i == len(pic_list)//2:
                 # base in the middle of the pics to avoid overflow
                 f.write("{}_picbase:\n\tdc.w\t0\n".format(t))
 
+            item_data = item_dict["item"]
             picname = "{}_pic_{:03d}".format(t,i)
-            f.write("{0}:\n".format(picname))
+            f.write("{}:   | index {} ({})\n".format(picname,item_dict["index"],sprite_names.get(item_dict["index"],"?")))
             f.write("\t.word\t{bitmap_type}\n".format(**item_data))
             if item_data["bitmap_type"] == BT_BOB:
                 for k in STD_MIRROR_LIST:
@@ -484,12 +485,13 @@ def write_tiles(t,matrix,f,is_sprite):
 
     else:
         f.write("{}_picbase:\n\tdc.w\t0\n".format(t))
-        for i,_ in enumerate(pic_list):
+        for i,item_dict in enumerate(pic_list):
             picname = "{}_pic_{:03d}".format(t,i)
-            f.write("{0}:\n".format(picname))
+            f.write("{}:    * index {}\n".format(picname,item_dict["index"]))
             for k in STD_MIRROR_LIST:
                 f.write("\tdc.l\t{}_{}_bytes\n".format(picname,k))
-        for i,item_data in enumerate(pic_list):
+        for i,item_dict in enumerate(pic_list):
+            item_data = item_dict["item"]
             for k in STD_MIRROR_LIST:
                 item = item_data[k]
                 f.write("{}_pic_{:03d}_{}_bytes:".format(t,i,k))
