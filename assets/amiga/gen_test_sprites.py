@@ -1,11 +1,11 @@
 import bitplanelib,struct
 
-with open("bridge_sprite_log","rb") as f:
+with open("sprite_log_bridge_jet","rb") as f:
     contents = f.read()
 
 new_data = []
 for i in range(0,len(contents),12):
-    (tile,state,x,y) = struct.unpack_from(">BBHH",contents,i)
+    (state,_,tile,color,x,y) = struct.unpack_from(">BBBBHH",contents,i)
     if state == 3:
         print(hex(tile),x,y)
     new_data.append(contents[i:i+12])

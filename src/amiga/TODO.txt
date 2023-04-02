@@ -6,9 +6,9 @@
 
 * critical:
 
-- jet taking off level 15 to test!!
-- bridge broken: test at start solvalou!!
-- test andor again
+- 
+- bridge not displayed properly
+- test andor again: colors wrong!!!
 - optim blit fg tile 40 -> 32 width with -8 modulo saves bandwidth
 
 * not urgent

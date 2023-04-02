@@ -25,14 +25,15 @@ src_dir = os.path.join(this_dir,"../../src/amiga")
 
 hw_dict = dict(HW_NONE = 0,
 HW_OTHER = 4,
-HW_MASKED_TILE = 12,  # tile not displayed (bridge, andor, jet): do not change value
+HW_MASKED_TILE = 8,  # tile not displayed (bridge, andor, jet)
 # special big size sprites from "HW_BRIDGE"
-HW_SPECIAL_SPRITES = 14,  # not real just to delimit special sprites
-HW_BRIDGE = 16,
-HW_FLYING_JET_1 = 18,
-HW_FLYING_JET_2 = 19,
-HW_ANDOR_FIRST = 20,   # do not change value, present in bin dump to create big andor sprite
-HW_ANDOR_SECOND = 24)  # ""
+HW_SPECIAL_SPRITES = 10,  # not real just to delimit special sprites
+HW_BRIDGE = 12,
+HW_FLYING_JET_0 = 16,
+HW_FLYING_JET_1 = 20,
+HW_FLYING_JET_2 = 24,
+HW_ANDOR_FIRST = 28,
+HW_ANDOR_SECOND = 32)
 
 globals().update(hw_dict)
 
@@ -42,6 +43,7 @@ real_sprites = {80:{"sprites":[0,1]},   # solvalou
 240:{"sprites":[2,3],"mirror":True},   # helicopter
 241:{"sprites":[2,3],"mirror":True},   # helicopter
 243:{"sprites":[2,3],"mirror":True},   # taking off jet
+226:{"sprites":[2,3],"mirror":True},   # flying jet 0
 230:{"sprites":[2,3],"mirror":True},   # flying jet 1
 234:{"sprites":[2,3],"mirror":True},   # flying jet 2
 248:{"sprites":[2,3],"mirror":True},   # tank
@@ -71,9 +73,9 @@ for r in real_sprites:
 # sets bridge tiles. top left tile is 254 but since sprite has double width/double height
 # tile 252 is the key and controls HW sprite other tiles shouldn't be displayed or dumped
 # as BOBs
-sprite_table[252:256] = [HW_BRIDGE,HW_MASKED_TILE,HW_MASKED_TILE,HW_MASKED_TILE]
-sprite_table[228:231] = [HW_FLYING_JET_1,HW_MASKED_TILE,HW_MASKED_TILE,HW_MASKED_TILE]
-sprite_table[232:236] = [HW_FLYING_JET_2,HW_MASKED_TILE,HW_MASKED_TILE,HW_MASKED_TILE]
+
+for (i,t) in [(252,HW_BRIDGE),(224,HW_FLYING_JET_0),(228,HW_FLYING_JET_1),(232,HW_FLYING_JET_2)]:
+    sprite_table[i:i+4] = [t,HW_MASKED_TILE,HW_MASKED_TILE,HW_MASKED_TILE]
 
 
 def split_sprite(palette,img):
@@ -134,8 +136,7 @@ def doit():
         y -= min_y
         if x==0 and y==0:
             sprite_table[sprite_code] = HW_ANDOR_FIRST   # sprite code = 132
-            print(sprite_code)
-        if x==64 and y==0:
+        elif x==64 and y==0:
             sprite_table[sprite_code] = HW_ANDOR_SECOND # sprite code = 88
 
 
@@ -194,10 +195,11 @@ def doit():
     dict_32x32 = {}
 
     for name,tiles in [("bridge",((254,0,0),(252,1,0),(255,0,1),(253,1,1))),
+    ("flying_jet_0",((226,0,0),(224,1,0),(227,0,1),(225,1,1))),
     ("flying_jet_1",((230,0,0),(228,1,0),(231,0,1),(229,1,1))),
     ("flying_jet_2",((234,0,0),(232,1,0),(235,0,1),(233,1,1)))
     ]:
-        # brige: much simpler: just assemble 4 parts for 32x32 sprite
+        # brige/jet: much simpler: just assemble 4 parts for 32x32 sprite
         big_32x32 = Image.new("RGB",(32,32),color=transparent)
         for n,xo,yo in tiles:
             source = os.path.join(dump_dir,"{}_{}_2.png".format(name,n))

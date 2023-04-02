@@ -1505,7 +1505,7 @@ osd_update_sprite_shadow:
 	addq.w	#2,a2
 	bra.b	2b
 	
-	**.include	"ag_test.68k"
+	*.include	"ag_test.68k"
 
 out:
 	rts
@@ -1544,10 +1544,12 @@ osd_update_32_sprite_hw:
 0:
 	.ifeq		OPT_DISABLE_SPRITES
 	lea		current_sprite_state(pc),a4
+	.ifne	OPT_ENABLE_LOGGING
 	move.l	a4,0x140
+	.endif
+	
 	** S sprite_log <address> !12*!64
 	**lea		ag_sprites(pc),a4
-	**LOGPC	140
 	move.l		previous_sprite_state_ptr(pc),a5
 	lea			is_hw_sprite_table,a6
 	
@@ -1690,12 +1692,13 @@ osd_update_32_sprite_hw:
 	* tile type (bob, sprite and which sprite type)
 	move.b	(a6,d0.w),d6
 	
+	* uncomment to test bridge (51f), jet (52-54f)
+	**bne		51f
 	
-**	cmp.b	#HW_OTHER,d6
-**	beq		51f		| temp uncomment test bridge
-
 	cmp.w	#HW_OTHER,d6
 	jle		60f		| bob or 16x16 sized sprite: skip specific sprite part
+
+	
 	cmp.b	#HW_MASKED_TILE,d6
 	jeq		2f
 	cmp.b	#HW_BRIDGE,d6
@@ -1704,6 +1707,9 @@ osd_update_32_sprite_hw:
 	jeq		52f
 	cmp.b	#HW_FLYING_JET_2,d6
 	jeq		53f
+	cmp.b	#HW_FLYING_JET_0,d6
+	jeq		54f
+
 	* andor genesis or bridge sprite
 	* left or right part
 	* D1 is the color code
@@ -1777,6 +1783,12 @@ osd_update_32_sprite_hw:
 53:
 	move.l	a3,-(a7)
 	lea		flying_jet_2,a3
+	bsr		draw_32x32_hw_sprite
+	move.l	(a7)+,a3
+	bra.b	2f
+54:
+	move.l	a3,-(a7)
+	lea		flying_jet_0,a3
 	bsr		draw_32x32_hw_sprite
 	move.l	(a7)+,a3
 	bra.b	2f
@@ -2233,23 +2245,6 @@ draw_andor_sprite:
 	rts
 
 	
-
-* < D0: sprite index times 64 (for backup/clipping table)
-* < D2: y offset for clipping (0 if no clipping)
-* < D3: Y
-* < D5: X
-draw_jet_1_sprite:
-	move.l	a3,-(a7)
-	lea		flying_jet_1,a3
-	bsr		draw_32x32_hw_sprite
-	move.l	(a7)+,a3
-	rts
-draw_jet_2_sprite:
-	move.l	a3,-(a7)
-	lea		flying_jet_2,a3
-	bsr		draw_32x32_hw_sprite
-	move.l	(a7)+,a3
-	rts
 	
 draw_32x32_hw_sprite:
 	move.w	d4,-(a7)
