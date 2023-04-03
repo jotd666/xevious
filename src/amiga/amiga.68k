@@ -922,19 +922,6 @@ osd_w_fg_colorram:
    .endif | OPT_DISABLE_FG_LAYER
 	rts
 
-* d0=offset (preserved), d1=attribute (preserved)
-osd_w_bg_colorram:
-    .ifeq OPT_DISABLE_BG_LAYER
-	movem.l	d0-d7/a0-a1,-(a7)
-	lea		bg_colorram,a1
-	move.b	d1,(a1,d0.w)	| store attribute in bg table
-	lea		bg_videoram,a1
-	move.b	d1,d2
-	move.b	(a1,d0.w),d1	| fetch tile from character grid
-	bsr	update_bg_tile
-	movem.l	(a7)+,d0-d7/a0-a1
-   .endif | OPT_DISABLE_BG_LAYER
-	rts
 		
 * the first 4 rows are not visible, then the next 36 rows
 * are visible. Screen is 32 tiles wide but only 28 visible.
@@ -962,20 +949,36 @@ osd_w_fg_videoram:
     .endif | OPT_DISABLE_FG_LAYER
 	rts
 
+* d0=offset (preserved), d1=attribute (preserved)
+osd_w_bg_colorram:
+    .ifeq OPT_DISABLE_BG_LAYER
+	movem.l	d0-d1/d7/a0-a1,-(a7)
+	lea		bg_colorram,a1
+	move.b	d1,(a1,d0.w)	| store attribute in bg table
+	lea		bg_videoram,a1
+	move.b	d1,d2
+	move.b	(a1,d0.w),d1	| fetch tile from character grid
+	bsr.b	update_bg_tile
+	movem.l	(a7)+,d0-d1/d7/a0-a1
+   .endif | OPT_DISABLE_BG_LAYER
+	rts
+
 * d0=offset (preserved), d1=tile (preserved)
+* must preserve A0 and D7 too
 osd_w_bg_videoram:
     .ifeq OPT_DISABLE_BG_LAYER
-	movem.l	d0-d5/a0-a2,-(a7)
-	lea		bg_videoram,a2
+	movem.l	d0-d1/a0,-(a7)
+	lea		bg_videoram,a1
 	* dump both tables (color+char): S bg_data <address@0x110> $1000
-	cmp.b	(a2,d0.w),d1
-	beq.b	0f				| already the proper value
-	move.b	d1,(a2,d0.w)	| update logical grid
+	add.w	d0,a1
+	cmp.b	(a1),d1
+	beq.b	0f		| already the proper value
+	move.b	d1,(a1)	| update logical grid
 	lea		bg_colorram,a1
 	move.b	(a1,d0.w),d2	| color & X/Y flip data
-	bsr		update_bg_tile
+	bsr.b		update_bg_tile
 0:
-	movem.l	(a7)+,d0-d5/a0-a2
+	movem.l	(a7)+,d0-d1/a0
     .endif | OPT_DISABLE_BG_LAYER
 	rts
 
@@ -1569,7 +1572,7 @@ osd_update_32_sprite_hw:
 	tst.w	d1
 	beq.b	30f
 	and.b	#3,d0
-	beq.b	310f
+	beq.b	310f	| not double height, not double width: can optimize height
 30:
     move.w  #16,d4		| max single size height
 	
@@ -1934,6 +1937,7 @@ clear_fg_tiles:
 	moveq	#0,d7	| row counter
 	moveq	#0,d6	| column counter
 	moveq	#0,d5	| "bitmap in row" flag
+	move.w	#32,d4	| preload 32
 1:
 	* optimized scan of the table. Most of the time rows
 	* are zeroed so we use post-increment counter, and fix
@@ -1956,7 +1960,7 @@ clear_fg_tiles:
 3:
 	* next column
 	addq	#1,d6
-	cmp.w	#32,d6
+	cmp.w	d4,d6   | == 32 ?
 	bne.b	1b
 	tst		d5
 	bne.b	31f
