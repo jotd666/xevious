@@ -562,6 +562,7 @@ _vblank:
 	bne.b	0f
 	bsr		toggle_pause
 0:
+
 	* if music loops, no need to play it again and again
 	* ticks aren't important either
 	tst.b	music_loops
@@ -585,55 +586,21 @@ _vblank:
 	move.w	#0x20,_custom+intreq	
 	bra.b	3f
 1:
- 	clr.b	no_gfx_update
-    move.w  vbl_counter(pc),d0
-	* skip it no matter what, it is going to be updated twice (60Hz emu)
-	cmp.w	#4,d0
-	beq.b	12f
-
-	* 50Hz is too much even for A1200, specially
-	* when there are a lot of objects on screen
-	* at start of the game, where things
-	* are pretty light, but in the later stages, this is 
-	* just too much to handle, even for a fast amiga, because
-	* of all the blits
-	* so adapt framerate to the currently active sprites
-	tst.b	pause_flag
-	bne.b	23f
-	
-	cmp.w	#MEDIUM_SPRITES_THRESHOLD,nb_active_bobs
-	bcs.b	2f		| few active sprites
-	cmp.w	#0,d0	| skip that frame
-	beq.b	12f
-	cmp.w	#HIGH_SPRITES_THRESHOLD,nb_active_bobs
-	bcs.b	2f		| some active sprites, but not too many
-	cmp.w	#2,d0	| skip that frame
-	bne.b	2f
-12:
-	st.b	no_gfx_update
-	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
-	* no screen switch to skip if no double buffering,
-	* hence that branch is only required if double buffering
-	bra.b	21f
-	.endif
-2:
 	* has to be copper
-	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
-	bsr		switch_screen_buffers
-21:	
-	.endif
 	
-    move.w  vbl_counter(pc),d0
-    addq.w  #1,d0
-    cmp.w   #5,d0
-    bne.b   22f
-	move.b	#2,vb_semaphore_main
-    * update a second time, simulate 60Hz: doesn't work!
-    **jsr	xevious_im1_irq
-    clr.w d0    
-22:
+*    move.w  vbl_counter(pc),d0
+*    addq.w  #1,d0
+*    cmp.w   #5,d0
+*    bne.b   22f
+*    * update a second time, simulate 60Hz: doesn't work!
+*	move.b	#2,vb_semaphore_main
+*    clr.w d0    
+*22:
 
 	jsr		xevious_im1_irq
+	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
+	bsr		switch_screen_buffers
+	.endif
 	
     move.w  d0,vbl_counter
 23:
@@ -2853,7 +2820,7 @@ level2_interrupt:
 0:
 
 	BSET	#0x06,0x1E01(A5)
-	move.l	#2,d0
+	moveq	#2,d0
 	bsr	beamdelay
 	BCLR	#0x06,0x1E01(A5)	| acknowledge key
 

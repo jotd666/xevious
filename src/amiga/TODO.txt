@@ -1,29 +1,34 @@
 * to see with Mark:
 
-- make game 20% faster (60Hz): done, probably not working...
+- make game 20% faster (60Hz): done, probably not working... adapt this
+  routine:
+update_sprite_hw_and_other_things: | $0096
+    * copy sprites from shadow to OSD
+    move.w    #0,d0                             | start at sprite 0
+    jsr       osd_update_32_sprite_hw
+    bsr.b     read_dipswitches
+    move.b    #1,(vb_semaphore_sub)
+    move.b    #1,(vb_semaphore_main)
+    rts
+	
+  
   
 * can be worked on my own:
 
 * critical:
 
-- 
 - bridge not displayed properly
 - test andor again: colors wrong!!!
-- optim blit fg tile 40 -> 32 width with -8 modulo saves bandwidth
 
-* not urgent
+further optims/fixes:
 
 - highscore yellow highlight shifted for entry 3 (change score and run with 1 life)
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
-
-further optims:
-
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
 - a lot of blank sprites should just be NOT drawn (ex: clut 0)
-- find a way to make up for those still slightly shaking ground enemies
 - don't generate mirror X-sprites like ... at all? do the game use those?
   (saves 130kb, not worth it)
   
