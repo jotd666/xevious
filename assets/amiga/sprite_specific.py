@@ -209,18 +209,18 @@ def doit():
             big_32x32.paste(src,(x_offset,y_offset))
         big_32x32.save(os.path.join(dump_dir,"..","{}.png".format(name)))
 
-        (first_half,fimg),(second_half,simg) = split_sprite(bitplanelib.palette_extract(big_32x32),big_32x32)
+        (first_half_32,fimg),(second_half_32,simg) = split_sprite(bitplanelib.palette_extract(big_32x32),big_32x32)
 
         # now create 2 overlayed sprites
         # (32x32)
 
         xx_sprites = []
-        for pal,img in [(first_half,fimg),(second_half,simg)]:
+        for pal,img in [(first_half_32,fimg),(second_half_32,simg)]:
             sprite = bitplanelib.palette_image2sprite(img,None,pal,sprite_fmode=3)
             xx_sprites.append(sprite)
 
-        dict_32x32[name] = {"sprites":xx_sprites,"first_half":first_half,
-        "second_half":second_half}
+        dict_32x32[name] = {"sprites":xx_sprites,"first_half":first_half_32,
+        "second_half":second_half_32}
 
     with open(srcout,"w") as f:
         f.write("* table:\n")

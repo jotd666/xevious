@@ -10,15 +10,12 @@ update_sprite_hw_and_other_things: | $0096
     move.b    #1,(vb_semaphore_sub)
     move.b    #1,(vb_semaphore_main)
     rts
-	
-  
-  
+	  
 * can be worked on my own:
 
 * critical:
 
 - bridge not displayed properly
-- test andor again: colors wrong!!!
 
 further optims/fixes:
 
