@@ -588,21 +588,24 @@ _vblank:
 1:
 	* has to be copper
 	
-*    move.w  vbl_counter(pc),d0
-*    addq.w  #1,d0
-*    cmp.w   #5,d0
-*    bne.b   22f
-*    * update a second time, simulate 60Hz: doesn't work!
-*	move.b	#2,vb_semaphore_main
-*    clr.w d0    
-*22:
-
+	moveq	#1,d1
+    move.w  vbl_counter(pc),d0
+    addq.w  #1,d0
+    cmp.w   #5,d0
+    bne.b   22f
+    * update a second time, simulate 60Hz
+	moveq	#2,d1
+	clr.w d0    
+22:
+	move.b	d1,vb_ticks_count
+    move.w  d0,vbl_counter
+	
 	jsr		xevious_im1_irq
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 	bsr		switch_screen_buffers
 	.endif
 	
-    move.w  d0,vbl_counter
+
 23:
 	move.w	#0x10,_custom+intreq		
 3:
@@ -1868,6 +1871,9 @@ zzz:
 			blitz
 			rts
 
+BLANK_FG_ROW_START = 3
+BLANK_FG_ROW_END = 10
+
 redraw_fg_tiles:
 	* in the second pass (D0=32), redraw all foreground tiles
 	* where row was marked as "to draw"
@@ -1921,6 +1927,12 @@ redraw_fg_tiles:
 20:
 	addq.w	#1,d7
 	* one more row, else it misses the last one
+	cmp.w	#BLANK_FG_ROW_START,d7
+	bne.b	21f
+	move.w	#BLANK_FG_ROW_END,d7	| skip rows
+	clr		d6
+	bra.b	10b
+21:
 	cmp.w	#NB_VISIBLE_ROWS+1,d7
 	bne.b	10b
 	rts
@@ -1970,9 +1982,18 @@ clear_fg_tiles:
 31:
 	* next row
 	addq.w	#1,d7
+	cmp.w	#BLANK_FG_ROW_START,d7
+	bne.b	32f
+	* skip rows 2-10
+	move.w	#BLANK_FG_ROW_END,d7
+	add.w	#BLANK_FG_ROW_END-BLANK_FG_ROW_START,a6
+	add.w	#(BLANK_FG_ROW_END-BLANK_FG_ROW_START-1)*32,a5
+	bra.b	33f
+32:
 	cmp.w	#NB_VISIBLE_ROWS,d7
 	beq.b	4f
 	addq.w	#1,a6
+33:
 	moveq	#0,d5	| clear "bitmap in row" flag
 	moveq	#0,d6
 	bra.b	1b

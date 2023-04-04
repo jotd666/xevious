@@ -41,6 +41,7 @@ NO68020 = 1
 _start_of_xevious_main_rom:
 
 xevious_reset: | $0000
+	move.b	#1,vb_ticks_count
     bsr     xevious_sub_reset                 | obviously 68K only
 	tst.b	is_super_xevious
 	bne.b	0f
@@ -221,8 +222,7 @@ update_sprite_hw_and_other_things: | $0096
     move.w    #0,d0                             | start at sprite 0
     jsr       osd_update_32_sprite_hw
     bsr.b     read_dipswitches
-    move.b    #1,(vb_semaphore_sub)
-    move.b    #1,(vb_semaphore_main)
+    move.b    vb_ticks_count,(vb_semaphore_main)
     rts
     
 read_dipswitches: | $0115

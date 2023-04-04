@@ -79,16 +79,6 @@ sub_start: | $0165
 
 xevious_sub_cpu: | $018A
 restart_main_fn_loop:
-.if 0
-    *** we realy don't need to check the semaphore
-    *** because we're being called directly from MAIN
-    tst.b     (vb_semaphore_sub)
-    beq.b     9f
-    *clr.b     (vb_semaphore_sub)
-    subq.b    #1,(vb_semaphore_sub)             | dec
-    * don't support FREEZE
-.endif
-    
     move.w    #0x100F,d0                        | blue
     jsr       osd_debug_hook
 

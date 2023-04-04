@@ -1,21 +1,7 @@
-* to see with Mark:
-
-- make game 20% faster (60Hz): done, probably not working... adapt this
-  routine:
-update_sprite_hw_and_other_things: | $0096
-    * copy sprites from shadow to OSD
-    move.w    #0,d0                             | start at sprite 0
-    jsr       osd_update_32_sprite_hw
-    bsr.b     read_dipswitches
-    move.b    #1,(vb_semaphore_sub)
-    move.b    #1,(vb_semaphore_main)
-    rts
-	  
-* can be worked on my own:
 
 * critical:
 
-- bridge not displayed properly
+- bridge not displayed properly: use faster tick to test 
 
 further optims/fixes:
 

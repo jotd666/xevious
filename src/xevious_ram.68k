@@ -7,7 +7,7 @@
     .global watermark_0x8000
     .global vb_semaphore_main
     .global countup_timer_1
-    .global vb_semaphore_sub
+    .global vb_ticks_count
     .global pseudo_random_seed
     .global bg_scroll_x_shadow
     .global scroll_cntr
@@ -115,7 +115,7 @@ obj_tbl:                                ds.b  _OBJSIZE*64
 watermark_0x8000:
 vb_semaphore_main:                      ds.b  1
 countup_timer_1:                        ds.b  1
-vb_semaphore_sub:                       ds.b  1
+vb_ticks_count:                       	ds.b  1
     .align 2
 pseudo_random_seed:                     ds.w  1
 bg_scroll_x_shadow:                     ds.w  1
