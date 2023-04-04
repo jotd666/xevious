@@ -1,7 +1,4 @@
 
-* critical:
-
-- bridge not displayed properly: use faster tick to test 
 
 further optims/fixes:
 

@@ -14,7 +14,8 @@
 STATE_ACTIVE = 2
 STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
-	
+
+
 SPRITE_LIFETIME = 2
 
 NB_VISIBLE_ROWS = 36
@@ -22,6 +23,7 @@ NB_VISIBLE_ROWS = 36
 	.ifdef	RELEASE
 OPT_ENABLE_PROFILING = 0
 OPT_ENABLE_LOGGING = 0
+ONE_TICK = 1
 	* check most used options in release mode
 	* to avoid creating a version with cheats on!
 	.ifne	OPT_INVINCIBLE
@@ -42,9 +44,13 @@ OPT_ENABLE_LOGGING = 0
 	.else
 OPT_ENABLE_LOGGING = 1
 OPT_ENABLE_PROFILING = 0
+* set to higher values than 1 to speed game up
+ONE_TICK = 1
 * Xevious still has some strange sprite/clut combinations
 * we choose to ignore them as they're completely bogus
-* (ex: 95,12: yellow part of andor genesis, makes no sense)
+* (ex: 95,12: yellow part of andor genesis, makes no sense,
+* Mark says that it happens when starting at level > 1 as
+* game isn't designed to do this)
 
 	.endif
 	
@@ -588,13 +594,13 @@ _vblank:
 1:
 	* has to be copper
 	
-	moveq	#1,d1
+	moveq	#ONE_TICK,d1
     move.w  vbl_counter(pc),d0
     addq.w  #1,d0
     cmp.w   #5,d0
     bne.b   22f
     * update a second time, simulate 60Hz
-	moveq	#2,d1
+	moveq	#ONE_TICK*2,d1
 	clr.w d0    
 22:
 	move.b	d1,vb_ticks_count
@@ -1504,8 +1510,6 @@ out:
 
 
 osd_update_32_sprite_hw:
-	tst.b	no_gfx_update
-	bne.b	out
 	move.w	d0,d7
 	bne.b	0f
 	* reset number of active bobs only at first call
@@ -2243,9 +2247,8 @@ draw_32x32_hw_sprite:
 	move.w	d4,-(a7)
 	move.w	d3,d4		| Y in D4
 	clr.w	d1			| fake color config 0 (we change it dynamically just above)
-	move.w	d2,d3	| y-clipping in D3
+	moveq	#0,d3	| y-clipping in D3
 	move.w	#32,d2
-	addq.w	#2,d5	| make up for shift (strange!!)
 	bsr	draw_hw_sprite
 	move.w	(a7)+,d4
 	rts
@@ -3278,8 +3281,6 @@ blit_planes_any_internal_cookie_cut:
     bclr    #0,d1
     add.w   d1,a1       | plane position (D1 < 0x7FFF, 288*40=0x2D00)
 
-    add.w   d6,a2       | X offset for background
-
 	move.w	#NB_BYTES_PER_ROW,d0
 	tst.w	d4
 	bpl.b	5f
@@ -3318,11 +3319,10 @@ blit_planes_any_internal_cookie_cut:
 	move.l (a0)+,a4
 	add.w	d5,a4
 	move.l	a4,bltbpt(a5)	|source graphic top left corner
-	move.l	a2,bltcpt(a5)	|pristine background top (bottom) left corner
+	move.l	a1,bltcpt(a5)	|pristine background top (bottom) left corner
 	move.l	a1,bltdpt(a5)	|destination top (bottom) left corner
 	move.w  d4,bltsize(a5)	|rectangle size, starts blit
 	lea		(FG_SCREEN_PLANE_SIZE,a1),a1
-	lea		(FG_SCREEN_PLANE_SIZE,a2),a2
 	WAIT_BLIT
 	dbf		d3,6b
 7:
@@ -3330,7 +3330,7 @@ blit_planes_any_internal_cookie_cut:
 	move.l (a0),a4
 	add.w	d5,a4
 	move.l	a4,bltbpt(a5)	|source graphic top left corner
-	move.l	a2,bltcpt(a5)	|pristine background top (bottom) left corner
+	move.l	a1,bltcpt(a5)	|pristine background top (bottom) left corner
 	move.l	a1,bltdpt(a5)	|destination top (bottom) left corner
 	move.w  d4,bltsize(a5)	|rectangle size, starts blit
     
@@ -3366,8 +3366,6 @@ unknown_tile_found:
 unknown_sprite_found:
 	dc.b	0
 ingame_palette_loaded:
-	dc.b	0
-no_gfx_update:
 	dc.b	0
 	.align	2
 	* sound variables
