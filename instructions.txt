@@ -33,7 +33,13 @@ NOMUSIC: some find the in-game music annoying. Turn it off
 
 SUPER: enable Super Xevious game variant
 
-STARTAREA: 1-16 (this is a cheat!)
+Cheats:
+
+STARTAREA: 1-16 : start somewhere far in the game
+INVINCIBLE: can't die
+INFLIVES: infinite lives
+REVSOL: reveal Sol towers (bonuses)
+REVBFLAG: reveal bonus flags
 
 Examples: 
 
