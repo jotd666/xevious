@@ -1,7 +1,3 @@
-
-set bits of row flag if write a fg tile, else it's zero
-if zero, don't inspect data
-
 further optims/fixes:
 
 - highscore yellow highlight shifted for entry 3 (change score and run with 1 life)

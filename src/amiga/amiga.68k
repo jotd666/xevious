@@ -408,6 +408,24 @@ _user:
 	and.l	#0xF,d0
 	move.l	d0,start_area_option
 1:
+	move.l	(A0)+,D0	| INVINCIBLE/S
+	beq.b	1f
+	or.l	#1,cheat_flags
+1:
+	move.l	(A0)+,D0	| INFLIVES/S
+	beq.b	1f
+	or.l	#2,cheat_flags
+1:
+	move.l	(A0)+,D0	| REVSOL/S
+	beq.b	1f
+	or.l	#4,cheat_flags
+1:
+	move.l	(A0)+,D0	| REVBFLAG/S
+	beq.b	1f
+	or.l	#8,cheat_flags
+1:
+
+
 
 	move.l	rdargs_struct,d1
 	jsr		_LVOFreeArgs(a6)
@@ -3390,7 +3408,9 @@ rdargs_struct:
 program_args:
 	ds.l	40,0	
 read_args_string:
-	.asciz	"STARTLIVES/K/N,SKILL/K/N,FLAGXTRA/S,NOMUSIC/S,SUPER/S,STARTAREA/K/N"
+	.ascii	"STARTLIVES/K/N,SKILL/K/N,FLAGXTRA/S,NOMUSIC/S,SUPER/S,STARTAREA/K/N,"
+	.ascii	"INVINCIBLE/S,INFLIVES/S,REVSOL/S,REVBFLAG/S"
+	.byte	0
 
 unknown_tile_found:
 	dc.b	0
