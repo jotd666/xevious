@@ -1354,7 +1354,9 @@ update_fg_tile:
 	GET_XY_FROM_OFFSET
 	subq.w	#2,d1
 
-	
+	* mark tile row as modified, must be checked 3 times
+	lea		fg_refresh_tile_row_table(pc),a1
+	move.b	#3,(1,a1,d1.w*2)
 	* mark tile as modified in our amiga-friendly table (32x64,
 	* transposed compared to original table)
 	*
@@ -1417,8 +1419,22 @@ update_fg_tile:
 not_mask:
 	.long	0,0
 		
+* row/screen fg tile flags. Part of highly optimized tile refresh
+* to avoid 1) redrawing everything 2) scanning for changes in 36*32 cells
+* all the time, when most of the time row is empty or not changing
+*
+* list of row flags. 2 bytes per row.
+* first byte: refresh flags. Bit 0: must clear, bit 1: must redraw too
+* second byte: number of times row must be checked (because of
+* double buffering, this has to be >= 2). This allows to avoid checking row
+* status if nothing has changed in the row.
+
 fg_refresh_tile_row_table:
-	ds.b	64
+	ds.b	64*2
+
+* flags in a matrix. Row is fully checked when a tile is written somewhere
+* in the row (setting the counter flag in fg_refresh_tile_row_table to do it
+* only a few number of times, after that no need to recompute row status)
 fg_refresh_tile_table:
 	ds.b	0x800
 	
@@ -1889,7 +1905,7 @@ redraw_fg_tiles:
 10:
 	tst		d6
 	beq.b	11f
-	move.b	(a6,d7.w),d0
+	move.b	(a6,d7.w*2),d0
 	bne.b	19f		| still dirty
 	* this row is clean: compute refresh height
 	move.w	d7,d3
@@ -1918,7 +1934,7 @@ redraw_fg_tiles:
 	jbsr	blit_fg_layer
 	* previous rows were clean: looking for a dirty row
 11:
-	move.b	(a6,d7.w),d0
+	move.b	(a6,d7.w*2),d0
 	beq.b	20f		| clean, next tile
 	* dirty row found (D7)
 	* mark start
@@ -1954,11 +1970,19 @@ clear_fg_tiles:
 	moveq	#0,d6	| column counter
 	move.w	#32,d4	| preload 32
 	move.w	#28,d5	| preload 28
-	LOGPC	200
+0:
+	move.b	(1,a6),d0
+	subq.b	#1,d0
+	bpl.b	1f
+	* row hasn't been modified since scanned: skip it
+	add.w	d4,a5	| add 32 to A5
+	bra.b	31f
 1:
-	* optimized scan of the table. Most of the time rows
+	*move.b	d0,(1,a6)
+	* row has been written to (bitmap or empty)
+	* optimized scan of the table. Most of the time, cells
 	* are zeroed so we use post-increment counter, and fix
-	* offsets if something is non-zero
+	* offsets if something is non-zero. Also read longwords
 	move.l	(a5)+,d0
 	beq.b	3f
 	* loop 3 times
@@ -1999,23 +2023,23 @@ clear_fg_tiles:
 	bne.b	32f
 	* skip rows 2-10
 	move.w	#BLANK_FG_ROW_END,d7
-	add.w	#BLANK_FG_ROW_END-BLANK_FG_ROW_START,a6
+	add.w	#(BLANK_FG_ROW_END-BLANK_FG_ROW_START)*2,a6
 	add.w	#(BLANK_FG_ROW_END-BLANK_FG_ROW_START-1)*32,a5
 	bra.b	33f
 32:
 	cmp.w	#NB_VISIBLE_ROWS+1,d7
 	beq.b	4f
-	addq.w	#1,a6
+	addq.w	#2,a6
 33:
 	moveq	#0,d6
-	bra.b	1b
+	bra.b	0b
 4:
 	lea		fg_refresh_tile_row_table(pc),a6
 
 	* then use the condensed info to clear rows. This info will also be
 	* used afterwards to OR back non-empty fg tiles
 	* make sure it finds a block end
-	clr.b	(NB_VISIBLE_ROWS+1,a6)
+	clr.b	((NB_VISIBLE_ROWS+1)*2,a6)
 	lea		_custom,a5
 	moveq	#0,d7	| row counter
 	moveq	#0,d6	| "in dirty block" flag
@@ -2024,7 +2048,7 @@ clear_fg_tiles:
 10:
 	tst		d6
 	beq.b	11f
-	move.b	(a6,d7.w),d0
+	move.b	(a6,d7.w*2),d0
 	bne.b	19f		| still dirty
 	* this row is clean: compute refresh height
 	move.w	d7,d3
@@ -2052,7 +2076,7 @@ clear_fg_tiles:
 	bra.b	20f
 	* previous rows were clean: looking for a dirty row
 11:
-	move.b	(a6,d7.w),d0
+	move.b	(a6,d7.w*2),d0
 	beq.b	20f		| clean, next tile
 	* dirty row found (D7)
 	* mark start in d4
@@ -2065,7 +2089,7 @@ clear_fg_tiles:
 	* is a tile clear, value is 0, 
 	* so forget about redrawing something here
 	bclr.b	#0,d0
-	move.b	d0,(a6,d7.w)
+	move.b	d0,(a6,d7.w*2)
 20:
 	addq.w	#1,d7
 	cmp.w	#NB_VISIBLE_ROWS+1,d7
