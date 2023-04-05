@@ -1353,10 +1353,10 @@ update_fg_tile:
 	* into X,Y (native amiga)
 	GET_XY_FROM_OFFSET
 	subq.w	#2,d1
-
+	add.w	d1,d1		| Y *= 2
 	* mark tile row as modified, must be checked 3 times
 	lea		fg_refresh_tile_row_table(pc),a1
-	move.b	#3,(1,a1,d1.w*2)
+	move.b	#3,(1,a1,d1.w)
 	* mark tile as modified in our amiga-friendly table (32x64,
 	* transposed compared to original table)
 	*
@@ -1369,7 +1369,7 @@ update_fg_tile:
 	lea		fg_refresh_tile_table(pc),a1
 	* X/Y offsets
 	move.w	d1,d4
-	lsl.w	#5,d4
+	lsl.w	#4,d4	| Y*2*16
 	add.w	d4,a1
 	
 	st	d4
@@ -1383,10 +1383,10 @@ update_fg_tile:
 41:
 	move.b	d4,(a1,d0.w)	| modify flag for that tile
 	
-	* we have amiga XY now get plane offset to change tile data
-	* now multiply D1 by 32*8
+	* we have amiga D0=X,D1=Y*2 now get plane offset to change tile data
+	* now multiply D1 by 32*4
 
-	lsl.w	#8,d1
+	lsl.w	#7,d1
 	* add y offset to screen data	
 	add.w	d1,d0		
 
@@ -1898,17 +1898,18 @@ redraw_fg_tiles:
 	* in the second pass (D0=32), redraw all foreground tiles
 	* where row was marked as "to draw"
 	lea		fg_refresh_tile_row_table(pc),a6
-	moveq	#0,d7	| row counter
+	moveq	#0,d7	| row counter (2 by 2, we only need flags)
 	moveq	#0,d6	| "in dirty block" flag
 	bra.b	11f
 	* 2 passes: first compute the first dirty tile
 10:
 	tst		d6
 	beq.b	11f
-	move.b	(a6,d7.w*2),d0
+	move.b	(a6,d7.w),d0
 	bne.b	19f		| still dirty
 	* this row is clean: compute refresh height
 	move.w	d7,d3
+	lsr.w	#1,d3	| divide as d7 is doubled
 	sub.w	d4,d3	| nb dirty rows
 	* D4: first dirty row
 	* D5: nb of dirty rows
@@ -1934,26 +1935,27 @@ redraw_fg_tiles:
 	jbsr	blit_fg_layer
 	* previous rows were clean: looking for a dirty row
 11:
-	move.b	(a6,d7.w*2),d0
+	move.b	(a6,d7.w),d0
 	beq.b	20f		| clean, next tile
 	* dirty row found (D7)
 	* mark start
 	move.w	d7,d4
+	lsr.w	#1,d4	| divide as d7 is doubled	
 	* flag as "looking for clean tile"
 	st	d6
 19:
 	* tile has been accounted for, but must leave
 	* dirty flag until the whole row is clear
 20:
-	addq.w	#1,d7
+	addq.w	#2,d7
 	* one more row, else it misses the last one
-	cmp.w	#BLANK_FG_ROW_START,d7
+	cmp.w	#BLANK_FG_ROW_START*2,d7
 	bne.b	21f
-	move.w	#BLANK_FG_ROW_END,d7	| skip rows
+	move.w	#BLANK_FG_ROW_END*2,d7	| skip rows
 	clr		d6
 	bra.b	10b
 21:
-	cmp.w	#NB_VISIBLE_ROWS+1,d7
+	cmp.w	#(NB_VISIBLE_ROWS+1)*2,d7
 	bne.b	10b
 	rts
 	
