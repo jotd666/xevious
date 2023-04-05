@@ -1952,36 +1952,45 @@ clear_fg_tiles:
 	lea		fg_refresh_tile_table(pc),a5
 	moveq	#0,d7	| row counter
 	moveq	#0,d6	| column counter
-	moveq	#0,d5	| "bitmap in row" flag
 	move.w	#32,d4	| preload 32
+	move.w	#28,d5	| preload 28
+	LOGPC	200
 1:
 	* optimized scan of the table. Most of the time rows
 	* are zeroed so we use post-increment counter, and fix
 	* offsets if something is non-zero
-	move.b	(a5)+,d0
+	move.l	(a5)+,d0
 	beq.b	3f
+	* loop 3 times
+	moveq	#3,d3
+100:
+	tst.b	d0
+	beq.b	21f
 	bpl.b	2f
 	* negative: bitmap: mark as dirty and that's it
-	bset	#1,(a6)
-	st		d5		| note down that there's some bitmap in that line
+	bset	#1,(a6)  | note down that there's some bitmap in that line
 	* advance tile table to next row
-	add.w	#31,a5	| minus one as (a5)+ added 1
+	add.w	d5,a5	| 32 minus 4 as (a5)+ added 4
 	sub.w	d6,a5	| remove current column counter
 	bra.b	31f
 2:
-	subq	#1,d0
-	move.b	d0,(-1,a5)	| update
+	* positive: this value counts how many times we have
+	* to erase that cell. After a while, if no bitmaps are on that row
+	* everything is zero and there's no need to refresh
+	subq.b	#1,d0
+	move.b	d0,(-4,a5,d3.w)	| update
 	* space: mark row as dirty : needs clearing
 	bset	#0,(a6)
+21:
+	lsr.l	#8,d0	| data for next column (reverted)
+	dbf		d3,100b
 3:
 	* next column
-	addq	#1,d6
+	addq	#4,d6
 	cmp.w	d4,d6   | == 32 ?
 	bne.b	1b
-	tst		d5
-	bne.b	31f
+	* we reached that point without finding a bitmap:
 	* row is devoid of bitmap now: convert to "clear"
-
 	bclr	#1,(a6)
 31:
 	* next row
@@ -1994,11 +2003,10 @@ clear_fg_tiles:
 	add.w	#(BLANK_FG_ROW_END-BLANK_FG_ROW_START-1)*32,a5
 	bra.b	33f
 32:
-	cmp.w	#NB_VISIBLE_ROWS,d7
+	cmp.w	#NB_VISIBLE_ROWS+1,d7
 	beq.b	4f
 	addq.w	#1,a6
 33:
-	moveq	#0,d5	| clear "bitmap in row" flag
 	moveq	#0,d6
 	bra.b	1b
 4:
@@ -2007,7 +2015,7 @@ clear_fg_tiles:
 	* then use the condensed info to clear rows. This info will also be
 	* used afterwards to OR back non-empty fg tiles
 	* make sure it finds a block end
-	clr.b	(NB_VISIBLE_ROWS,a6)
+	clr.b	(NB_VISIBLE_ROWS+1,a6)
 	lea		_custom,a5
 	moveq	#0,d7	| row counter
 	moveq	#0,d6	| "in dirty block" flag
@@ -3223,8 +3231,7 @@ blit_planes_cookie_cut_16x:
 * < A5: custom
 * < D0.W,D1.W: x,y
 * < A0: source (pointer on array of planes)
-* < A1: destination fg plane
-* < A2: background to mix with cookie cut fg plane (same as a1 here)
+* < A1: destination fg plane, also background to mix with cookie cut fg plane
 * < A3: source mask for cookie cut
 * < D2: width in bytes (inc. 2 extra for shifting)
 * < D3: number of planes
@@ -3253,7 +3260,6 @@ blit_planes_any_internal_cookie_cut:
 	.else
     move.w  (a4,d1.w*2),d1	| y times 40
 	.endif
-	add.w	d1,a2			| Y plane position for background
 2:
 	move.w	d5,-(a7)
     move.l  #0x0fca0000,d5    | B+C-A->D cookie cut   
@@ -3272,7 +3278,6 @@ blit_planes_any_internal_cookie_cut:
     clr.w   d6
     or.l    d6,d5            | add shift
 3:   
-    move.w  d0,d6
     add.w   d0,d1
     
 4:

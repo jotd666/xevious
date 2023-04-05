@@ -1,4 +1,6 @@
 
+set bits of row flag if write a fg tile, else it's zero
+if zero, don't inspect data
 
 further optims/fixes:
 
