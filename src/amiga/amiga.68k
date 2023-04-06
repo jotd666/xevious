@@ -623,7 +623,8 @@ _vblank:
 22:
 	move.b	d1,vb_ticks_count
     move.w  d0,vbl_counter
-	
+	tst.b	pause_flag
+	bne.b	23f
 	jsr		xevious_im1_irq
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 	bsr		switch_screen_buffers

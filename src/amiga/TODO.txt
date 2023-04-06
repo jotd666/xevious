@@ -1,5 +1,7 @@
 further optims/fixes:
 
+- terrible slowdowns in higher levels on plain A1200/nofast. Not sure it can be fixed. There are just too many objects on
+  the screen (bullets are small but take time to draw too)
 - highscore yellow highlight shifted for entry 3 (change score and run with 1 life)
 - optim: cookie cut with fixed B=0 source if plane_pic_0 (saves bandwidth)! blit_plane_any_internal_cookie_cut_blank_source
 - if no tile can be double width / double height AND simple at the same time
