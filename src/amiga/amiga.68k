@@ -102,6 +102,7 @@ actsprite_second_sprite = 32   | second sprite... etc... everything repeated
 
 ACTIVE_SPRITE_STRUCT_BITS = 6    | 1<<6 = 64: can hold a slb struct
 
+	move.l	a7,old_stack
 	bra	_user
 
 | write current PC value to some address
@@ -430,6 +431,8 @@ _user:
 	move.l	rdargs_struct,d1
 	jsr		_LVOFreeArgs(a6)
 
+	bsr		store_system
+	
 	lea		_custom,a5
 	lea		debug_copperlist,a0
 	move.l	a0,cop1lc(a5)
@@ -440,8 +443,10 @@ _user:
     jsr _LVOOpenLibrary(a6)
     move.l  d0,_gfxbase
     move.l	d0,a6
-	sub.l	a1,a1
+	move.l	38(a6),old_syscoplist
+	move.l	34(A6),old_actiview		| gb_ActiView
 
+	sub.l	a1,a1
 	jsr	_LVOLoadView(a6)
 	jsr	_LVOWaitTOF(a6)
 	jsr	_LVOWaitTOF(a6)
@@ -528,15 +533,6 @@ eye_catcher:
 
 
 demo_game:
-		tst.l   _resload
-		bne.b   .no_super
-		move.l	4,A6
-		jsr		_LVODisable(a6)
-		jsr		_LVOSuperState(a6)
-		* force VBR to zero if not whdload
-		moveq	#0,d0
-		movec	d0,vbr
-.no_super:
 		move		#0x4000,_custom+intena						| disable interrupts
 		move		#0x7FFF,_custom+intreq						| ack all interrupts
 		bsr			platform_init					| amiga-specific init
@@ -623,8 +619,11 @@ _vblank:
 22:
 	move.b	d1,vb_ticks_count
     move.w  d0,vbl_counter
+	* we're going to ack copper interrupt now
+	
 	tst.b	pause_flag
 	bne.b	23f
+	
 	jsr		xevious_im1_irq
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 	bsr		switch_screen_buffers
@@ -779,7 +778,96 @@ switch_screen_buffers:
 	bra		set_fg_bitplanes
 	.endif
 	
+store_system:
+	tst.l	_resload
+	beq.b	0f
+	rts
+0:
+	* system copper
+	
+	move.l	4,a6
+	lea	zero_vbr(pc),a5
+	jsr		_LVOSupervisor(a6)
+
+	lea	_custom,a6
+	move.w	intenar(a6),old_intena
+	move.w	dmaconr(a6),old_dmacon
+	lea		old_sysvectors,a0
+	move.l	0x64.w,(a0)+
+	move.l	0x68.w,(a0)+
+	move.l	0x6c.w,(a0)+
+	move.l	0x70.w,(a0)+
+	move.l	0x74.w,(a0)+
+	move.l	0x78.w,(a0)+
+	rts
+
+restore_system:
+	lea	_custom,a6
+	move.w	#0x4000,intena(a6)	| ints off
+	lea		old_sysvectors,a0
+
+	move.l	(a0)+,0x0064
+	move.l	(a0)+,0x0068
+	move.l	(a0)+,0x006c
+	move.l	(a0)+,0x0070
+	move.l	(a0)+,0x0074
+	move.l	(a0)+,0x0078
+
+
+	bclr	#6,0xbfee01
+
+	move.l	old_vbr,d0
+	movec	D0,vbr
+
+	lea	_custom,a6
+	move.w	old_intena,d0			| get old val
+	and.w	#0x3fff,d0
+	eor.w	#0x3fff,d0
+	move.w	d0,intena(a6)		| clr bits
+	eor.w	#0x3fff,d0
+	or.w	#0xc000,d0		
+	move.w	d0,intena(a6)		| set bits and main
+
+	move.w	old_dmacon,d0			| get old val
+	and.w	#0x3fff,d0
+	eor.w	#0x3fff,d0
+
+***		and.w	#0xfff0,d0		| preserve sound dma for now
+
+	move.w	d0,dmacon(a6)		| clr bits
+
+
+
+	eor.w	#0x3fff,d0
+	or.w	#0xc000,d0		
+	move.w	d0,dmacon(a6)		| set bits and main
+
+	move.l	old_syscoplist,cop1lc(a6)
+	move.l	_gfxbase,a6
+	move.l	old_actiview,a1
+	jsr	_LVOLoadView(a6)
+
+
+	moveq	#0,d0
+	rts
+
+quit_to_os:
+	bsr		restore_system
+	move.w	#0,SR
+	move.l	old_stack(pc),a7
+	moveq	#0,d0
+	rts
+	
+zero_vbr:
+	movec	vbr,d0
+	move.l	d0,old_vbr
+	moveq	#0,d0
+	movec	D0,vbr
+	rte
+
 platform_init:
+	bsr		store_system
+	
 	lea		_custom,a5
 	move.w	#0x7FFF,dmacon(a5)
 	* set blitter parameters once and for all
@@ -1911,7 +1999,7 @@ zzz:
 			rts
 
 BLANK_FG_ROW_START = 3
-BLANK_FG_ROW_END = 10
+BLANK_FG_ROW_END = 9
 
 redraw_fg_tiles:
 	* in the second pass (D0=32), redraw all foreground tiles
@@ -2566,8 +2654,21 @@ osd_read_dipswitches:
 1:
 	rts
 
-
-
+old_intena:
+	.long	0
+old_dmacon:
+	.long	0
+old_sysvectors:
+	ds.l	8
+old_vbr:
+	.long	0
+old_syscoplist:
+	.long	0
+old_actiview:
+	.long	0
+old_stack:
+	.long	0
+	
 _tag:
 		.long	WHDLTAG_CUSTOM1_GET
 cheat_flags:
@@ -2899,7 +3000,16 @@ level2_interrupt:
 
     bsr	toggle_pause
 0:
-
+	tst.l	_resload
+	bne.b	0f
+	cmp.b	#0x45,d0	| "ESC" key
+	bne.b	0f
+	BSET	#0x06,0x1E01(A5)
+	moveq	#2,d0
+	bsr	beamdelay
+	BCLR	#0x06,0x1E01(A5)	| acknowledge key
+	bra		quit_to_os
+0:
 	BSET	#0x06,0x1E01(A5)
 	moveq	#2,d0
 	bsr	beamdelay

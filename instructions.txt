@@ -8,6 +8,7 @@ Amiga controls:
 - fire/red to fire
 - 2nd button/blue to launch a bomb
 - P key or CD32 play to pause the game
+- ESC key to quit (when run from amigaDOS)
 
 Command line arguments (no whdload)
 
