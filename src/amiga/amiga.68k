@@ -15,6 +15,7 @@ STATE_ACTIVE = 2
 STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
 
+SCORE_FILE_SIZE = 16*5
 
 SPRITE_LIFETIME = 2
 
@@ -349,7 +350,6 @@ _user:
 	move.l	a0,a2
 	lea	(_tag,pc),a0
 	jsr	(resload_Control,a2)
-
 	
     bra		.no_forbid
 .standard:
@@ -451,6 +451,8 @@ _user:
 	jsr	_LVOWaitTOF(a6)
 	jsr	_LVOWaitTOF(a6)
 
+	bsr		load_highscores
+
     * check if "floppy" file is here
     
     move.l  _dosbase(pc),a6
@@ -482,7 +484,7 @@ _user:
 	sub.l	A1,A1
 	jsr	_LVOFindTask(a6)		| find ourselves
 	move.l	D0,A0
-	*move.l	#-1,pr_WindowPtr(A0)	| no more system requesters (insert volume, write protected...)
+	move.l	#-1,184(A0)	| pr_WindowPtr no more system requesters (insert volume, write protected...)
 
 .no_forbid:
 	move.l	start_lives(pc),d2
@@ -497,11 +499,6 @@ _user:
 	lsl.w	#5,d2
 	move.w	d2,difficulty_level_dsw
 	
-	* soundfx lib
-	lea		_custom,a6
-	sub.l	a0,a0	| assuming vbr=0
-	moveq	#1,d0	| PAL
-	jsr		_mt_install_cia
 	
 	jsr	 _detect_controller_types 
 
@@ -524,7 +521,49 @@ eye_catcher:
 * we're not doing things the NeoGeo way
 		rts
 
+load_highscores:
+    lea hiscorename(pc),a0
+    move.l  _resload(pc),d0
+    bne.b   1f
 
+    move.l  _dosbase(pc),a6
+    move.l  a0,d1
+    move.l  #1005,d2
+    jsr     (_LVOOpen,a6)
+    move.l  d0,d1
+    beq.b   1f
+    move.l  d1,d4
+    move.l  #SCORE_FILE_SIZE,d3
+    move.l  #high_score_buffer,d2
+    jsr (_LVORead,a6)
+    move.l  d4,d1
+    jsr (_LVOClose,a6)   
+	st.b	highscore_loaded
+1:
+    rts
+
+save_highscores:
+	tst.l	_resload
+	bne.b	1f
+    tst.b   highscore_needs_saving
+    beq.b   1f
+    move.l  _dosbase(pc),a6
+	lea		hiscorename(pc),a0
+    move.l  a0,d1
+    move.l  #1006,d2
+    jsr     (_LVOOpen,a6)
+    move.l  d0,d1
+    beq.b   1f
+    move.l  d1,d4
+    move.l  #SCORE_FILE_SIZE,d3
+    move.l  #high_score_buffer,d2
+    jsr (_LVOWrite,a6)
+    move.l  d4,d1
+    jsr (_LVOClose,a6)   
+1:	
+    rts
+    
+	
 * To get the core to run, you just need to jump to xevious_reset after
 * you've initialised the platform (Amiga) stuff. That essentially does a
 * Z80 reset. You also need to call xevious_im1_irq from the Amiga vblank
@@ -607,6 +646,8 @@ _vblank:
 	bra.b	3f
 1:
 	* has to be copper
+	* we're going to ack copper interrupt now
+	move.w	#0x10,_custom+intreq
 	
 	moveq	#ONE_TICK,d1
     move.w  vbl_counter(pc),d0
@@ -619,7 +660,6 @@ _vblank:
 22:
 	move.b	d1,vb_ticks_count
     move.w  d0,vbl_counter
-	* we're going to ack copper interrupt now
 	
 	tst.b	pause_flag
 	bne.b	23f
@@ -628,10 +668,16 @@ _vblank:
 	.ifne  OPT_ENABLE_DOUBLE_BUFFERING
 	bsr		switch_screen_buffers
 	.endif
-	
-
 23:
-	move.w	#0x10,_custom+intreq		
+	* now we check copper interrupt again
+	move.w	_custom+intreqr,d0
+	btst	#4,d0
+	beq.b	3f		| clear: ok
+	* copper interrupt has been called, which means that
+	* rendering was so slow that we couldn't cope within a frame
+	* skip a tick and ack again, we lose one update frame
+	addq.b	#ONE_TICK,vb_ticks_count
+	move.w	#0x10,_custom+intreq
 3:
     movem.l (a7)+,d0-d7/a0-a6
 	
@@ -648,11 +694,15 @@ osd_sound_unmute:
 	
 osd_sound_start:
 	movem.l	d0/a0/a6,-(a7)
-	tst.b	sound_muted
-	bne.b	1f
 	tst.b	sound_lock
 	bne.b	1f
-	
+	* coin sound overrides muted sound
+	* (but not locked sound when start music is playing)
+	cmp.w	#COIN_SND,d0
+	beq.b	0f
+	tst.b	sound_muted
+	bne.b	1f
+0:	
 	lea		_custom,a6
 	lsl.w	#3,d0
 	lea		sound_table(pc),a0
@@ -803,6 +853,8 @@ store_system:
 
 restore_system:
 	lea	_custom,a6
+	jsr		_mt_remove_cia
+
 	move.w	#0x4000,intena(a6)	| ints off
 	lea		old_sysvectors,a0
 
@@ -855,6 +907,7 @@ quit_to_os:
 	bsr		restore_system
 	move.w	#0,SR
 	move.l	old_stack(pc),a7
+	bsr		save_highscores
 	moveq	#0,d0
 	rts
 	
@@ -925,6 +978,12 @@ platform_init:
 	move.l	(a7)+,0x68.W
 	pea		_vblank(pc)
 	move.l	(a7)+,0x6C.W
+
+	* soundfx lib
+	lea		_custom,a6
+	sub.l	a0,a0	| we know vbr=0
+	moveq	#1,d0	| PAL
+	jsr		_mt_install_cia
 
 	.ifne	OPT_ENABLE_PROFILING
 	* init profiling if enabled
@@ -2953,28 +3012,48 @@ osd_read_high_scores:
 	lea		hiscorename(pc),a0
 	jsr		resload_GetFileSize(a2)		
 	tst.l	d0
-	beq.b	0f
+	beq.b	1f
 	lea		hiscorename(pc),a0
 	move.l	a3,a1
 	jsr		resload_LoadFile(a2)		
+	bra.b	1f
 0:
+	tst.b	highscore_loaded
+	beq.b	2f
+	* from DOS: just copy buffer
+	lea		high_score_buffer(pc),a1
+	move.l	#SCORE_FILE_SIZE/4-1,d0
+2:
+	move.l	(a1)+,(a0)+
+	dbf		D0,2b
+
+1:
 	movem.l	(a7)+,d0-d7/a0-a6
 	rts
 	
 osd_write_high_scores:
 	movem.l	d0-d7/a0-a6,-(a7)
+	tst.l	cheat_flags		| don't save score if cheat on
+	bne.b	1f
+	tst.l	start_area_option	| don't save score if cheat on
+	bne.b	1f
 	move.l	_resload(pc),d0
 	beq.b	0f
-	tst.l	cheat_flags		| don't save score if cheat on
-	bne.b	0f
-	tst.l	start_area_option	| don't save score if cheat on
-	bne.b	0f
 	move.l	d0,a2
-	move.l	#16*5,d0
+	move.l	#SCORE_FILE_SIZE,d0
 	move.l	a0,a1
 	lea		hiscorename(pc),a0
-	jsr		resload_SaveFile(a2)		
+	jsr		resload_SaveFile(a2)
+	bra.b	1f
 0:
+	* from DOS: just copy buffer
+	lea		high_score_buffer(pc),a1
+	move.l	#SCORE_FILE_SIZE/4-1,d0
+2:
+	move.l	(a0)+,(a1)+
+	dbf		D0,2b
+	st.b	highscore_needs_saving
+1:
 	movem.l	(a7)+,d0-d7/a0-a6
 	rts
 
@@ -3027,6 +3106,15 @@ toggle_pause:
 	eor.b   #1,pause_flag
 0:
 	rts
+	
+high_score_buffer:
+	ds.b	SCORE_FILE_SIZE
+
+highscore_needs_saving:
+	.byte	0
+highscore_loaded:
+	.byte	0
+	.align	2
 	
 keyboard_table:
 	ds.b	0x100
@@ -3522,7 +3610,7 @@ read_args_string:
 	.ascii	"STARTLIVES/K/N,SKILL/K/N,FLAGXTRA/S,NOMUSIC/S,SUPER/S,STARTAREA/K/N,"
 	.ascii	"INVINCIBLE/S,INFLIVES/S,REVSOL/S,REVBFLAG/S"
 	.byte	0
-
+	
 unknown_tile_found:
 	dc.b	0
 unknown_sprite_found:
@@ -3613,8 +3701,7 @@ graphicsname:
 	.ascii	"graphics.library"
 	.byte	0
 hiscorename:
-	.ascii	"xevious.high"
-	.byte	0
+	.asciz	"xevious.high"
 floppy_file:
 	.ascii	"floppy"
 	.byte	0

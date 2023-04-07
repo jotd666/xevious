@@ -8,7 +8,7 @@ Amiga controls:
 - fire/red to fire
 - 2nd button/blue to launch a bomb
 - P key or CD32 play to pause the game
-- ESC key to quit (when run from amigaDOS)
+- ESC key to quit & save high-scores (when run from amigaDOS)
 
 Command line arguments (no whdload)
 
@@ -41,6 +41,8 @@ INVINCIBLE: can't die
 INFLIVES: infinite lives
 REVSOL: reveal Sol towers (bonuses)
 REVBFLAG: reveal bonus flags
+
+If any cheat is selected, highscores won't be saved.
 
 Examples: 
 
