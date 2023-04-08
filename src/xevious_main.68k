@@ -3321,19 +3321,7 @@ toroid_swing_left: | $205F
     bra       add_obj_handler
     
 init_toroid_shot: | $2092
-    move.l    d0,-(a7)
-	.ifdef	NO68020
-    move.w    sr,-(a7)                          | save C
-	.else
-	move.w	ccr,-(a7)
-	.endif
     bsr       init_new_bullet
-	.ifdef	NO68020
-    move.w    (a7)+,sr                          | restore C
-	.else
-	move.w	(a7)+,ccr
-	.endif
-    move.l    (a7)+,d0
     subq.b    #2,d0
     bcs.b     toroid_swing_left
     bra.w     toroid_swing_right
