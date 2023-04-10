@@ -694,6 +694,12 @@ osd_sound_unmute:
 	
 osd_sound_start:
 	movem.l	d0/a0/a6,-(a7)
+	cmp.w	#SOLVALOU_EXPLOSION_SND,d0
+	bne.b	0f
+	* remove music locking all sounds when player
+	* is hit while music is playing
+	clr.b	sound_lock
+0:
 	tst.b	sound_lock
 	bne.b	1f
 	* coin sound overrides muted sound
@@ -702,7 +708,7 @@ osd_sound_start:
 	beq.b	0f
 	tst.b	sound_muted
 	bne.b	1f
-0:	
+0:
 	lea		_custom,a6
 	lsl.w	#3,d0
 	lea		sound_table(pc),a0
@@ -3005,6 +3011,7 @@ osd_read_start:
 		
 osd_read_high_scores:
 	movem.l	d0-d7/a0-a6,-(a7)
+	move.l	a1,a4
 	move.l	_resload(pc),d0
 	beq.b	0f
 	move.l	d0,a2
@@ -3015,13 +3022,21 @@ osd_read_high_scores:
 	beq.b	1f
 	lea		hiscorename(pc),a0
 	move.l	a3,a1
-	jsr		resload_LoadFile(a2)		
+	jsr		resload_LoadFile(a2)
+	* set highest score entry
+    move.b    (0,a3),(a4)+
+    move.b    (1,a3),(a4)+
+    move.b    (2,a3),(a4)+		
 	bra.b	1f
 0:
 	tst.b	highscore_loaded
 	beq.b	2f
 	* from DOS: just copy buffer
 	lea		high_score_buffer(pc),a1
+	* set highest score entry
+    move.b    (0,a1),(a4)+
+    move.b    (1,a1),(a4)+
+    move.b    (2,a1),(a4)+	
 	move.l	#SCORE_FILE_SIZE/4-1,d0
 2:
 	move.l	(a1)+,(a0)+
