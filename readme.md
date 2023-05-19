@@ -36,12 +36,13 @@ CREDITS:
 - phx: ptplayer sound/music replay Amiga code
 - Namco: original game :)
 
-CONTROLS (Amiga: 2-button joystick required):
+CONTROLS (Amiga: 2-button joystick recommended):
 
 - red/fire: fire/start game (from menu)
-- blue/2nd button: bomb/insert coin (from menu)
+- blue/2nd button/space/left shift: bomb/insert coin (from menu)
 - green/5 key: insert coin
 - yellow/1 key: start game
+- 2 key: start game (2P game)
 - play/P key: pause
 
 REBUILDING FROM SOURCES:

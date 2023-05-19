@@ -521,8 +521,16 @@ eye_catcher:
 * we're not doing things the NeoGeo way
 		rts
 
+get_hiscore_name:
+    lea normal_hiscorename(pc),a0
+	tst.b	is_super_xevious
+	beq.b	0f
+	lea	super_hiscorename(pc),a0
+0:
+	rts
+	
 load_highscores:
-    lea hiscorename(pc),a0
+	bsr.b		get_hiscore_name
     move.l  _resload(pc),d0
     bne.b   1f
 
@@ -548,7 +556,7 @@ save_highscores:
     tst.b   highscore_needs_saving
     beq.b   1f
     move.l  _dosbase(pc),a6
-	lea		hiscorename(pc),a0
+	bsr.b		get_hiscore_name
     move.l  a0,d1
     move.l  #1006,d2
     jsr     (_LVOOpen,a6)
@@ -609,11 +617,21 @@ _vblank:
     movem.l d0-d7/a0-a6,-(a7)
 	move.w	_custom+intreqr,d0
 	btst	#5,d0
-	beq.b		1f
+	beq.b		2f
 
 	move.l	_joypad_state(pc),d1
 	moveq	#1,d0
 	jsr	_read_joystick
+
+	lea keyboard_table(pc),a0
+	tst.b	(0x40,a0)		| space
+	beq.b	1f
+	bset	#JPB_BTN_BLU,d0
+1:
+	tst.b	(0x60,a0)		| shift
+	beq.b	1f
+	bset	#JPB_BTN_BLU,d0
+1:
 	move.l	d0,_joypad_state
 	btst	#JPB_BTN_PLAY,d0
 	beq.b	0f
@@ -644,7 +662,7 @@ _vblank:
 13:
 	move.w	#0x20,_custom+intreq	
 	bra.b	3f
-1:
+2:
 	* has to be copper
 	* we're going to ack copper interrupt now
 	move.w	#0x10,_custom+intreq
@@ -2994,6 +3012,11 @@ osd_read_start:
 	clr.b	(1,a0)
 	bra.b	2f
 0:
+	tst.b	(2,a0)		| "2" key like in MAME
+	beq.b	0f
+	clr.b	(2,a0)
+	bra.b	4f
+0:
 	move.l	_joypad_state(pc),d1
 	tst.b	ingame_palette_loaded
 	bne.b	3f
@@ -3008,7 +3031,10 @@ osd_read_start:
 	move.l	(a7)+,d1
 	tst.b	d0
 	rts
-		
+4:
+	bset	#1,d0
+	bra.b	1b
+	
 osd_read_high_scores:
 	movem.l	d0-d7/a0-a6,-(a7)
 	move.l	a1,a4
@@ -3016,11 +3042,11 @@ osd_read_high_scores:
 	beq.b	0f
 	move.l	d0,a2
 	move.l	a0,a3
-	lea		hiscorename(pc),a0
-	jsr		resload_GetFileSize(a2)		
+	bsr		get_hiscore_name
+ 	jsr		resload_GetFileSize(a2)		
 	tst.l	d0
 	beq.b	1f
-	lea		hiscorename(pc),a0
+	bsr		get_hiscore_name
 	move.l	a3,a1
 	jsr		resload_LoadFile(a2)
 	* set highest score entry
@@ -3057,7 +3083,7 @@ osd_write_high_scores:
 	move.l	d0,a2
 	move.l	#SCORE_FILE_SIZE,d0
 	move.l	a0,a1
-	lea		hiscorename(pc),a0
+	bsr		get_hiscore_name
 	jsr		resload_SaveFile(a2)
 	bra.b	1f
 0:
@@ -3514,7 +3540,7 @@ blit_planes_any_internal_cookie_cut:
     lea		mulNB_BYTES_PER_ROW_table,a4
 	.ifdef	NO68020
 	add.w	d1,d1
-    add.w  (a4,d1.w),d1	| y times 40
+    move.w  (a4,d1.w),d1	| y times 40
 	.else
     move.w  (a4,d1.w*2),d1	| y times 40
 	.endif
@@ -3524,7 +3550,7 @@ blit_planes_any_internal_cookie_cut:
 
     move    d0,d6
     beq.b   4f
-    asr.w   #3,d0
+    lsr.w   #3,d0
 	bclr	#0,d0
     and.w   #0xF,d6
 	beq.b	3f
@@ -3715,8 +3741,10 @@ dosname:
 graphicsname:
 	.ascii	"graphics.library"
 	.byte	0
-hiscorename:
+normal_hiscorename:
 	.asciz	"xevious.high"
+super_hiscorename:
+	.asciz	"super_xevious.high"
 floppy_file:
 	.ascii	"floppy"
 	.byte	0

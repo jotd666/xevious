@@ -27,8 +27,8 @@ NO68020 = 1
     *.global main_debug1
     *.global main_debug2
 
-.include "xevious.inc"
-
+	.include "xevious.inc"
+	
 .macro SET_REENTRY_ADDR_HERE
     move.l    #0f,(a6)
 0:    

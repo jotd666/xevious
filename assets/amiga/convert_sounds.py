@@ -135,15 +135,11 @@ with open(sndfile,"w") as fst,open(outfile,"w") as fw:
         if signed_contents[0] != b'\x00' and signed_contents[1] != b'\x00':
             # add zeroes
             signed_contents = struct.pack(">H",0) + signed_contents
-        with open(raw_file,"rb") as f:
-            contents = f.read().rstrip(b"\x00")
+
+        contents = signed_contents
         # align on 16-bit
         if len(contents)%2:
             contents += b'\x00'
-        # pre-pad with 0W, used by ptplayer for idling
-        if contents[0] != b'\x00' and contents[1] != b'\x00':
-            # add zeroes
-            contents = b'\x00\x00' + contents
 
         fw.write("{}_raw:   | {} bytes".format(wav,len(contents)))
 

@@ -1,3 +1,6 @@
+
+- optim to include ram source for pc relative addressing
+
 further optims/fixes:
 
 - highscore yellow highlight shifted for entry 3 (change score and run with 1 life)
