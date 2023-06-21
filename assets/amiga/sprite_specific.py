@@ -281,7 +281,7 @@ def doit():
 """.format(k))
 
 
-        f.write("\t.datachip\n")
+        f.write("\t.section\t.datachip\n")
         f.write("\t.align\t8\n")
         for j,d in enumerate(("left","right")):
             for i in range(2):

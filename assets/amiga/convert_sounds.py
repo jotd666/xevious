@@ -84,7 +84,7 @@ raw_file = os.path.join(tempfile.gettempdir(),"out.raw")
 with open(sndfile,"w") as fst,open(outfile,"w") as fw:
     fst.write(snd_header)
 
-    fw.write("\t.datachip\n")
+    fw.write("\t.section\t.datachip\n")
     fw.write("\t.global\t{}\n".format(music_module_label))
 
     for wav_file,details in sound_dict.items():

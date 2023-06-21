@@ -470,7 +470,7 @@ def write_tiles(t,matrix,f,is_sprite):
         # write the lines of references to plane BOBs that we have stashed
         f.writelines(end_lines)
 
-        f.write("\t.datachip\n")
+        f.write("\t.section\t.datachip\n")
         for k,v in sorted(bob_plane_cache.items(),key=lambda x:x[1]):
             f.write("plane_pic_{}:".format(v))
             dump_asm_bytes(k,f)
@@ -674,6 +674,13 @@ if dump_graphics:
     # background data: requires to generate as many copies of each tile that there are used CLUTs on that tile
     # the only way to know which CLUTs are used is to run the game and log them... We can't generate all pics, that
     # would take too much memory (512*64 pics of 16 color 8x8 tiles!!)
+
+    # this is stupid: this call reads a png picture containing only Xevious title
+    # tiles. This png has been generated a long time ago from tiles. Now we need that png
+    # to create palette, and to generate tiles... So I have to track this "bg_data_title.png"
+    # because I'm not able to generate it anymore... Well, it doesn't matter, as it's only to extract
+    # colors. Could be done using game dump + clut. Anyway, I restored the file from an old commit
+    # and it works. Not going to do the same error again!
 
     reduced_color_dict = gen_color_dict.doit()
 
