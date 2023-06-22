@@ -617,6 +617,7 @@ _vblank:
     movem.l d0-d7/a0-a6,-(a7)
 	lea		_custom,a5
 	move.w	(intreqr,a5),d0
+	btst	#5,d0
 	beq.b		2f
 
 	move.l	_joypad_state(pc),d1

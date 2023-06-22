@@ -4,6 +4,7 @@ Amiga controls:
 
 - 5 key or CD32 green/blue button to insert a coin
 - 1 key or CD32 yellow/red button to start a game
+- 2 key: start game (2P game)
 - P key or CD32 play button to pause a game
 - fire/red to fire
 - 2nd button/blue to launch a bomb
