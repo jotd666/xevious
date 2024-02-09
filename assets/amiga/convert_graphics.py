@@ -442,13 +442,17 @@ def write_tiles(t,matrix,f,is_sprite):
 
                         for p in range(BG_NB_PLANES+1):  # +1: mask
                             block = tuple(item[p*plane_size:p*plane_size+plane_size])
-                            block_id = bob_plane_cache.get(block)
-                            if block_id is None:
-                                # block is not in cache
-                                block_id = bob_plane_id
-                                bob_plane_cache[block] = block_id
-                                bob_plane_id += 1
-                            end_lines.append("\tdc.l\tplane_pic_{}\n".format(block_id))
+                            if any(block):
+                                block_id = bob_plane_cache.get(block)
+                                if block_id is None:
+                                    # block is not in cache
+                                    block_id = bob_plane_id
+                                    bob_plane_cache[block] = block_id
+                                    bob_plane_id += 1
+                                end_lines.append("\tdc.l\tplane_pic_{}\n".format(block_id))
+                            else:
+                                end_lines.append("\tdc.l\t0   | blank plane\n")
+
             elif item_data["bitmap_type"] == BT_SPRITE:
                 # hardware sprite: each have their own 4 color palette
                 f.write("* {} sprite(s)\n".format(len(item_data["sprite_data"])))
