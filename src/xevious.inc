@@ -4,7 +4,31 @@
 ***    
 *** BUILD OPTIONS
 ***
-
+	.ifdef	RELEASE
+    * hardware options
+    OPT_DISABLE_FG_LAYER=0              | don't change values here!
+    OPT_DISABLE_BG_LAYER=0              | don't change values here!
+    OPT_DISABLE_SPRITES=0               | don't change values here!
+    OPT_DISABLE_DISPLAY_MASKS=0         | don't change values here!
+										| don't change values here!
+    * optimisation options              | don't change values here!
+    OPT_SUB_HAS_IRQ=1                   | don't change values here!
+    * game test options                 | don't change values here!
+    OPT_START_AREA=1    | 1-16          | don't change values here!
+    OPT_LOOP_AREA=0                     | don't change values here!
+    OPT_INVINCIBLE=0                    | don't change values here!
+    OPT_INFINITE_LIVES=0                | don't change values here!
+    * score is BCD format               | don't change values here!
+    OPT_START_SCORE=0x0000000           | don't change values here!
+    OPT_ENABLE_HIGH_SCORE_IO=1          | don't change values here!
+    OPT_TCDEV_EASTER_EGG=1              | don't change values here!
+    OPT_REVEAL_SOL_TOWER=0              | don't change values here!
+    OPT_REVEAL_BONUS_FLAG=0             | don't change values here!
+    OPT_DISPLAY_AREA=0                  | don't change values here!
+    OPT_SKIP_SPLASH=0                   | don't change values here!
+    OPT_SKIP_ATTRACT=0                  | don't change values here!
+	.else
+	* dev/debug mode: changes here won't reflect on release version!
     * hardware options
     OPT_DISABLE_FG_LAYER=0
     OPT_DISABLE_BG_LAYER=0
@@ -14,7 +38,7 @@
     * optimisation options
     OPT_SUB_HAS_IRQ=1
     * game test options    
-    OPT_START_AREA=5    | 1-16
+    OPT_START_AREA=1    | 1-16
     OPT_LOOP_AREA=0
     OPT_INVINCIBLE=0
     OPT_INFINITE_LIVES=0
@@ -27,7 +51,8 @@
     OPT_DISPLAY_AREA=0
     OPT_SKIP_SPLASH=0
     OPT_SKIP_ATTRACT=0
-
+	.endif
+	
 ***
 *** end of BUILD OPTIONS
 ***

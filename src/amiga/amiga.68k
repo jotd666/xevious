@@ -16,6 +16,8 @@ STATE_DO_NOT_UPDATE_SHADOW = 1
 STATE_INACTIVE = 0
 
 SCORE_FILE_SIZE = 16*5
+* don't change without changing other optimized stuff! check for [SPRITE_MEM_SIZE] tag
+SPRITE_MEM_SIZE = 12
 
 SPRITE_LIFETIME = 2
 
@@ -30,23 +32,6 @@ FG_TILE_CLEAR = 2
 OPT_ENABLE_PROFILING = 0
 OPT_ENABLE_LOGGING = 0
 ONE_TICK = 1
-	* check most used options in release mode
-	* to avoid creating a version with cheats on!
-	.ifne	OPT_INVINCIBLE
-	.error	"cheat option in release mode"
-	.endif
-	.ifne	OPT_START_AREA-1
-	.error	"level select option in release mode"
-	.endif
-	.ifne	OPT_START_SCORE
-	.error	"nonzero score option in release mode"
-	.endif
-	.ifne	OPT_REVEAL_SOL_TOWER
-	.error	"reveal sol tower option in release mode"
-	.endif
-	.ifne	OPT_REVEAL_BONUS_FLAG
-	.error	"reveal bonus flag option in release mode"
-	.endif
 	.else
 OPT_ENABLE_LOGGING = 1
 OPT_ENABLE_PROFILING = 0
@@ -1692,13 +1677,13 @@ osd_update_sprite_shadow:
 	neg.w	d2
 	add.w	#32*8,d2
 	move.w	d2,(a4)+
-	addq.w	#4,a4		| skip 4 last bytes of the structure
+	addq.w	#4,a4		| skip last bytes of the structure [SPRITE_MEM_SIZE]
 2:	
 	lea		(_OBJSIZE.W,a5),a5
 	dbf				d7,1b
 	rts
 3:
-	lea	(SPRITE_MEM_SIZE.W,a4),a4
+	lea	(SPRITE_MEM_SIZE,a4),a4
 	addq.w	#2,a2
 	bra.b	2b
 	
@@ -2033,7 +2018,7 @@ osd_update_32_sprite_hw:
 	.endif
 	
 2:
-	lea		(SPRITE_MEM_SIZE.W,a4),a4		| next sprite
+	lea		(SPRITE_MEM_SIZE,a4),a4		| next sprite
 	dbf		d4,4b
 
 	* now restore all foreground tiles behind the previous
@@ -2050,10 +2035,10 @@ osd_update_32_sprite_hw:
 	lea		(NB_SPRITES_TO_UPDATE*SPRITE_MEM_SIZE.W,a5),a5
 3:
 	* copy one sprite backup structure (multiple of 4 bytes) 32 times
-	** | 12/4 change if SPRITE_MEM_SIZE changes!!
+	** | 12/4 change if SPRITE_MEM_SIZE changes!! [SPRITE_MEM_SIZE]
 	movem.l	(a4)+,d1/d2/d3
 	movem.l	d1/d2/d3,(a5)
-	lea		(12,a5),a5
+	lea		(SPRITE_MEM_SIZE,a5),a5
 
 	dbf		d0,3b
 	tst.w	d7
@@ -2626,6 +2611,7 @@ draw_sprite_part:
 	move.w	d4,(8,a4)
 	move.w	d3,(10,a4)
 	add.w	d4,d1		| apply Y offset
+	
 	* attributes remain in d2
 	bsr	blit_16x_bob
 2:
@@ -3665,7 +3651,6 @@ process_1_plane:
 	MUL_TABLE	NB_BYTES_PER_ROW,512+32
 	MUL_TABLE	NB_PLAYFIELD_PLANES,512+32
 
-SPRITE_MEM_SIZE = 12
 current_sprite_state:
 	ds.b	SPRITE_MEM_SIZE*NB_SPRITES_TOTAL
 previous_sprite_state_ptr:

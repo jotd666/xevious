@@ -1,7 +1,8 @@
-- optim: don't erase planes where source is null
 
 further optims/fixes:
 
+- optim: don't erase planes where source is null (complex as there is
+  the case of double height/width)
 - highscore yellow highlight shifted for entry 3 (change score and run with 1 life)
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
