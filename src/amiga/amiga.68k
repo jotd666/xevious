@@ -335,7 +335,7 @@ _user:
     cmp.l   #0x05748444c,D0	| WHDL
     bne.b   .standard
     move.l a0,_resload
-    *move.b  d1,_keyexit
+    move.b  d1,_keyexit
 
 	move.l	a0,a2
 	lea	(_tag,pc),a0
@@ -922,13 +922,22 @@ restore_system:
 	rts
 
 quit_to_os:
+	tst.l	_resload
+	bne.b	0f
 	bsr		restore_system
+	* set SR to 0 from here, so we return to OS with SR=0
+	* (else it kills the system pretty quickly)
+	* it works as quit_to_os is called from an interrupt
 	move.w	#0,SR
 	move.l	old_stack(pc),a7
 	bsr		save_highscores
 	moveq	#0,d0
 	rts
-	
+0:
+	pea	  TDREASON_OK
+	move.l	_resload(pc),-(a7)
+	addq.l	#resload_Abort,(a7)
+	rts	
 zero_vbr:
 	movec	vbr,d0
 	move.l	d0,old_vbr
@@ -3137,6 +3146,14 @@ level2_interrupt:
 	illegal
 	.endif
 0:
+	cmp.b	_keyexit,d0	| "ESC" key or whdload quitkey
+	bne.b	2f
+	BSET	#0x06,0x1E01(A5)
+	moveq	#2,d0
+	bsr	beamdelay
+	BCLR	#0x06,0x1E01(A5)	| acknowledge key
+	bra		quit_to_os
+2:
 	BSET	#0x06,0x1E01(A5)
 	moveq	#2,d0
 	bsr	beamdelay
@@ -3670,6 +3687,8 @@ read_args_string:
 	.ascii	"STARTLIVES/K/N,SKILL/K/N,FLAGXTRA/S,NOMUSIC/S,SUPER/S,STARTAREA/K/N,"
 	.ascii	"INVINCIBLE/S,INFLIVES/S,REVSOL/S,REVBFLAG/S"
 	.byte	0
+_keyexit:
+	.byte	0x45	| ESC by default unless whdload overwrites it
 	
 unknown_tile_found:
 	dc.b	0
