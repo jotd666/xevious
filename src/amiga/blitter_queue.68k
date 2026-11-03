@@ -1,0 +1,383 @@
+*============================================================================
+* asynchronous blitter queue (blitter interrupt chaining)
+*
+* - the renderer (osd_update_32_sprite_hw, called from the level 1 job)
+*   doesn't wait for the blitter anymore: it appends fixed-format entries
+*   to a queue and "publishes" them one by one. The blitter starts on the
+*   first entry while the CPU computes the next ones
+* - each entry = routine pointer + data. The level 3 blitter interrupt
+*   runs the next entry. Entries that don't start a blit (modulos, fixed
+*   registers) are chained immediately. bltcon0/1 and modulos are only
+*   written when they change (tracked on the producer side)
+* - very short blits are chained "inline": the handler waits for them
+*   instead of taking another interrupt (*_spin entries)
+* - when the queue is drained and the producer has finished, the frame is
+*   READY: it's shown at the next bottom of frame interrupt, then the back
+*   buffer is FREE again for the next frame
+*
+* frame build (level 1 job, frame_state == FS_FREE):
+*   BLITQ_BEGIN_FRAME / ... emit entries + PUBLISH ... / BLITQ_END_FRAME
+*============================================================================
+
+	.ifeq	OPT_ENABLE_DOUBLE_BUFFERING
+	.error	"blitter queue needs double buffering"
+	.endif
+
+* debug options (0 for release)
+* OPT_BLITQ_DEBUG: counters & state copies in low memory (WinUAE: m 150)
+*  0x150.l level 1 entries        0x154.l blitter interrupts (chain runs)
+*  0x158.l frames built           0x15C.l frames shown (swaps)
+*  0x160.b frame_state .b blit_idle .b producer_done .b vb_semaphore_main
+*  0x164.l blitq_rd     0x168.l blitq_wr    (copied at each level 1 entry)
+*  0x16C.w dmaconr  0x16E.w intreqr  0x170.w intenar  (idem)
+*  0x174.l last queue routine run   0x178.l queue start
+*  0x180.l lost blitter interrupts recovered by the level 1 watchdog
+*  0x184.l drawing started on the displayed buffer (should stay 0)
+*  0x188.l frames ready but not shown because level 1 was late
+*  0x18C.l vposr when the last frame build started
+* OPT_BLITQ_SYNC_TEST: the producer runs the queue itself, polling the
+*  blitter (no blitter interrupt involved): tells whether the problem is
+*  in the entries or in the interrupt chain
+OPT_BLITQ_DEBUG = 0
+OPT_BLITQ_SYNC_TEST = 0
+
+	.macro	BLITQ_DBG_COUNT	address
+	.ifne	OPT_BLITQ_DEBUG
+	addq.l	#1,\address\().W
+	.endif
+	.endm
+
+FS_FREE = 0			| back buffer can be drawn
+FS_BUSY = 1			| blit chain building/running into the back buffer
+FS_READY = 2		| back buffer complete, waiting for the bottom of frame
+
+IRQ_SET = 0x8000
+IRQ_SOFT = 0x0004	| level 1: game job (im1 + frame build)
+IRQ_VERTB = 0x0020	| level 3: joystick, music
+IRQ_BLIT = 0x0040	| level 3: blit chain
+
+* a blit shorter than that (in blitter DMA cycles) is chained inline
+* an interrupt round trip costs roughly 50 DMA cycles on a 14MHz 68020
+* (tunable: 0 disables inline chaining)
+SPIN_DMA_CYCLES = 48
+
+* worst case: 64 erases * 4 planes + 64 sprites * 4 parts * 4 planes
+* (26 bytes each) + fg tiles: < 32000
+BLIT_QUEUE_SIZE = 40000
+* room needed to emit one multi-plane blit (if not there, it's dropped)
+BLITQ_MARGIN = 256
+
+BLTCON_CLEAR = 0x01000000		| D only, D=0
+BLTCON_COOKIE = 0x0FCA0000		| D = AB + /AC
+BLTCON_COOKIE_NOB = 0x0BCA0000	| same, B data = 0 (no B DMA)
+
+* make the entries written up to \reg visible to the blitter interrupt
+* and start the chain if the blitter is idle
+	.macro	PUBLISH	reg
+	move.l	\reg,blitq_wr
+	.ifne	OPT_BLITQ_SYNC_TEST
+	jbsr	blitq_flush_sync
+	.else
+	tst.b	blit_idle
+	jeq		nk\@
+	jbsr	blitq_kick
+nk\@:
+	.endif
+	.endm
+
+* < \reg: queue write pointer. If the queue is full, jump to \label
+* (the blit is dropped, never happens with the default queue size)
+	.macro	BLITQ_CHECK_ROOM	reg,label
+	cmp.l	#blitter_queue_end-BLITQ_MARGIN,\reg
+	jcs		ok\@
+	.ifndef	RELEASE
+	addq.l	#1,blitq_overflows
+	.endif
+	jra		\label
+ok\@:
+	.endm
+
+* start building a frame (level 1, frame_state == FS_FREE)
+* the first entry (not published yet) writes the registers that never
+* change (never trust them)
+	.macro	BLITQ_BEGIN_FRAME
+	BLITQ_DBG_COUNT	0x158
+	.ifne	OPT_BLITQ_DEBUG
+	move.l	_custom+vposr,0x18C.W
+	move.l	fg_drawed_screen_ptr,d0
+	cmp.l	fg_displayed_screen_ptr,d0
+	jne		bd\@
+	addq.l	#1,0x184.W
+bd\@:
+	.endif
+	move.b	#FS_BUSY,frame_state
+	clr.b	producer_done
+	st.b	blit_idle
+	move.l	#blitter_queue,blitq_rd
+	move.l	#r_fixed,blitter_queue
+	move.l	#blitter_queue+4,blitq_wr
+	move.w	#0x7FFF,blitq_mod		| unknown modulo
+	move.l	#-1,blitq_con			| unknown bltcon0/1
+	.endm
+
+* end of frame building: if the chain has already drained (or was empty)
+* we have to declare completion ourselves
+	.macro	BLITQ_END_FRAME
+	move.w	sr,-(a7)
+	or.w	#0x0700,sr
+	st.b	producer_done
+	tst.b	blit_idle
+	jeq		nr\@
+	movem.l	d0/a0-a1/a5,-(a7)
+	lea		_custom,a5
+	clr.b	blit_idle
+	jbsr	blitq_run				| runs what's left, declares the frame ready
+	movem.l	(a7)+,d0/a0-a1/a5
+nr\@:
+	move.w	(a7)+,sr
+	.endm
+
+* level 3 interrupt, blitter part
+* < A5: custom, D0/A0/A1 free
+	.macro	BLITQ_INTERRUPT
+	move.w	#IRQ_BLIT,(intreq,a5)
+	move.w	#IRQ_BLIT,(intreq,a5)	| twice (040/060/pistorm)
+	tst.b	blit_idle
+	jne		bi\@					| no chain running: ignore
+	* the interrupt can be raised before BBUSY clears (final D write):
+	* a fast CPU sees the blitter still busy for a few cycles. Wait for it
+	* (ignoring the interrupt there stalls the chain for good)
+	tst.b	(dmaconr,a5)			| dummy read (early Agnus BBUSY quirk)
+bw\@:
+	btst	#6,(dmaconr,a5)
+	jne		bw\@
+	BLITQ_DBG_COUNT	0x154
+	jbsr	blitq_run
+bi\@:
+	.endm
+
+*----------------------------------------------------------------------------
+* consumer: called from the blitter interrupt, or by the producer with
+* interrupts masked when the blitter is idle
+* < A5: custom
+* trashes D0,A0,A1
+*----------------------------------------------------------------------------
+
+blitq_run:
+	move.l	blitq_rd,a0
+blitq_next:
+	cmp.l	blitq_wr,a0
+	jeq		blitq_empty
+	move.l	(a0)+,a1
+	.ifne	OPT_BLITQ_DEBUG
+	move.l	a1,0x174.W
+	.endif
+	jmp		(a1)
+blitq_empty:
+	move.l	a0,blitq_rd
+	st.b	blit_idle
+	tst.b	producer_done
+	jeq		0f						| producer will restart us
+	move.b	#FS_READY,frame_state	| back buffer complete
+0:
+	rts
+
+* no data: masks & A/B modulos (sources are compact, with shift padding)
+r_fixed:
+	move.l	#-1,(bltafwm,a5)
+	clr.l	(bltbmod,a5)			| B & A modulos
+	jra		blitq_next
+
+* .w C & D modulo
+r_mod:
+	move.w	(a0),(bltcmod,a5)
+	move.w	(a0)+,(bltdmod,a5)
+	jra		blitq_next
+
+* clear: .l D .w bltsize
+r_clear_con:
+	move.l	#BLTCON_CLEAR,(bltcon0,a5)
+r_clear:
+	move.l	(a0)+,(bltdpt,a5)
+	move.w	(a0)+,(bltsize,a5)
+	move.l	a0,blitq_rd
+	rts
+
+* cookie cut: [.l bltcon0/1] .l C=D .l B .l A .w bltsize
+r_cookie_con:
+	move.l	(a0)+,(bltcon0,a5)
+r_cookie:
+	move.l	(a0)+,d0
+	move.l	d0,(bltcpt,a5)
+	move.l	(a0)+,(bltbpt,a5)
+	move.l	(a0)+,(bltapt,a5)
+	move.l	d0,(bltdpt,a5)
+	move.w	(a0)+,(bltsize,a5)
+	move.l	a0,blitq_rd
+	rts
+
+* cookie cut, B data = 0: [.l bltcon0/1] .l A .l C=D .w bltsize
+* (B DMA blits overwrite bltbdat, and they always use another bltcon0:
+* clearing it when bltcon0 changes is enough)
+r_nob_con:
+	move.l	(a0)+,(bltcon0,a5)
+	clr.w	(bltbdat,a5)
+r_nob:
+	move.l	(a0)+,(bltapt,a5)
+	move.l	(a0),(bltcpt,a5)
+	move.l	(a0)+,(bltdpt,a5)
+	move.w	(a0)+,(bltsize,a5)
+	move.l	a0,blitq_rd
+	rts
+
+* same entries, short blits: wait for the blit and go on
+r_clear_con_spin:
+	move.l	#BLTCON_CLEAR,(bltcon0,a5)
+r_clear_spin:
+	move.l	(a0)+,(bltdpt,a5)
+	move.w	#IRQ_BLIT,(intreq,a5)	| clear "done" flag, we'll poll it
+	move.w	(a0)+,(bltsize,a5)
+	jra		blitq_spin
+
+r_cookie_con_spin:
+	move.l	(a0)+,(bltcon0,a5)
+r_cookie_spin:
+	move.l	(a0)+,d0
+	move.l	d0,(bltcpt,a5)
+	move.l	(a0)+,(bltbpt,a5)
+	move.l	(a0)+,(bltapt,a5)
+	move.l	d0,(bltdpt,a5)
+	move.w	#IRQ_BLIT,(intreq,a5)
+	move.w	(a0)+,(bltsize,a5)
+	jra		blitq_spin
+
+r_nob_con_spin:
+	move.l	(a0)+,(bltcon0,a5)
+	clr.w	(bltbdat,a5)
+r_nob_spin:
+	move.l	(a0)+,(bltapt,a5)
+	move.l	(a0),(bltcpt,a5)
+	move.l	(a0)+,(bltdpt,a5)
+	move.w	#IRQ_BLIT,(intreq,a5)
+	move.w	(a0)+,(bltsize,a5)
+* we poll the BLIT interrupt request rather than BBUSY (BBUSY can read 0
+* a few cycles after the bltsize write)
+blitq_spin:
+	btst	#6,(intreqr+1,a5)
+	jeq		blitq_spin
+	move.w	#IRQ_BLIT,(intreq,a5)	| this one is handled
+	* the request can come before BBUSY clears (final D write): don't
+	* program the next blit over the end of this one
+	tst.b	(dmaconr,a5)
+0:
+	btst	#6,(dmaconr,a5)
+	jne		0b
+	jra		blitq_next
+
+* routine tables for the cookie cut emitter (see blit_planes_any_internal_cookie_cut)
+cookie_routines_irq:
+	.long	r_cookie_con,r_cookie,r_nob_con,r_nob
+cookie_routines_spin:
+	.long	r_cookie_con_spin,r_cookie_spin,r_nob_con_spin,r_nob_spin
+
+*----------------------------------------------------------------------------
+* producer side (level 1 job, supervisor mode)
+*----------------------------------------------------------------------------
+
+* start the chain if the blitter is idle
+blitq_kick:
+	move.w	sr,-(a7)
+	or.w	#0x0700,sr
+	tst.b	blit_idle
+	jeq		0f
+	movem.l	d0/a0-a1/a5,-(a7)
+	lea		_custom,a5
+	clr.b	blit_idle
+	jbsr	blitq_run
+	movem.l	(a7)+,d0/a0-a1/a5
+0:
+	move.w	(a7)+,sr
+	rts
+
+	.ifne	OPT_BLITQ_SYNC_TEST
+* test: run the published entries now, polling the blitter
+* (blit_idle stays set: blitter interrupts are ignored)
+blitq_flush_sync:
+	movem.l	d0/a0-a1/a5,-(a7)
+	lea		_custom,a5
+	move.w	sr,-(a7)
+	or.w	#0x0700,sr
+0:
+	move.l	blitq_rd,a0
+	cmp.l	blitq_wr,a0
+	jeq		1f
+	* never trust BBUSY right after a start (it reads 0 until the blitter
+	* actually starts): wait for the "done" request of each blit instead
+	move.w	#IRQ_BLIT,(intreq,a5)
+	clr.b	blit_idle
+	jbsr	blitq_run
+	tst.b	blit_idle
+	jne		1f					| drained, no blit pending
+2:
+	btst	#6,(intreqr+1,a5)
+	jeq		2b
+	move.w	#IRQ_BLIT,(intreq,a5)
+	tst.b	(dmaconr,a5)
+3:
+	btst	#6,(dmaconr,a5)
+	jne		3b
+	jra		0b
+1:
+	st.b	blit_idle			| blitter interrupts ignored
+	move.w	(a7)+,sr
+	movem.l	(a7)+,d0/a0-a1/a5
+	rts
+	.endif
+
+* emit a modulo entry if the C/D modulo changes
+* (written in the queue, published with the next blit)
+* < D0.W: C & D modulo
+* < A2: queue write pointer (updated)
+blitq_set_mod:
+	cmp.w	blitq_mod,d0
+	jeq		0f
+	move.w	d0,blitq_mod
+	move.l	#r_mod,(a2)+
+	move.w	d0,(a2)+
+0:
+	rts
+
+	.ifndef	RELEASE
+* number of blits dropped because the queue was full (should stay 0)
+blitq_overflows:
+	.long	0
+	.endif
+
+	.align	2
+blitq_rd:
+	.long	0
+blitq_wr:
+	.long	0
+blitq_con:
+	.long	-1			| bltcon0/1 as the queue will have set it
+blitq_mod:
+	.word	0x7FFF		| C/D modulo as the queue will have set it
+blit_idle:
+	.byte	-1			| no blit chain running
+producer_done:
+	.byte	0
+frame_state:
+	.byte	FS_FREE
+render_this_frame:
+	.byte	0			| current im1 call draws the back buffer
+	.align	2
+back_scroll_offset:
+	.word	0			| scroll value matching the back buffer
+
+	.bss
+	.align	4
+blitter_queue:
+	ds.b	BLIT_QUEUE_SIZE
+blitter_queue_end:
+	ds.l	1
+	.text
