@@ -438,7 +438,7 @@ def write_tiles(t,matrix,f,is_sprite):
                         # so the picture (including mask) is a list of pointers on planes
                         # plane data (32 bytes) are only listed once, and used a lot of times
 
-                        plane_size = 4*item_data["height"]   # 64 max
+                        plane_size = 2*item_data["height"]   # 32 max
 
                         for p in range(BG_NB_PLANES+1):  # +1: mask
                             block = tuple(item[p*plane_size:p*plane_size+plane_size])
@@ -626,7 +626,7 @@ def generate_tile(pic,img_name,tile_index,side,current_palette,current_original_
                 palette=global_palette,
                 forced_nb_planes=nb_planes,
                 generate_mask=is_sprite,
-                blit_pad=is_sprite,
+                blit_pad=False,
                 mask_color=transparent_color)
                 rval.append(raw)
             sprite_dict.update({"standard":rval[0],"mirror":rval[1]})

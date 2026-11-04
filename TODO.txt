@@ -1,16 +1,17 @@
+- remove BLIT PAD
+- convert_graphics.py should use interleave format
+- a lot of blank sprites should just be NOT drawn (ex: clut 0)
+- highscore yellow highlight shifted for entry 3 (add ESC or F8 and use score increaser)
 
 further optims/fixes:
 
-- optim: don't erase planes where source is null (complex as there is
-  the case of double height/width)
-- highscore yellow highlight shifted for entry 3 (change score and run with 1 life)
 - if no tile can be double width / double height AND simple at the same time
   generate 16x32,32x16,32x32 bob data directly for a fewer number of blits
+  not very interesting as the performance issue occurs already with 16x16
 - 1 color lost because of fg tiles: not useable color is color 17: it is the color of the FG tiles
   we _could_ use it with a hack in the FG row copperlist (no color change) when nothing is displayed...
-- a lot of blank sprites should just be NOT drawn (ex: clut 0)
 - don't generate mirror X-sprites like ... at all? do the game use those?
-  (saves 130kb, not worth it)
+  (saves 130kb, not worth it, or is it???)
   
   
 Super Xevious additions (taken from http://retroports.blogspot.com/)
